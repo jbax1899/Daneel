@@ -1,0 +1,16 @@
+{
+    "name": "ai-assistant",
+    "private": true,
+    "workspaces": [
+        "packages/*"
+    ],
+    "scripts": {
+        "start:dev": "concurrently \"yarn workspace @ai-assistant/backend dev\" \"yarn workspace @ai-assistant/frontend dev\"",
+        "build": "yarn workspaces run build"
+    },
+    "devDependencies": {
+        "@types/node": "^24.2.0",
+        "concurrently": "^8.0.1",
+        "typescript": "^5.0.0"
+    }
+}

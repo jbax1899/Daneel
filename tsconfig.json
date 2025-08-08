@@ -1,0 +1,30 @@
+{
+  // Visit https://aka.ms/tsconfig to read more about this file
+  "compilerOptions": {
+    // Base compiler options for all packages
+    "target": "esnext",
+    "module": "esnext",
+    "moduleResolution": "node",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "noEmit": true,
+    
+    // Path aliases
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./packages/*/src"],
+      "@shared/*": ["./packages/shared/src/*"]
+    }
+  },
+  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "exclude": ["node_modules", "**/node_modules/*", "**/dist/*"]
+}
