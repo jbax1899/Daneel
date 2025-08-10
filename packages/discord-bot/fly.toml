@@ -1,0 +1,19 @@
+app = "daneel"
+primary_region = "ord"
+
+[build]
+  args = { 
+    BUILDKIT_CONTEXT_KEEP_GIT_DIR = "1",
+    BUILDKIT_CONTEXT = "packages/discord-bot"
+  }
+
+[deploy]
+  release_command = "cd packages/discord-bot && npm run build"
+
+[processes]
+  app = "cd packages/discord-bot && npm start"
+
+[[vm]]
+  memory = "256mb"
+  cpu_kind = "shared"
+  cpus = 1
