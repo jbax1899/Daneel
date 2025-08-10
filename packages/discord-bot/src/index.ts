@@ -133,7 +133,7 @@ client.on(Events.MessageCreate, async (message: Message) => {
       });
 
     // Call OpenAI API
-    const model = 'gpt-5'; //'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
+    const model = 'gpt-4.1-mini' //'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
     const completion = await openai.chat.completions.create({
       model,
       messages: [
