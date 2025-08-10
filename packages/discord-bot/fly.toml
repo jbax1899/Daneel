@@ -1,9 +1,6 @@
 app = "daneel"
 primary_region = "ord"
 
-[build]
-  dockerfile = "Dockerfile"
-
 [processes]
   app = "npm start"
 
