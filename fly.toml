@@ -10,13 +10,12 @@ primary_region = 'ord'
 # Process configuration
 [processes]
   app = "/app/start.sh"
-  web = "/app/start.sh"
 
 # HTTP service configuration
 [[services]]
   http_checks = []
   internal_port = 8080
-  processes = ["web"]
+  processes = ["app"]
   protocol = "tcp"
   script_checks = []
   auto_stop_machines = 'stop'
