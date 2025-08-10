@@ -5,7 +5,7 @@ const openaiClient = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 export const maxDuration = 30;
 
 interface ToolParameter {
@@ -39,16 +39,16 @@ export async function POST(req: Request) {
     const response = await openaiClient.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages.map(m => {
-        // For function messages
+        // Handle function messages
         if (m.role === 'function' && m.name) {
           return {
             role: 'function' as const,
             name: m.name,
             content: m.content,
-          } as const;
+          };
         }
 
-        // For assistant messages
+        // Handle assistant messages
         if (m.role === 'assistant') {
           return m.name ? {
             role: 'assistant' as const,
@@ -60,7 +60,7 @@ export async function POST(req: Request) {
           };
         }
 
-        // For user messages
+        // Handle user messages
         if (m.role === 'user') {
           return m.name ? {
             role: 'user' as const,
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
           };
         }
 
-        // For system messages (no name allowed)
+        // Handle system messages (no name allowed)
         if (m.role === 'system') {
           return {
             role: 'system' as const,
@@ -80,14 +80,14 @@ export async function POST(req: Request) {
           };
         }
 
-        // Fallback (shouldn't happen with proper typing)
+        // Fallback for any other role
         return {
           role: m.role as 'user' | 'assistant' | 'system' | 'function',
           content: m.content,
         };
       }) as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       ...(system && { system }),
-      ...(tools && Object.keys(tools).length > 0 && { 
+      ...(Object.keys(tools).length > 0 && { 
         tools: Object.entries(tools).map(([name, tool]) => ({
           type: 'function' as const,
           function: {
@@ -95,20 +95,18 @@ export async function POST(req: Request) {
             description: tool.description,
             parameters: tool.parameters as unknown as Record<string, unknown>,
           },
-        })) as OpenAI.Chat.Completions.ChatCompletionTool[],
+        })),
       }),
-      stream: true as const,
+      stream: true,
     });
 
-    // Create a new ReadableStream
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
         try {
-          const stream = response as unknown as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>;
-          
-          for await (const chunk of stream) {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+          for await (const chunk of response as any) {
+            const data = `data: ${JSON.stringify(chunk)}\n\n`;
+            controller.enqueue(encoder.encode(data));
           }
         } catch (error) {
           console.error('Error streaming response:', error);
