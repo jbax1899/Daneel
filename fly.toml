@@ -30,7 +30,6 @@ primary_region = 'ord'
   [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
-    force_https = true
 
   [services.concurrency]
     hard_limit = 25
