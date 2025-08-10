@@ -6,8 +6,8 @@ node_modules/
 .env.*
 !.env.example
 
-# Reference code
-reference
-
 # Discord bot logs
 packages/discord-bot/logs/
+
+# Reference code
+reference
