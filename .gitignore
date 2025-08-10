@@ -8,3 +8,6 @@ node_modules/
 
 # Reference code
 reference
+
+# Discord bot logs
+packages/discord-bot/logs
