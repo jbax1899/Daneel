@@ -20,11 +20,13 @@ export class CommandHandler {
   async loadCommands() {
     try {
       const commandFiles = (await readdir(commandsPath))
-        .filter(file => 
-          (file.endsWith('.js') || file.endsWith('.ts')) && 
-          !file.endsWith('BaseCommand.js') && 
-          !file.endsWith('BaseCommand.ts')
-        );
+        .filter(file => {
+          // Only include .js files (compiled output) and exclude .d.ts and BaseCommand files
+          const isJsFile = file.endsWith('.js');
+          const isNotDeclaration = !file.endsWith('.d.ts');
+          const isNotBaseCommand = !file.includes('BaseCommand');
+          return isJsFile && isNotDeclaration && isNotBaseCommand;
+        });
 
       for (const file of commandFiles) {
         try {

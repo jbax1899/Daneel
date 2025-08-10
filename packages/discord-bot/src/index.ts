@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, ActivityType, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -27,11 +27,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
   ],
   presence: {
-    status: 'online',
-    activities: [{
-      name: 'with Slash Commands',
-      type: ActivityType.Playing
-    }]
+    status: 'online'
   }
 });
 
