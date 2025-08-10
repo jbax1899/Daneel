@@ -1,10 +1,10 @@
-import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Message, Collection } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
 import { logger } from './utils/logger.js';
-import { Collection } from '@discordjs/collection';
+import OpenAI from 'openai';
 
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -14,7 +14,7 @@ const __dirname = path.dirname(__filename);
 dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
 
 // Ensure required environment variables are loaded
-const requiredVars = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID'];
+const requiredVars = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPENAI_API_KEY'];
 for (const varName of requiredVars) {
   if (!process.env[varName]) {
     throw new Error(`${varName} is not defined in the environment variables`);
@@ -32,13 +32,19 @@ const client = new Client({
   }
 });
 
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
+
 // Initialize commands collection on the client
 client.commands = new Collection();
 
 const commandHandler = new CommandHandler();
+const log = logger;
 
 client.once(Events.ClientReady, async () => {
-  logger.info(`Logged in as ${client.user?.tag}!`);
+  log.info(`Logged in as ${client.user?.tag}!`);
   
   try {
     // Load commands first
@@ -49,7 +55,7 @@ client.once(Events.ClientReady, async () => {
       client.commands?.set(name, cmd);
     });
     
-    logger.info(`Registered ${commands.size} commands in client`);
+    log.info(`Registered ${commands.size} commands in client`);
     
     // Then deploy them
     await commandHandler.deployCommands(
@@ -58,7 +64,7 @@ client.once(Events.ClientReady, async () => {
       process.env.GUILD_ID!
     );
   } catch (error) {
-    logger.error('Error during startup:', error);
+    log.error('Error during startup:', error);
     process.exit(1);
   }
 });
@@ -70,17 +76,17 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = (interaction.client as any).commands?.get(interaction.commandName);
 
     if (!command) {
-      logger.warn(`No command matching ${interaction.commandName} was found.`);
+      log.warn(`No command matching ${interaction.commandName} was found.`);
       return interaction.reply({
         content: 'This command is not available.',
         flags: 'Ephemeral'
       });
     }
 
-    logger.info(`Executing command: ${interaction.commandName}`);
+    log.info(`Executing command: ${interaction.commandName}`);
     return command.execute(interaction);
   } catch (error) {
-    logger.error(`Error executing ${interaction.commandName}`, error);
+    log.error(`Error executing ${interaction.commandName}`, error);
     
     const reply = { 
       content: 'There was an error while executing this command!', 
@@ -95,14 +101,81 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
+// Message listener for mentions and replies
+client.on(Events.MessageCreate, async (message: Message) => {
+  // Ignore messages from bots
+  if (message.author.bot) return;
+
+  // Check if the bot is mentioned or the message is a reply to the bot
+  const isMentioned = message.mentions.users.has(client.user!.id);
+  const isReplyToBot = message.reference?.messageId && message.reference.guildId === message.guildId;
+
+  // If neither mentioned nor a reply to the bot, ignore the message
+  if (!isMentioned && !isReplyToBot) return;
+
+  try {
+    // Send typing indicator
+    if (message.channel.isTextBased() && !message.channel.isDMBased() && !message.channel.isThread()) {
+      await message.channel.sendTyping();
+    }
+
+    // Get conversation history (last 10 messages for context)
+    const messages = await message.channel.messages.fetch({ limit: 10 });
+    const conversation = Array.from(messages.values())
+      .reverse()
+      .filter(msg => msg.content.trim().length > 0)
+      .map(msg => {
+        const role = msg.author.id === client.user!.id ? 'assistant' as const : 'user' as const;
+        return {
+          role,
+          content: msg.content.replace(`<@${client.user!.id}>`, '').trim()
+        };
+      });
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: 'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
+      messages: [
+        {
+          role: 'system',
+          content: `Your name is Daneel (or Danny) and you are a helpful assistant in a Discord server.`
+        },
+        ...conversation
+      ],
+      max_tokens: 500,
+    });
+
+    const response = completion.choices[0]?.message?.content;
+    
+    if (response) {
+      // Split response if it's too long for Discord's 2000 character limit
+      if (response.length > 2000) {
+        const chunks = response.match(/[\s\S]{1,2000}/g) || [];
+        for (const chunk of chunks) {
+          await message.reply(chunk);
+        }
+      } else {
+        await message.reply(response);
+      }
+    }
+  } catch (error) {
+    log.error('Error in message handler:', error);
+    try {
+      await message.reply('Sorry, I encountered an error while processing your message.');
+    } catch (e) {
+      log.error('Failed to send error message:', e);
+    }
+  }
+});
+
 client.login(process.env.DISCORD_TOKEN);
 
 // Handle uncaught exceptions
 process.on('unhandledRejection', error => {
-  logger.error('Unhandled promise rejection:', error);
+  log.error('Unhandled promise rejection:', error);
 });
 
 process.on('uncaughtException', error => {
-  logger.error('Uncaught exception:', error);
+  log.error('Uncaught exception:', error);
   process.exit(1);
 });
