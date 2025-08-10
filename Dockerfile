@@ -12,7 +12,6 @@ WORKDIR /app
 # Set production environment
 ENV NODE_ENV=production
 
-
 # Throw-away build stage to reduce size of final image
 FROM base as build
 
@@ -20,25 +19,30 @@ FROM base as build
 RUN apt-get update -qq && \
     apt-get install -y python-is-python3 pkg-config build-essential 
 
-# Install node modules
+# Copy package files
 COPY --link package.json package-lock.json ./
-RUN npm install --production=false
+COPY --link packages/discord-bot/package.json packages/discord-bot/package.json
+
+# Install all dependencies (including devDependencies)
+RUN npm install --include=dev
+
+# Copy TypeScript config
+COPY --link tsconfig.json ./
+COPY --link packages/discord-bot/tsconfig.json packages/discord-bot/
 
 # Copy application code
 COPY --link . .
 
 # Build application
-RUN npm run build
+RUN npm run build --workspace=@ai-assistant/discord-bot
 
-# Remove development dependencies
-RUN npm prune --production
-
-
-# Final stage for app image
+# Production stage
 FROM base
 
-# Copy built application
-COPY --from=build /app /app
+# Copy built application and production dependencies
+COPY --from=build /app/packages/discord-bot /app
+COPY --from=build /app/node_modules /app/node_modules
 
 # Start the server by default, this can be overwritten at runtime
-CMD [ "npm", "run", "start" ]
+WORKDIR /app
+CMD [ "node", "dist/index.js" ]
