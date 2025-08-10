@@ -104,7 +104,7 @@ client.on(Events.InteractionCreate, async interaction => {
 // Message listener for mentions and replies
 client.on(Events.MessageCreate, async (message: Message) => {
   // Ignore messages from bots
-  if (message.author.bot) return;
+  //if (message.author.bot) return;
 
   // Check if the bot is mentioned or the message is a reply to the bot
   const isMentioned = message.mentions.users.has(client.user!.id);
