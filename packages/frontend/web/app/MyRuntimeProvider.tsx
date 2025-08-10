@@ -7,6 +7,17 @@ import {
   type ChatModelAdapter,
 } from "@assistant-ui/react";
 
+interface ToolCallFunction {
+  name: string;
+  arguments: string;
+}
+
+interface ToolCall {
+  id: string;
+  type: 'function';
+  function: ToolCallFunction;
+}
+
 const MyModelAdapter: ChatModelAdapter = {
   async *run({ messages, abortSignal, context }) {
     const result = await fetch("/api/chat", {
@@ -40,7 +51,7 @@ const MyModelAdapter: ChatModelAdapter = {
     const decoder = new TextDecoder();
     let buffer = '';
     let content = '';
-    const toolCalls: any[] = [];
+    const toolCalls: ToolCall[] = [];
 
     while (true) {
       const { done, value } = await reader.read();
