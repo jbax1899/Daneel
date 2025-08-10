@@ -1,3 +1,4 @@
+import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
 const openaiClient = new OpenAI({
@@ -29,7 +30,7 @@ export async function POST(req: Request) {
     };
 
     if (!Array.isArray(messages) || messages.length === 0) {
-      return new Response(
+      return new NextResponse(
         JSON.stringify({ error: 'Messages array is required and cannot be empty' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
@@ -126,7 +127,7 @@ export async function POST(req: Request) {
     });
   } catch (error) {
     console.error('Error in chat API route:', error);
-    return new Response(
+    return new NextResponse(
       JSON.stringify({ 
         error: 'Internal server error',
         details: error instanceof Error ? error.message : 'Unknown error'
