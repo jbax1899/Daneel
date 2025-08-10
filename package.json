@@ -5,8 +5,8 @@
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "concurrently \"yarn workspace @ai-assistant/backend dev\" \"yarn workspace @ai-assistant/frontend dev\"",
-        "build": "yarn workspaces run build"
+        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/frontend",
+        "build": "npm run build --workspaces"
     },
     "devDependencies": {
         "@types/node": "^24.2.0",
