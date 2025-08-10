@@ -10,4 +10,4 @@ node_modules/
 reference
 
 # Discord bot logs
-packages/discord-bot/logs
+packages/discord-bot/logs/

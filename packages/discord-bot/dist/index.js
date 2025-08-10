@@ -70,10 +70,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
             ephemeral: true
         };
         if (interaction.replied || interaction.deferred) {
-            await interaction.followUp(reply);
+            return interaction.followUp(reply);
         }
         else {
-            await interaction.reply(reply);
+            return interaction.reply(reply);
         }
     }
 });

@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events, MessageFlags } from 'discord.js';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -78,7 +78,7 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     logger.info(`Executing command: ${interaction.commandName}`);
-    await command.execute(interaction);
+    return command.execute(interaction);
   } catch (error) {
     logger.error(`Error executing ${interaction.commandName}`, error);
     
@@ -88,9 +88,9 @@ client.on(Events.InteractionCreate, async interaction => {
     };
 
     if (interaction.replied || interaction.deferred) {
-      await interaction.followUp(reply);
+      return interaction.followUp(reply);
     } else {
-      await interaction.reply(reply);
+      return interaction.reply(reply);
     }
   }
 });
