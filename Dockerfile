@@ -1,41 +1,61 @@
 # syntax = docker/dockerfile:1
 
-# Adjust NODE_VERSION as desired
-ARG NODE_VERSION=22.14.0
-FROM node:${NODE_VERSION}-slim as base
-
-LABEL fly_launch_runtime="NodeJS"
-
-# NodeJS app lives here
+# Stage 1: Build the frontend
+FROM node:22.14.0-slim as frontend-builder
 WORKDIR /app
 
-# Set production environment
-ENV NODE_ENV=production
+# Create directory structure and copy package.json
+RUN mkdir -p packages/frontend
+COPY packages/frontend/package*.json packages/frontend/
 
-# Install packages needed to build node modules
-RUN apt-get update -qq && \
-    apt-get install -y python3 pkg-config build-essential 
+# Install dependencies
+RUN cd packages/frontend && npm install
+
+# Copy frontend source
+COPY packages/frontend/src packages/frontend/src/
+
+# Build frontend
+RUN cd packages/frontend && npm run build
+
+# Stage 2: Build the bot
+FROM node:22.14.0-slim as bot-builder
+WORKDIR /app
 
 # Copy package files
-COPY --link package.json package-lock.json ./
-COPY --link packages/discord-bot/package.json ./packages/discord-bot/
+COPY package*.json ./
+COPY packages/discord-bot/package*.json packages/discord-bot/
 
-# Install root dependencies including TypeScript
+# Install root dependencies
 RUN npm install --include=dev
 
-# Install discord-bot specific dependencies
-RUN cd packages/discord-bot && \
-    npm install --include=dev
-
 # Copy application code
-COPY --link . .
+COPY . .
 
-# Build the application using root's TypeScript
+# Build TypeScript
 RUN npx tsc -p packages/discord-bot/tsconfig.json
 
-# Remove development dependencies
-RUN npm prune --production
+# Install production dependencies
+RUN cd packages/discord-bot && npm install --production
 
-# Start the server by default, this can be overwritten at runtime
-WORKDIR /app/packages/discord-bot
-CMD [ "node", "dist/index.js" ]
+# Final stage
+FROM node:22.14.0-slim
+WORKDIR /app
+
+# Install serve for the frontend
+RUN npm install -g serve
+
+# Copy built frontend
+COPY --from=frontend-builder /app/packages/frontend/build ./frontend
+
+# Copy built bot and its production node_modules
+COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
+COPY --from=bot-builder /app/packages/discord-bot/node_modules ./packages/discord-bot/node_modules
+
+# Create a simple start script
+RUN echo '#!/bin/sh\n\
+    (cd /app/packages/discord-bot && node dist/index.js) & \n\
+    cd /app/frontend && npx serve -s . -l 8080\n\
+    wait' > /app/start.sh && \
+    chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

@@ -9,7 +9,28 @@ primary_region = 'ord'
 
 # Process configuration
 [processes]
-  app = "sh -c 'cd /app/packages/discord-bot && node dist/index.js'"
+  app = "/app/start.sh"
+  web = "/app/start.sh"
+
+# HTTP service configuration
+[[services]]
+  http_checks = []
+  internal_port = 8080
+  processes = ["web"]
+  protocol = "tcp"
+  script_checks = []
+  auto_stop_machines = 'stop'
+  auto_start_machines = true
+  min_machines_running = 0
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+    force_https = true
+
+  [[services.ports]]
+    port = 443
+    handlers = ["tls", "http"]
 
 # VM configuration
 [[vm]]
