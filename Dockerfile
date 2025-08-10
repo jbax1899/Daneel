@@ -14,7 +14,7 @@ COPY packages/frontend/web/ ./
 # Build the frontend
 RUN npm run build
 
-# Stage 2: Build the bot (keep your existing bot build stage)
+# Stage 2: Build the bot
 FROM node:22.14.0-slim as bot-builder
 WORKDIR /app
 
@@ -38,10 +38,12 @@ RUN cd packages/discord-bot && npm install --production
 FROM node:22.14.0-slim
 WORKDIR /app
 
+# Create necessary directories
+RUN mkdir -p ./.next/static
+
 # Copy built frontend
 COPY --from=frontend-builder /app/.next/standalone ./
 COPY --from=frontend-builder /app/.next/static ./.next/static
-COPY --from=frontend-builder /app/public ./public
 
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
