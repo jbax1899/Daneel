@@ -1,9 +1,19 @@
 import { NextResponse } from 'next/server';
 import OpenAI from 'openai';
 
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+// Initialize the OpenAI client lazily
+let openaiClient: OpenAI | null = null;
+
+function getOpenAIClient() {
+  if (!openaiClient) {
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set');
+    }
+    openaiClient = new OpenAI({ apiKey });
+  }
+  return openaiClient;
+}
 
 export const runtime = "nodejs";
 export const maxDuration = 30;
@@ -36,7 +46,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const response = await openaiClient.chat.completions.create({
+    const openai = getOpenAIClient();
+    const response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
       messages: messages.map(m => {
         // Handle function messages
