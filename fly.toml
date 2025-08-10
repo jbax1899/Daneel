@@ -1,4 +1,4 @@
-app = 'daneel-discord-bot'
+app = 'daneel'
 primary_region = 'ord'
 
 [build]
