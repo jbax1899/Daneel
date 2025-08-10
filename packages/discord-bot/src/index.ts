@@ -108,7 +108,10 @@ client.on(Events.MessageCreate, async (message: Message) => {
 
   // Check if the bot is mentioned or the message is a reply to the bot
   const isMentioned = message.mentions.users.has(client.user!.id);
-  const isReplyToBot = message.reference?.messageId && message.reference.guildId === message.guildId;
+  const isReplyToBot = message.reference?.messageId && 
+                     message.reference.guildId === message.guildId &&
+                     message.reference.channelId === message.channelId &&
+                     message.mentions.repliedUser?.id === client.user!.id;
 
   // If neither mentioned nor a reply to the bot, ignore the message
   if (!isMentioned && !isReplyToBot) return;
