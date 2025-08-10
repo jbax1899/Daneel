@@ -1,0 +1,20 @@
+app = 'daneel-discord-bot'
+primary_region = 'ord'
+
+# Build configuration
+[build]
+  args = { NODE_ENV = "production" }
+
+# Environment variables
+[env]
+  NODE_ENV = "production"
+
+# Process configuration
+[processes]
+  app = "cd packages/discord-bot && npm start"
+
+# VM configuration
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1
