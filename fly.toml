@@ -38,3 +38,8 @@ primary_region = 'ord'
 
 [deploy]
   strategy = "immediate"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "512mb"
