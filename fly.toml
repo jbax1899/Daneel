@@ -1,17 +1,15 @@
 app = 'daneel-discord-bot'
 primary_region = 'ord'
 
-# Build configuration
 [build]
   args = { NODE_ENV = "production" }
 
-# Environment variables
 [env]
   NODE_ENV = "production"
 
 # Process configuration
 [processes]
-  app = "cd packages/discord-bot && npm start"
+  app = "sh -c 'cd /app/packages/discord-bot && node dist/index.js'"
 
 # VM configuration
 [[vm]]
