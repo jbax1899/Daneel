@@ -200,13 +200,44 @@ const ComposerAction: FC = () => {
   return (
     // aui-composer-action-wrapper
     <div className="bg-muted border-border dark:border-muted-foreground/15 relative flex items-center justify-between rounded-b-2xl border-x border-b p-2">
+      <input
+        type="file"
+        id="file-upload"
+        className="hidden"
+        accept="image/*,application/pdf"
+        onChange={async (e) => {
+          const file = e.target.files?.[0];
+          if (!file) return;
+          
+          try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const response = await fetch('/api/upload', {
+              method: 'POST',
+              body: formData,
+            });
+            
+            if (!response.ok) {
+              const error = await response.json();
+              throw new Error(error.error || 'Failed to upload file');
+            }
+            
+            const attachment = await response.json();
+            // TODO: Add the attachment to the message
+            console.log('File uploaded successfully:', attachment);
+          } catch (error) {
+            console.error('Error uploading file:', error);
+            // TODO: Show error to user
+          }
+        }}
+      />
       <TooltipIconButton
         tooltip="Attach file"
         variant="ghost"
         // aui-composer-attachment-button
         className="hover:bg-foreground/15 dark:hover:bg-background/50 scale-115 p-3.5"
         onClick={() => {
-          console.log("Attachment clicked - not implemented");
+          document.getElementById('file-upload')?.click();
         }}
       >
         <PlusIcon />

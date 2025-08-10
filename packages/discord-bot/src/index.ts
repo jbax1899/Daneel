@@ -1,9 +1,10 @@
-import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events, MessageFlags } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
 import { logger } from './utils/logger.js';
+import { Collection } from '@discordjs/collection';
 
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -31,12 +32,26 @@ const client = new Client({
   }
 });
 
+// Initialize commands collection on the client
+client.commands = new Collection();
+
 const commandHandler = new CommandHandler();
 
 client.once(Events.ClientReady, async () => {
   logger.info(`Logged in as ${client.user?.tag}!`);
   
   try {
+    // Load commands first
+    const commands = await commandHandler.loadCommands();
+    
+    // Store commands in the client for access in commands
+    commands.forEach((cmd, name) => {
+      client.commands?.set(name, cmd);
+    });
+    
+    logger.info(`Registered ${commands.size} commands in client`);
+    
+    // Then deploy them
     await commandHandler.deployCommands(
       process.env.DISCORD_TOKEN!,
       process.env.CLIENT_ID!,
@@ -51,21 +66,25 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  const command = commandHandler.getCommand(interaction.commandName);
-
-  if (!command) {
-    logger.warn(`No command matching ${interaction.commandName} was found.`);
-    return;
-  }
-
   try {
+    const command = (interaction.client as any).commands?.get(interaction.commandName);
+
+    if (!command) {
+      logger.warn(`No command matching ${interaction.commandName} was found.`);
+      return interaction.reply({
+        content: 'This command is not available.',
+        flags: 'Ephemeral'
+      });
+    }
+
+    logger.info(`Executing command: ${interaction.commandName}`);
     await command.execute(interaction);
   } catch (error) {
     logger.error(`Error executing ${interaction.commandName}`, error);
     
     const reply = { 
       content: 'There was an error while executing this command!', 
-      ephemeral: true 
+      ephemeral: true
     };
 
     if (interaction.replied || interaction.deferred) {

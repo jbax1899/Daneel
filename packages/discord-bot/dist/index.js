@@ -4,6 +4,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
 import { logger } from './utils/logger.js';
+import { Collection } from '@discordjs/collection';
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -26,10 +27,20 @@ const client = new Client({
         status: 'online'
     }
 });
+// Initialize commands collection on the client
+client.commands = new Collection();
 const commandHandler = new CommandHandler();
 client.once(Events.ClientReady, async () => {
     logger.info(`Logged in as ${client.user?.tag}!`);
     try {
+        // Load commands first
+        const commands = await commandHandler.loadCommands();
+        // Store commands in the client for access in commands
+        commands.forEach((cmd, name) => {
+            client.commands?.set(name, cmd);
+        });
+        logger.info(`Registered ${commands.size} commands in client`);
+        // Then deploy them
         await commandHandler.deployCommands(process.env.DISCORD_TOKEN, process.env.CLIENT_ID, process.env.GUILD_ID);
     }
     catch (error) {
@@ -40,12 +51,16 @@ client.once(Events.ClientReady, async () => {
 client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand())
         return;
-    const command = commandHandler.getCommand(interaction.commandName);
-    if (!command) {
-        logger.warn(`No command matching ${interaction.commandName} was found.`);
-        return;
-    }
     try {
+        const command = interaction.client.commands?.get(interaction.commandName);
+        if (!command) {
+            logger.warn(`No command matching ${interaction.commandName} was found.`);
+            return interaction.reply({
+                content: 'This command is not available.',
+                flags: 'Ephemeral'
+            });
+        }
+        logger.info(`Executing command: ${interaction.commandName}`);
         await command.execute(interaction);
     }
     catch (error) {

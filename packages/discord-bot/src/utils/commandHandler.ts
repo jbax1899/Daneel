@@ -19,24 +19,35 @@ export class CommandHandler {
 
   async loadCommands() {
     try {
-      const commandFiles = (await readdir(commandsPath))
+      // In development, we need to look in the src directory for .ts files
+      const isDev = process.env.NODE_ENV !== 'production';
+      const basePath = isDev ? path.join(process.cwd(), 'src/commands') : commandsPath;
+      
+      const commandFiles = (await readdir(basePath))
         .filter(file => {
-          // Only include .js files (compiled output) and exclude .d.ts and BaseCommand files
-          const isJsFile = file.endsWith('.js');
+          // In development, look for .ts files, in production look for .js files
+          const isCorrectExtension = isDev ? file.endsWith('.ts') : file.endsWith('.js');
           const isNotDeclaration = !file.endsWith('.d.ts');
           const isNotBaseCommand = !file.includes('BaseCommand');
-          return isJsFile && isNotDeclaration && isNotBaseCommand;
+          return isCorrectExtension && isNotDeclaration && isNotBaseCommand;
         });
+
+      logger.info(`Found ${commandFiles.length} command files in ${basePath}`);
 
       for (const file of commandFiles) {
         try {
-          const filePath = path.join(commandsPath, file);
+          const filePath = path.join(basePath, file);
+          logger.info(`Attempting to load command from: ${filePath}`);
+          
+          // Use dynamic import with file:// URL for Windows compatibility
           const fileUrl = new URL(`file://${filePath.replace(/\\/g, '/')}`);
           const { default: command } = await import(fileUrl.href);
           
           if (command?.data) {
             this.commands.set(command.data.name, command);
             logger.info(`✅ Loaded command: ${command.data.name}`);
+          } else {
+            logger.warn(`❌ Command in ${file} is missing required 'data' property`);
           }
         } catch (error) {
           logger.error(`❌ Error loading command from ${file}:`, error);

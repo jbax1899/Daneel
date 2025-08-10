@@ -8,8 +8,54 @@ import {
     useLocalRuntime, 
     type ChatModelAdapter,
     type ChatModelRunOptions,
-    type ChatModelRunResult
+    type ChatModelRunResult,
+    type AttachmentAdapter
   } from "@assistant-ui/react";
+
+// Custom AttachmentAdapter implementation
+class CustomAttachmentAdapter implements AttachmentAdapter {
+  accept = "image/*,application/pdf";
+  multiple = true;
+
+  async add(file: File): Promise<{
+    id: string;
+    type: string;
+    name: string;
+    url: string;
+  }> {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to upload file');
+    }
+
+    const { id, url } = await response.json();
+    return {
+      id,
+      type: file.type.startsWith('image/') ? 'image' : 'document',
+      name: file.name,
+      url,
+    };
+  }
+
+  async remove(id: string): Promise<void> {
+    const response = await fetch(`/api/upload?id=${id}`, {
+      method: 'DELETE',
+    });
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Failed to delete file');
+    }
+  }
+}
 
 export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
   const { userId, isLoaded } = useAuth();
@@ -27,118 +73,61 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
           body: JSON.stringify({ 
             messages, 
             system: context?.system, 
-            tools: context?.tools 
+            // Include attachments in the request
+            attachments: context?.attachments?.map(a => ({
+              id: a.id,
+              type: a.type,
+              name: a.name,
+              url: a.url,
+            })),
           }),
           signal: abortSignal,
         });
-      
+
         if (!result.ok) {
-          const errorData = await result.text();
-          console.error('API Error:', { status: result.status, error: errorData });
-          throw new Error(`API request failed with status ${result.status}: ${errorData}`);
+          const error = await result.json().catch(() => ({}));
+          throw new Error(error.message || 'Failed to get response from server');
         }
 
-        const reader = result.body?.getReader();
-        if (!reader) {
-          throw new Error('Failed to read response body');
+        if (!result.body) {
+          throw new Error('No response body');
         }
 
+        const reader = result.body.getReader();
         const decoder = new TextDecoder();
+        let done = false;
         let buffer = '';
-        let content = "";
-        const toolCalls: any[] = [];
 
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            // Decode the chunk and add to buffer
+        while (!done) {
+          const { value, done: doneReading } = await reader.read();
+          done = doneReading;
+          
+          if (value) {
             buffer += decoder.decode(value, { stream: true });
-
-            // Process complete lines (separated by double newlines for SSE)
-            const lines = buffer.split(/\r?\n\r?\n/);
-            buffer = lines.pop() || ''; // Keep incomplete line in buffer
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
 
             for (const line of lines) {
-              if (!line.trim() || !line.startsWith('data: ')) continue;
-              
-              try {
-                // Extract the JSON data (remove 'data: ' prefix)
-                const jsonStr = line.startsWith('data: ') ? line.slice(6) : line;
-                if (!jsonStr.trim()) continue;
-
-                const data = JSON.parse(jsonStr);
-                const delta = data.choices?.[0]?.delta;
-                if (!delta) continue;
-
-                // Handle text content
-                if (delta.content !== undefined && delta.content !== null) {
-                  content += String(delta.content);
-                  
-                  // Yield text content immediately
-                  yield {
-                    content: [{
-                      type: 'text' as const,
-                      text: content
-                    }]
-                  };
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+                
+                try {
+                  const parsed = JSON.parse(data);
+                  yield { content: parsed.choices[0]?.delta?.content || '' };
+                } catch (e) {
+                  console.error('Error parsing SSE data:', e);
                 }
-
-                // Handle tool calls
-                if (delta.tool_calls) {
-                  for (const toolCall of delta.tool_calls) {
-                    if (!toolCalls[toolCall.index]) {
-                      toolCalls[toolCall.index] = {
-                        id: toolCall.id || `call_${Date.now()}`,
-                        type: "function",
-                        function: { name: "", arguments: "" }
-                      };
-                    }
-
-                    if (toolCall.function?.name) {
-                      toolCalls[toolCall.index].function.name = toolCall.function.name;
-                    }
-
-                    if (toolCall.function?.arguments) {
-                      toolCalls[toolCall.index].function.arguments += toolCall.function.arguments;
-                    }
-
-                    // Yield tool call updates
-                    if (toolCall.function?.name || toolCall.function?.arguments) {
-                      try {
-                        const args = toolCalls[toolCall.index].function.arguments 
-                          ? JSON.parse(toolCalls[toolCall.index].function.arguments)
-                          : {};
-                        
-                        yield {
-                          content: [{
-                            type: 'tool-call' as const,
-                            toolCallId: toolCalls[toolCall.index].id,
-                            toolName: toolCalls[toolCall.index].function.name,
-                            args
-                          }]
-                        };
-                      } catch (e) {
-                        console.error('Error parsing tool call arguments:', e);
-                      }
-                    }
-                  }
-                }
-              } catch (e) {
-                console.error('Error parsing line:', line, 'Error:', e);
               }
             }
           }
-        } finally {
-          reader.releaseLock();
         }
       } catch (error) {
         console.error('Error in model adapter:', error);
         throw error;
       }
-    }
-  }), []);
+    },
+  }), [userId]);
 
   // Initialize the cloud instance
   useEffect(() => {
@@ -161,6 +150,9 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
   // Initialize the runtime after cloud is ready
   const runtime = useLocalRuntime(modelAdapter, {
     cloud: cloud || undefined,
+    adapters: { 
+      attachments: new CustomAttachmentAdapter(),
+    },
   });
 
   if (error) {
