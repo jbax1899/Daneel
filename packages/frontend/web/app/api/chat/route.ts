@@ -1,6 +1,3 @@
-import { openai } from "@ai-sdk/openai";
-import { frontendTools } from "@assistant-ui/react-ai-sdk";
-import { streamText } from "ai";
 import OpenAI from 'openai';
 
 const openaiClient = new OpenAI({
@@ -10,9 +7,26 @@ const openaiClient = new OpenAI({
 export const runtime = "edge";
 export const maxDuration = 30;
 
+interface ToolParameter {
+  type: string;
+  properties: Record<string, unknown>;
+  required?: string[];
+}
+
+interface ToolDefinition {
+  description: string;
+  parameters: ToolParameter;
+}
+
+type ToolsRecord = Record<string, ToolDefinition>;
+
 export async function POST(req: Request) {
   try {
-    const { messages, system, tools = {} } = await req.json();
+    const { messages, system, tools = {} } = await req.json() as {
+      messages: Array<{ role: string; content: string; name?: string }>;
+      system?: string;
+      tools?: ToolsRecord;
+    };
 
     if (!Array.isArray(messages) || messages.length === 0) {
       return new Response(
@@ -23,23 +37,66 @@ export async function POST(req: Request) {
 
     const response = await openaiClient.chat.completions.create({
       model: "gpt-4o-mini",
-      messages: messages.map(m => ({
-        role: m.role,
-        content: m.content,
-        name: m.name,
-      })),
+      messages: messages.map(m => {
+        // For function messages
+        if (m.role === 'function' && m.name) {
+          return {
+            role: 'function' as const,
+            name: m.name,
+            content: m.content,
+          } as const;
+        }
+
+        // For assistant messages
+        if (m.role === 'assistant') {
+          return m.name ? {
+            role: 'assistant' as const,
+            name: m.name,
+            content: m.content,
+          } : {
+            role: 'assistant' as const,
+            content: m.content,
+          };
+        }
+
+        // For user messages
+        if (m.role === 'user') {
+          return m.name ? {
+            role: 'user' as const,
+            name: m.name,
+            content: m.content,
+          } : {
+            role: 'user' as const,
+            content: m.content,
+          };
+        }
+
+        // For system messages (no name allowed)
+        if (m.role === 'system') {
+          return {
+            role: 'system' as const,
+            content: m.content,
+          };
+        }
+
+        // Fallback (shouldn't happen with proper typing)
+        return {
+          role: m.role as 'user' | 'assistant' | 'system' | 'function',
+          content: m.content,
+        };
+      }) as OpenAI.Chat.Completions.ChatCompletionMessageParam[],
       ...(system && { system }),
-      ...(Object.keys(tools).length > 0 && { 
-        tools: Object.entries(tools).map(([name, tool]: [string, any]) => ({
+      ...(tools && Object.keys(tools).length > 0 && { 
+        tools: Object.entries(tools).map(([name, tool]) => ({
           type: 'function' as const,
           function: {
             name,
             description: tool.description,
-            parameters: tool.parameters || {},
+            parameters: tool.parameters as unknown as Record<string, unknown>,
           },
-        })),
+        })) as OpenAI.Chat.Completions.ChatCompletionTool[],
       }),
-      stream: true,
+      stream: true as const,
     });
 
     // Create a new ReadableStream
