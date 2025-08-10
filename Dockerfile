@@ -1,20 +1,20 @@
 # Stage 1: Build the frontend
-FROM node:22.14.0-slim as frontend-builder
+FROM node:22.14.0 AS frontend-builder
 WORKDIR /app
 
 # Copy package files
-COPY packages/frontend/package*.json packages/frontend/
+COPY packages/frontend/web/package*.json ./
 
-# Install frontend dependencies
-RUN cd packages/frontend && npm install
+# Install dependencies
+RUN npm install
 
 # Copy frontend source
-COPY packages/frontend packages/frontend/
+COPY packages/frontend/web/ ./
 
-# Build frontend
-RUN cd packages/frontend && npm run build
+# Build the frontend
+RUN npm run build
 
-# Stage 2: Build the bot
+# Stage 2: Build the bot (keep your existing bot build stage)
 FROM node:22.14.0-slim as bot-builder
 WORKDIR /app
 
@@ -38,27 +38,24 @@ RUN cd packages/discord-bot && npm install --production
 FROM node:22.14.0-slim
 WORKDIR /app
 
-# Install serve for the frontend
-RUN npm install -g serve
-
 # Copy built frontend
-COPY --from=frontend-builder /app/packages/frontend/build ./frontend
+COPY --from=frontend-builder /app/.next/standalone ./
+COPY --from=frontend-builder /app/.next/static ./.next/static
+COPY --from=frontend-builder /app/public ./public
 
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
-
-# Copy package.json and install production dependencies
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
 RUN cd packages/discord-bot && npm install --production
 
 # Create a simple start script
 RUN echo '#!/bin/sh\n\
     cd /app/packages/discord-bot && node dist/index.js & \n\
-    serve -s /app/frontend -l 8080\n\
+    cd /app && node server.js\n\
     ' > /app/start.sh && chmod +x /app/start.sh
 
 # Expose the port the app runs on
-EXPOSE 8080
+EXPOSE 3000
 
 # Start the application
 CMD ["/app/start.sh"]

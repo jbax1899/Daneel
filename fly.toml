@@ -14,7 +14,7 @@ primary_region = 'ord'
 # HTTP service configuration
 [[services]]
   http_checks = []
-  internal_port = 8080
+  internal_port = 3000  # Changed from 8080 to 3000
   processes = ["app"]
   protocol = "tcp"
   script_checks = []
@@ -30,9 +30,12 @@ primary_region = 'ord'
   [[services.ports]]
     port = 443
     handlers = ["tls", "http"]
+    force_https = true
 
-# VM configuration
-[[vm]]
-  memory = "1gb"
-  cpu_kind = "shared"
-  cpus = 1
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+    type = "connections"
+
+[deploy]
+  strategy = "immediate"
