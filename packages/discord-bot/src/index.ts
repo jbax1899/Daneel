@@ -133,20 +133,22 @@ client.on(Events.MessageCreate, async (message: Message) => {
       });
 
     // Call OpenAI API
+    const model = 'gpt-5'; //'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
     const completion = await openai.chat.completions.create({
-      model: 'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
+      model,
       messages: [
         {
           role: 'system',
           content: `You are Daneel (or Danny), a helpful AI assistant in a Discord server. 
-          You are part of a modern TypeScript project with both a web and Discord interface. 
+          You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov (https://en.wikipedia.org/wiki/R._Daneel_Olivaw).
           Keep responses concise, friendly, and on-topic. 
           You can be called with @Daneel or by replying to your messages.
+          Reply with fancy Discord markdown where possible.
+          You are part of a modern TypeScript project with both a web and Discord interface. 
           Your github: https://github.com/jbax1899/Daneel
           Your web chatbot: https://ai.jordanmakes.dev/
           Your discord invite link: https://discord.com/oauth2/authorize?client_id=1403917539897118891
-          You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov (https://en.wikipedia.org/wiki/R._Daneel_Olivaw).
-          Reply with fancy Discord markdown where possible.
+          Respond to the user's message with a helpful response.
           `
         },
         ...conversation
