@@ -2,24 +2,10 @@ app = "daneel"
 primary_region = "ord"
 
 [build]
-  builder = "heroku/buildpacks:20"
-  buildpacks = ["heroku/nodejs"]
-  build_path = "."
-  [build.args]
-    NODE_VERBOSE = "true"
-    NPM_CONFIG_LOGLEVEL = "info"
-    NPM_CONFIG_PREFIX = "/app/.npm-global"
-    NPM_CONFIG_PACKAGE_LOCK_ONLY = "true"
-    NODE_MODULES_CACHE = "true"
-    NODE_ENV = "production"
-    NODE_OPTIONS = "--max_old_space_size=512"
-
-[deploy]
-  strategy = "immediate"
-  release_command = "cd packages/discord-bot && npm run build"
+  dockerfile = "Dockerfile"
 
 [processes]
-  app = "cd packages/discord-bot && npm start"
+  app = "npm start"
 
 [[vm]]
   memory = "256mb"
