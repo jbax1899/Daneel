@@ -5,48 +5,67 @@ import { OpenAIService } from '../utils/openaiService.js';
 import { DiscordPromptBuilder } from '../utils/prompting/PromptBuilder.js';
 import { MessageProcessor } from '../utils/MessageProcessor.js';
 
+interface Dependencies {
+  openai: {
+    apiKey: string;
+  };
+}
+
 export class MentionBotEvent extends Event {
-  public name = 'messageCreate' as const;
-  public once = false;
-  private messageProcessor: MessageProcessor;
+  public readonly name = 'messageCreate' as const; // The event name from discord.js that we are listening to
+  public readonly once = false;
+  private readonly messageProcessor: MessageProcessor;
 
-  constructor(dependencies: { openai: any }) {
+  constructor(dependencies: Dependencies) {
     super({ name: 'messageCreate', once: false });
-
     this.messageProcessor = new MessageProcessor({
       promptBuilder: new DiscordPromptBuilder(),
       openaiService: new OpenAIService(dependencies.openai.apiKey)
     });
   }
 
-  async execute(message: Message): Promise<void> {
-    // Ignore messages from bots
-    if (message.author.bot) return;
-  
-    const isMentioned = message.mentions.users.has(message.client.user!.id);
-    const isReplyToBot = message.reference?.messageId && 
-      message.reference.guildId === message.guildId &&
-      message.reference.channelId === message.channelId &&
-      message.mentions.repliedUser?.id === message.client.user!.id;
-
-    // Ignore messages that are not one of:
-    // - A mention of the bot (@Daneel)
-    // - A reply to the bot
-    if (!isMentioned && !isReplyToBot) return;
+  public async execute(message: Message): Promise<void> {
+    if (this.shouldIgnoreMessage(message)) return;
 
     try {
-      if (message.channel.isTextBased() && !message.channel.isDMBased() && !message.channel.isThread()) {
-        await message.channel.sendTyping();
-      }
-      
       await this.messageProcessor.processMessage(message);
     } catch (error) {
-      logger.error('Error in MentionBotEvent:', error);
-      try {
-        await message.reply('Sorry, I encountered an error while processing your message.');
-      } catch (replyError) {
-        logger.error('Failed to send error reply:', replyError);
+      await this.handleError(error, message);
+    }
+  }
+
+  private shouldIgnoreMessage(message: Message): boolean {
+    // Logic for ignoring messages
+    // 1. Ignore messages from other bots
+    // 2. Ignore messages that don't either mention the bot or reply to the bot
+    if (message.author.bot) return true;
+    return !this.isBotMentioned(message) && !this.isReplyToBot(message);
+  }
+
+  private isBotMentioned(message: Message): boolean {
+    return message.mentions.users.has(message.client.user!.id);
+  }
+
+  private isReplyToBot(message: Message): boolean {
+    if (!message.reference?.messageId) return false;
+    
+    const isSameChannel = message.reference.guildId === message.guildId &&
+                        message.reference.channelId === message.channelId;
+    const isReplyingToBot = message.mentions.repliedUser?.id === message.client.user!.id;
+    
+    return isSameChannel && isReplyingToBot;
+  }
+
+  private async handleError(error: unknown, message: Message): Promise<void> {
+    logger.error('Error in MentionBotEvent:', error);
+    
+    try {
+      const response = 'Sorry, I encountered an error while processing your message.';
+      if (message.channel.isTextBased()) {
+        await message.reply(response);
       }
+    } catch (replyError) {
+      logger.error('Failed to send error reply:', replyError);
     }
   }
 }

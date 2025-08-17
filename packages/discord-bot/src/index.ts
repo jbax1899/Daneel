@@ -21,6 +21,8 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
+    GatewayIntentBits.DirectMessages,
+    GatewayIntentBits.MessageContent
   ],
   presence: { status: 'online' }
 });

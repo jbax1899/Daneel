@@ -43,7 +43,7 @@ Some rules to follow (for Cascade):
 - [x] Create a basic frontend with chat interface
 - [x] Implement MessageProcessor for handling message flow
 - [x] Add PromptBuilder for AI context management
-- [x] Set up basic response handling
+- [x] Implement ResponseHandler for centralized response management
 - [ ] Add comprehensive error handling and logging
 - [ ] Implement command system enhancements
 - [ ] Add user preferences and state management
@@ -774,10 +774,12 @@ const command: Command = {
 #### 3. ResponseHandler
 - **Purpose**: Manages bot responses
 - **Key Features**:
-  - Formats responses for Discord
+  - Handles all Discord message sending logic
+  - Supports multiple response types (text, embeds, DMs, reactions)
+  - Manages typing indicators
+  - Provides consistent error handling
   - Handles message splitting for long responses
-  - Manages different response types (embeds, files, etc.)
-  - Implements rate limiting and cooldowns
+  - Implements smart reply behavior
 
 ### Updated Project Roadmap
 
@@ -790,7 +792,7 @@ const command: Command = {
 - [x] Create a basic frontend with chat interface
 - [x] Implement MessageProcessor for handling message flow
 - [x] Add PromptBuilder for AI context management
-- [x] Set up basic response handling
+- [x] Implement ResponseHandler for centralized response management
 - [ ] Add comprehensive error handling and logging
 - [ ] Implement command system enhancements
 - [ ] Add user preferences and state management
@@ -805,11 +807,35 @@ const command: Command = {
    - Context building via `PromptBuilder`
    - AI response generation
    - Response handling via `ResponseHandler`
-4. Response sent back to Discord
+4. `ResponseHandler` manages all aspects of sending the response
+5. Response sent back to Discord
 
 #### Key Improvements
-- Better separation of concerns
-- More maintainable and testable code
-- Easier to extend with new features
-- Improved error handling and logging
-- More consistent user experience
+- **Centralized Response Logic**: All message sending is now handled by `ResponseHandler`
+- **Better Error Handling**: Consistent error handling across all response types
+- **Improved Maintainability**: Clear separation of concerns between components
+- **Enhanced Features**: Support for embeds, reactions, and typing indicators
+- **Future-Proof**: Easy to add new response types or modify behavior in one place
+
+### ResponseHandler API
+```typescript
+interface IResponseHandler {
+  // Send text response
+  sendText(content: string, options?: MessageOptions): Promise<void>;
+  
+  // Send embedded message
+  sendEmbed(embed: EmbedBuilder, options?: MessageOptions): Promise<void>;
+  
+  // Send direct message
+  sendDM(content: string | MessagePayload | MessageOptions): Promise<void>;
+  
+  // Edit existing message
+  editMessage(messageId: string, content: string | MessageEditOptions): Promise<void>;
+  
+  // Add reaction to message
+  addReaction(emoji: string): Promise<void>;
+  
+  // Show typing indicator
+  indicateTyping(durationMs?: number): Promise<void>;
+}
+```

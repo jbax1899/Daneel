@@ -7,6 +7,7 @@ import type { Message } from 'discord.js';
 import { DiscordPromptBuilder } from './prompting/PromptBuilder.js';
 import { OpenAIService } from './openaiService.js';
 import { logger } from './logger.js';
+import { ResponseHandler } from './response/ResponseHandler.js';
 
 export interface IMessageProcessor {
   processMessage(message: Message): Promise<void>;
@@ -27,23 +28,28 @@ export class MessageProcessor implements IMessageProcessor {
   }
 
   async processMessage(message: Message): Promise<void> {
+    const responseHandler = new ResponseHandler(message, message.channel, message.author);
+    
     try {
       // 1. Validate message
       if (!this.isValidMessage(message)) {
         return;
       }
 
-      // 2. Build context and get AI response
+      // 2. Show typing indicator
+      await responseHandler.indicateTyping(5000);
+
+      // 3. Build context and get AI response
       const context = await this.buildMessageContext(message);
       const response = await this.openaiService.generateResponse(context);
 
-      // 3. Handle the response
+      // 4. Handle the response
       if (response) {
-        await this.handleResponse(message, response);
+        await this.handleResponse(responseHandler, response);
       }
     } catch (error) {
       logger.error('Error processing message:', error);
-      await this.handleError(message, error);
+      await this.handleError(responseHandler, error);
     }
   }
 
@@ -60,21 +66,21 @@ export class MessageProcessor implements IMessageProcessor {
     });
   }
 
-  private async handleResponse(message: Message, response: string): Promise<void> {
+  private async handleResponse(responseHandler: ResponseHandler, response: string): Promise<void> {
     if (response.length > 2000) {
       const chunks = response.match(/[\s\S]{1,2000}/g) || [];
       for (const chunk of chunks) {
-        await message.reply(chunk);
+        await responseHandler.sendText(chunk);
       }
     } else {
-      await message.reply(response);
+      await responseHandler.sendText(response);
     }
   }
 
-  private async handleError(message: Message, error: unknown): Promise<void> {
-    logger.error('Error processing message:', error);
+  private async handleError(responseHandler: ResponseHandler, error: unknown): Promise<void> {
+    logger.error('Error in MessageProcessor:', error);
     try {
-      await message.reply('Sorry, I encountered an error processing your message.');
+      await responseHandler.sendText('Sorry, I encountered an error processing your message.');
     } catch (replyError) {
       logger.error('Failed to send error reply:', replyError);
     }
