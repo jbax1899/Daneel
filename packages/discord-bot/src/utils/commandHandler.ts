@@ -37,7 +37,7 @@ export class CommandHandler {
       for (const file of commandFiles) {
         try {
           const filePath = path.join(basePath, file);
-          logger.info(`Attempting to load command from: ${filePath}`);
+          logger.debug(`Attempting to load command from: ${filePath}`);
           
           // Use dynamic import with file:// URL for Windows compatibility
           const fileUrl = new URL(`file://${filePath.replace(/\\/g, '/')}`);
@@ -45,7 +45,7 @@ export class CommandHandler {
           
           if (command?.data) {
             this.commands.set(command.data.name, command);
-            logger.info(`Loaded command: ${command.data.name}`);
+            logger.debug(`Loaded command: ${command.data.name}`);
           } else {
             logger.warn(`Command in ${file} is missing required 'data' property`);
           }
@@ -71,7 +71,7 @@ export class CommandHandler {
       const commands = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
       const rest = new REST({ version: '10' }).setToken(token);
       
-      logger.info('Started refreshing application (/) commands.');
+      logger.debug('Started refreshing application (/) commands.');
 
       await rest.put(
         Routes.applicationGuildCommands(clientId, guildId),
