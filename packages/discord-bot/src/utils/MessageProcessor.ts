@@ -45,7 +45,7 @@ export class MessageProcessor implements IMessageProcessor {
 
       // 4. Handle the response
       if (response) {
-        await this.handleResponse(responseHandler, response);
+        await this.handleResponse(responseHandler, response, context);
       }
     } catch (error) {
       logger.error('Error processing message:', error);
@@ -66,14 +66,30 @@ export class MessageProcessor implements IMessageProcessor {
     });
   }
 
-  private async handleResponse(responseHandler: ResponseHandler, response: string): Promise<void> {
-    if (response.length > 2000) {
-      const chunks = response.match(/[\s\S]{1,2000}/g) || [];
+  private async handleResponse(
+    responseHandler: ResponseHandler, 
+    response: string, 
+    context: any[]
+  ): Promise<void> {
+    let finalResponse = response;
+    
+    // In development, prepend the context if available
+    if (process.env.NODE_ENV === 'development' && context) {
+      const contextString = context.map(c => 
+        typeof c === 'string' ? c : JSON.stringify(c, null, 2)
+      ).join('\n\n---\n\n');
+      
+      finalResponse = `Full context:\n\`\`\`\n${contextString}\n\`\`\`\n\n${response}`;
+    }
+
+    // Handle long messages by splitting them into chunks
+    if (finalResponse.length > 2000) {
+      const chunks = finalResponse.match(/[\s\S]{1,2000}/g) || [];
       for (const chunk of chunks) {
         await responseHandler.sendText(chunk);
       }
     } else {
-      await responseHandler.sendText(response);
+      await responseHandler.sendText(finalResponse);
     }
   }
 

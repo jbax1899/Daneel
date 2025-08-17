@@ -800,15 +800,12 @@ const command: Command = {
 ### Architecture Changes
 
 #### Message Flow
-1. Message received via Discord event
-2. `MentionBotEvent` validates and forwards to `MessageProcessor`
-3. `MessageProcessor` coordinates:
-   - Message validation
-   - Context building via `PromptBuilder`
-   - AI response generation
-   - Response handling via `ResponseHandler`
-4. `ResponseHandler` manages all aspects of sending the response
-5. Response sent back to Discord
+1. `MentionBotEvent` receives and validates the message
+2. `MessageProcessor` handles the message:
+   - Builds context using `PromptBuilder`
+   - Generates AI response
+   - Manages response through `ResponseHandler`
+3. `ResponseHandler` sends the response to Discord
 
 #### Key Improvements
 - **Centralized Response Logic**: All message sending is now handled by `ResponseHandler`
@@ -819,23 +816,38 @@ const command: Command = {
 
 ### ResponseHandler API
 ```typescript
-interface IResponseHandler {
-  // Send text response
-  sendText(content: string, options?: MessageOptions): Promise<void>;
+export interface IResponseHandler {
+  /**
+   * Send a text response to a message
+   * @param content The text content to send
+   * @param options Additional message options
+   */
+  sendText(content: string, options?: Omit<MessageReplyOptions, 'content'>): Promise<void>;
   
-  // Send embedded message
-  sendEmbed(embed: EmbedBuilder, options?: MessageOptions): Promise<void>;
+  /**
+   * Send an embedded response
+   * @param embed The embed to send
+   * @param options Additional message options
+   */
+  sendEmbed(embed: EmbedBuilder, options?: Omit<MessageReplyOptions, 'embeds'>): Promise<void>;
   
-  // Send direct message
-  sendDM(content: string | MessagePayload | MessageOptions): Promise<void>;
+  /**
+   * Send a direct message to the user
+   * @param content The message content or options
+   */
+  sendDM(content: string | MessageCreateOptions): Promise<void>;
   
-  // Edit existing message
+  /**
+   * Edit an existing message
+   * @param messageId The ID of the message to edit
+   * @param content The new content or options
+   */
   editMessage(messageId: string, content: string | MessageEditOptions): Promise<void>;
   
-  // Add reaction to message
+  /**
+   * Add a reaction to a message
+   * @param emoji The emoji to react with
+   */
   addReaction(emoji: string): Promise<void>;
-  
-  // Show typing indicator
-  indicateTyping(durationMs?: number): Promise<void>;
 }
 ```

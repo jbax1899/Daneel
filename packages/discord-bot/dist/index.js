@@ -5,16 +5,12 @@ import { CommandHandler } from './utils/commandHandler.js';
 import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
-import OpenAI from 'openai';
 // ====================
 // Environment Setup
 // ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Initialize OpenAI
-const openai = new OpenAI({
-    apiKey: config.openaiApiKey
-});
+const openai = { apiKey: config.openaiApiKey };
 // ====================
 // Client Configuration
 // ====================
@@ -23,6 +19,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.MessageContent
     ],
     presence: { status: 'online' }
 });
@@ -51,8 +49,7 @@ catch (error) {
 // ====================
 // Load Events
 // ====================
-const eventsPath = path.join(__dirname, 'events');
-await eventManager.loadEvents(eventsPath);
+await eventManager.loadEvents(__dirname + '/events');
 eventManager.registerAll();
 // ====================
 // Start the Bot
@@ -61,13 +58,6 @@ client.login(config.token);
 // ====================
 // Process Handlers
 // ====================
-process.on('unhandledRejection', (error) => {
-    logger.error('Unhandled promise rejection:', error);
-});
-process.on('uncaughtException', (error) => {
-    logger.error('Uncaught exception:', error);
-    process.exit(1);
-});
 // Client ready handler
 client.once(Events.ClientReady, () => {
     logger.info(`Logged in as ${client.user?.tag}`);
@@ -101,5 +91,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
             return interaction.reply(reply);
         }
     }
+});
+// Handle uncaught exceptions
+process.on('unhandledRejection', (error) => {
+    logger.error('Unhandled promise rejection:', error);
+});
+process.on('uncaughtException', (error) => {
+    logger.error('Uncaught exception:', error);
+    process.exit(1);
 });
 //# sourceMappingURL=index.js.map
