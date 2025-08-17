@@ -1,4 +1,8 @@
+/**
+ * Base event class for Discord.js events with error handling and registration
+ */
 import { logger } from '../utils/logger.js';
+/** Base class for Discord.js event handlers */
 export class Event {
     name;
     once;
@@ -6,6 +10,7 @@ export class Event {
         this.name = options.name;
         this.once = options.once ?? false;
     }
+    /** Register this event with a Discord client */
     register(client) {
         if (this.once) {
             client.once(this.name, this._execute.bind(this));
@@ -14,6 +19,7 @@ export class Event {
             client.on(this.name, this._execute.bind(this));
         }
     }
+    // Wraps execute() with error handling
     async _execute(...args) {
         try {
             await this.execute(...args);

@@ -1,63 +1,98 @@
-import { Client, GatewayIntentBits, Events, Message, Collection } from 'discord.js';
+// Core dependencies
+import { Client, Collection, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CommandHandler } from './utils/commandHandler.js';
-import { logger } from './utils/logger.js';
-import OpenAI from 'openai';
 
-// Get the current directory
+// Utils
+import { CommandHandler } from './utils/commandHandler.js';
+import { EventManager } from './utils/eventManager.js';
+import { logger } from './utils/logger.js';
+
+// ====================
+// Environment Setup
+// ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ 
+  path: path.resolve(__dirname, '../../../.env') 
+});
 
-// Ensure required environment variables are loaded
-const requiredVars = ['DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPENAI_API_KEY'];
-for (const varName of requiredVars) {
-  if (!process.env[varName]) {
-    throw new Error(`${varName} is not defined in the environment variables`);
+// Validate required environment variables
+const REQUIRED_ENV_VARS = [
+  'DISCORD_TOKEN', 
+  'CLIENT_ID', 
+  'GUILD_ID', 
+  'OPENAI_API_KEY'
+] as const;
+
+for (const envVar of REQUIRED_ENV_VARS) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
   }
 }
 
+// ====================
+// Client Configuration
+// ====================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
   ],
-  presence: {
-    status: 'online'
-  }
+  presence: { status: 'online' }
 });
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-// Initialize commands collection on the client
-client.commands = new Collection();
-
+// ====================
+// Initialize Managers
+// ====================
 const commandHandler = new CommandHandler();
+const eventManager = new EventManager(client);
 const log = logger;
 
+// Initialize commands collection
+client.commands = new Collection();
+
+// ====================
+// Event Registration
+// ====================
+const eventsPath = path.join(__dirname, 'events');
+await eventManager.loadEvents(eventsPath);
+eventManager.registerAll();
+
+// ====================
+// Start the Bot
+// ====================
+client.login(process.env.DISCORD_TOKEN!);
+
+// ====================
+// Process Handlers
+// ====================
+process.on('unhandledRejection', (error: Error) => {
+  log.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  log.error('Uncaught exception:', error);
+  process.exit(1);
+});
+
+// Client ready handler
 client.once(Events.ClientReady, async () => {
   log.info(`Logged in as ${client.user?.tag}!`);
   
   try {
-    // Load commands first
+    // Load and register commands
     const commands = await commandHandler.loadCommands();
-    
-    // Store commands in the client for access in commands
     commands.forEach((cmd, name) => {
       client.commands?.set(name, cmd);
     });
-    
     log.info(`Registered ${commands.size} commands in client`);
     
-    // Then deploy them
+    // Deploy commands to Discord
     await commandHandler.deployCommands(
       process.env.DISCORD_TOKEN!,
       process.env.CLIENT_ID!,
@@ -69,6 +104,7 @@ client.once(Events.ClientReady, async () => {
   }
 });
 
+// Handle slash commands
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -99,97 +135,4 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.reply(reply);
     }
   }
-});
-
-// Message listener for mentions and replies
-client.on(Events.MessageCreate, async (message: Message) => {
-  // Ignore messages from bots
-  if (message.author.bot) return;
-
-  // Check if the bot is mentioned or the message is a reply to the bot
-  const isMentioned = message.mentions.users.has(client.user!.id);
-  const isReplyToBot = message.reference?.messageId && 
-                     message.reference.guildId === message.guildId &&
-                     message.reference.channelId === message.channelId &&
-                     message.mentions.repliedUser?.id === client.user!.id;
-
-  // If neither mentioned nor a reply to the bot, ignore the message
-  if (!isMentioned && !isReplyToBot) return;
-
-  try {
-    // Send typing indicator
-    if (message.channel.isTextBased() && !message.channel.isDMBased() && !message.channel.isThread()) {
-      await message.channel.sendTyping();
-    }
-
-    // Get conversation history (last 10 messages for context)
-    const messages = await message.channel.messages.fetch({ limit: 10 });
-    const conversation = Array.from(messages.values())
-      .reverse()
-      .filter(msg => msg.content.trim().length > 0)
-      .map(msg => {
-        const role = msg.author.id === client.user!.id ? 'assistant' as const : 'user' as const;
-        return {
-          role,
-          content: msg.content.replace(`<@${client.user!.id}>`, '').trim()
-        };
-      });
-
-    // Call OpenAI API
-    const model = 'gpt-4.1-mini' //'ft:gpt-4.1-2025-04-14:personal:rolybot:BOJYk0lB',
-    const completion = await openai.chat.completions.create({
-      model,
-      messages: [
-        {
-          role: 'system',
-          content: `You are Daneel (or Danny), a helpful AI assistant in a Discord server. 
-          You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov (https://en.wikipedia.org/wiki/R._Daneel_Olivaw).
-          Keep responses concise, friendly, and on-topic. 
-          You can be called with @Daneel or by replying to your messages.
-          Reply with fancy Discord markdown where possible.
-          You are part of a modern TypeScript project with both a web and Discord interface. 
-          Your github: https://github.com/jbax1899/Daneel
-          Your web chatbot: https://ai.jordanmakes.dev/
-          Your discord invite link: https://discord.com/oauth2/authorize?client_id=1403917539897118891
-          Respond to the user's message with a helpful response.
-          `
-        },
-        ...conversation
-      ],
-      max_completion_tokens: 500,
-    });
-
-    const response = completion.choices[0]?.message?.content;
-    
-    if (response) {
-      // Split response if it's too long for Discord's 2000 character limit
-      if (response.length > 2000) {
-        const chunks = response.match(/[\s\S]{1,2000}/g) || [];
-        for (const chunk of chunks) {
-          await message.reply(chunk);
-        }
-      } else {
-        await message.reply(response);
-      }
-    }
-  } catch (error) {
-    log.error('Error in message handler:', error);
-    try {
-      await message.reply('Sorry, I encountered an error while processing your message.');
-    } catch (e) {
-      log.error('Failed to send error message:', e);
-    }
-  }
-});
-
-client.login(process.env.DISCORD_TOKEN);
-
-// Handle uncaught exceptions
-process.on('unhandledRejection', error => {
-  log.error('Unhandled promise rejection:', error);
-});
-
-process.on('uncaughtException', error => {
-  log.error('Uncaught exception:', error);
-  process.exit(1);
 });
