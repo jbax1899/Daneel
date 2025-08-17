@@ -45,12 +45,12 @@ export class CommandHandler {
           
           if (command?.data) {
             this.commands.set(command.data.name, command);
-            logger.info(`✅ Loaded command: ${command.data.name}`);
+            logger.info(`Loaded command: ${command.data.name}`);
           } else {
-            logger.warn(`❌ Command in ${file} is missing required 'data' property`);
+            logger.warn(`Command in ${file} is missing required 'data' property`);
           }
         } catch (error) {
-          logger.error(`❌ Error loading command from ${file}:`, error);
+          logger.error(`Error loading command from ${file}:`, error);
         }
       }
 

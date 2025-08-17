@@ -1,10 +1,7 @@
-// Core dependencies
-import { Client, Collection, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events } from 'discord.js';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// Utils
 import { CommandHandler } from './utils/commandHandler.js';
 import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
@@ -51,13 +48,35 @@ const client = new Client({
 // ====================
 const commandHandler = new CommandHandler();
 const eventManager = new EventManager(client);
-const log = logger;
-
-// Initialize commands collection
-client.commands = new Collection();
 
 // ====================
-// Event Registration
+// Load and Register Commands
+// ====================
+try {
+  logger.info('Loading commands...');
+  const commands = await commandHandler.loadCommands();
+  
+  // Deploy commands to Discord
+  await commandHandler.deployCommands(
+    process.env.DISCORD_TOKEN!,
+    process.env.CLIENT_ID!,
+    process.env.GUILD_ID!
+  );
+  
+  // Store commands in memory for execution
+  commands.forEach((cmd, name) => {
+    (client as any).commands = (client as any).commands || new Map();
+    (client as any).commands.set(name, cmd);
+  });
+  
+  logger.info(`Successfully loaded and registered ${commands.size} commands`);
+} catch (error) {
+  logger.error('Failed to load/deploy commands:', error);
+  process.exit(1);
+}
+
+// ====================
+// Load Events
 // ====================
 const eventsPath = path.join(__dirname, 'events');
 await eventManager.loadEvents(eventsPath);
@@ -72,39 +91,20 @@ client.login(process.env.DISCORD_TOKEN!);
 // Process Handlers
 // ====================
 process.on('unhandledRejection', (error: Error) => {
-  log.error('Unhandled promise rejection:', error);
+  logger.error('Unhandled promise rejection:', error);
 });
 
 process.on('uncaughtException', (error: Error) => {
-  log.error('Uncaught exception:', error);
+  logger.error('Uncaught exception:', error);
   process.exit(1);
 });
 
 // Client ready handler
-client.once(Events.ClientReady, async () => {
-  log.info(`Logged in as ${client.user?.tag}!`);
-  
-  try {
-    // Load and register commands
-    const commands = await commandHandler.loadCommands();
-    commands.forEach((cmd, name) => {
-      client.commands?.set(name, cmd);
-    });
-    log.info(`Registered ${commands.size} commands in client`);
-    
-    // Deploy commands to Discord
-    await commandHandler.deployCommands(
-      process.env.DISCORD_TOKEN!,
-      process.env.CLIENT_ID!,
-      process.env.GUILD_ID!
-    );
-  } catch (error) {
-    log.error('Error during startup:', error);
-    process.exit(1);
-  }
+client.once(Events.ClientReady, () => {
+  logger.info(`Logged in as ${client.user?.tag}!`);
 });
 
-// Handle slash commands
+// Slash commands handler
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -112,17 +112,17 @@ client.on(Events.InteractionCreate, async interaction => {
     const command = (interaction.client as any).commands?.get(interaction.commandName);
 
     if (!command) {
-      log.warn(`No command matching ${interaction.commandName} was found.`);
+      logger.warn(`No command matching ${interaction.commandName} was found.`);
       return interaction.reply({
         content: 'This command is not available.',
-        flags: 'Ephemeral'
+        ephemeral: true
       });
     }
 
-    log.info(`Executing command: ${interaction.commandName}`);
+    logger.info(`Executing command: ${interaction.commandName}`);
     return command.execute(interaction);
   } catch (error) {
-    log.error(`Error executing ${interaction.commandName}`, error);
+    logger.error(`Error executing ${interaction.commandName}`, error);
     
     const reply = { 
       content: 'There was an error while executing this command!', 
