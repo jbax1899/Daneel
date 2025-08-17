@@ -59,6 +59,7 @@ export class MentionBotEvent extends Event {
   private async handleError(error: unknown, message: Message): Promise<void> {
     logger.error('Error in MentionBotEvent:', error);
     
+    // Attempt to send an error reply to the user
     try {
       const response = 'Sorry, I encountered an error while processing your message.';
       if (message.channel.isTextBased()) {
