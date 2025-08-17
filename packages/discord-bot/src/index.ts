@@ -68,15 +68,6 @@ client.login(config.token);
 // ====================
 // Process Handlers
 // ====================
-process.on('unhandledRejection', (error: Error) => {
-  logger.error('Unhandled promise rejection:', error);
-});
-
-process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught exception:', error);
-  process.exit(1);
-});
-
 // Client ready handler
 client.once(Events.ClientReady, () => {
   logger.info(`Logged in as ${client.user?.tag}`);
@@ -113,4 +104,14 @@ client.on(Events.InteractionCreate, async interaction => {
       return interaction.reply(reply);
     }
   }
+});
+
+// Handle uncaught exceptions
+process.on('unhandledRejection', (error: Error) => {
+  logger.error('Unhandled promise rejection:', error);
+});
+
+process.on('uncaughtException', (error: Error) => {
+  logger.error('Uncaught exception:', error);
+  process.exit(1);
 });
