@@ -5,18 +5,13 @@ import { CommandHandler } from './utils/commandHandler.js';
 import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
-import OpenAI from 'openai';
 
 // ====================
 // Environment Setup
 // ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Initialize OpenAI
-const openai = new OpenAI({
-  apiKey: config.openaiApiKey
-});
+const openai = { apiKey: config.openaiApiKey };
 
 // ====================
 // Client Configuration

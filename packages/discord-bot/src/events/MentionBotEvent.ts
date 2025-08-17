@@ -1,15 +1,19 @@
 import { Message } from 'discord.js';
 import { Event } from './Event.js';
 import { logger } from '../utils/logger.js';
+import { OpenAIService } from '../utils/openaiService.js';
+import { DiscordPromptBuilder } from '../utils/prompting/PromptBuilder.js';
 
 export class MentionBotEvent extends Event {
   public name = 'messageCreate' as const;
   public once = false;
-  private openai: any;
+  private openaiService: OpenAIService;
+  private promptBuilder: DiscordPromptBuilder;
 
   constructor(dependencies: { openai: any }) {
     super({ name: 'messageCreate', once: false });
-    this.openai = dependencies.openai;
+    this.openaiService = new OpenAIService(dependencies.openai.apiKey);
+    this.promptBuilder = new DiscordPromptBuilder();
   }
 
   async execute(message: Message): Promise<void> {
@@ -24,37 +28,18 @@ export class MentionBotEvent extends Event {
     if (!isMentioned && !isReplyToBot) return;
 
     try {
-      logger.debug('Processing message for MentionBotEvent');
       if (message.channel.isTextBased() && !message.channel.isDMBased() && !message.channel.isThread()) {
         await message.channel.sendTyping();
       }
 
-      const messages = await message.channel.messages.fetch({ limit: 10 });
-      const conversation = Array.from(messages.values())
-        .reverse()
-        .filter(msg => msg.content.trim().length > 0)
-        .map(msg => ({
-          role: msg.author.id === message.client.user!.id ? 'assistant' as const : 'user' as const,
-          content: msg.content.replace(`<@${message.client.user!.id}>`, '').trim()
-        }));
-
-      logger.debug('Sending request to OpenAI');
-      const completion = await this.openai.chat.completions.create({
-        model: 'gpt-4.1-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are Daneel (or Danny), a helpful AI assistant in a Discord server.
-            You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov.
-            Keep responses concise, friendly, and on-topic.
-            You can be called with @Daneel or by replying to your messages.`
-          },
-          ...conversation
-        ],
-        max_tokens: 500,
+      const context = await this.promptBuilder.buildContext(message, {
+        userId: message.author.id,
+        username: message.author.username,
+        isMentioned,
+        isReplyToBot
       });
 
-      const response = completion.choices[0]?.message?.content;
+      const response = await this.openaiService.generateResponse(context);
       
       if (response) {
         if (response.length > 2000) {
@@ -70,8 +55,8 @@ export class MentionBotEvent extends Event {
       logger.error('Error in MentionBotEvent:', error);
       try {
         await message.reply('Sorry, I encountered an error while processing your message.');
-      } catch (e) {
-        logger.error('Failed to send error message:', e);
+      } catch (replyError) {
+        logger.error('Failed to send error reply:', replyError);
       }
     }
   }
