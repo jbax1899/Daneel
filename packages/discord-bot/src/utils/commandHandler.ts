@@ -19,6 +19,8 @@ export class CommandHandler {
 
   async loadCommands() {
     try {
+      logger.debug('Loading commands...');
+
       // In development, we need to look in the src directory for .ts files
       const isDev = process.env.NODE_ENV !== 'production';
       const basePath = isDev ? path.join(process.cwd(), 'src/commands') : commandsPath;
@@ -32,7 +34,7 @@ export class CommandHandler {
           return isCorrectExtension && isNotDeclaration && isNotBaseCommand;
         });
 
-      logger.info(`Found ${commandFiles.length} command files in ${basePath}`);
+      logger.debug(`Found ${commandFiles.length} command files in ${basePath}`);
 
       for (const file of commandFiles) {
         try {

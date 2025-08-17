@@ -5,24 +5,30 @@ import { Event } from '../events/Event.js';
 export class EventManager {
     client;
     events = [];
-    constructor(client) {
+    dependencies;
+    constructor(client, dependencies = {}) {
         this.client = client;
+        this.dependencies = dependencies;
     }
     async loadEvents(eventsPath) {
         try {
+            logger.debug(`Loading events from: ${eventsPath}`);
             const eventFiles = (await readdir(eventsPath))
                 .filter(file => {
                 const isJsFile = file.endsWith('.js') || file.endsWith('.ts');
-                const isNotBaseFile = !file.endsWith('Event.ts') && !file.endsWith('Event.js');
+                const isNotBaseFile = file !== 'Event.ts' && file !== 'Event.js';
                 return isJsFile && isNotBaseFile;
             });
+            logger.debug(`Found ${eventFiles.length} event files in ${eventsPath}`);
             for (const file of eventFiles) {
+                logger.debug(`Attempting to load event from: ${file}`);
                 try {
                     const filePath = path.join(eventsPath, file);
                     const fileUrl = new URL(`file://${filePath}`).href;
                     const { default: EventClass } = await import(fileUrl);
                     if (EventClass && EventClass.prototype instanceof Event) {
-                        this.events.push(new EventClass());
+                        const event = new EventClass(this.dependencies);
+                        this.events.push(event);
                     }
                 }
                 catch (error) {

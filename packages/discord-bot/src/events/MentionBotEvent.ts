@@ -1,17 +1,15 @@
 import { Message } from 'discord.js';
 import { Event } from './Event.js';
 import { logger } from '../utils/logger.js';
-import OpenAI from 'openai';
 
-export class EventMentionBot extends Event {
-  private openai: OpenAI;
+export class MentionBotEvent extends Event {
+  public name = 'messageCreate' as const;
+  public once = false;
+  private openai: any;
 
-  constructor(openai: OpenAI) {
-    super({
-      name: 'messageCreate',
-      once: false
-    });
-    this.openai = openai;
+  constructor(dependencies: { openai: any }) {
+    super({ name: 'messageCreate', once: false });
+    this.openai = dependencies.openai;
   }
 
   async execute(message: Message): Promise<void> {
@@ -26,6 +24,7 @@ export class EventMentionBot extends Event {
     if (!isMentioned && !isReplyToBot) return;
 
     try {
+      logger.debug('Processing message for MentionBotEvent');
       if (message.channel.isTextBased() && !message.channel.isDMBased() && !message.channel.isThread()) {
         await message.channel.sendTyping();
       }
@@ -39,6 +38,7 @@ export class EventMentionBot extends Event {
           content: msg.content.replace(`<@${message.client.user!.id}>`, '').trim()
         }));
 
+      logger.debug('Sending request to OpenAI');
       const completion = await this.openai.chat.completions.create({
         model: 'gpt-4.1-mini',
         messages: [

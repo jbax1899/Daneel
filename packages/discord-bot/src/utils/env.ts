@@ -1,23 +1,48 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { logger } from './logger.js';
 
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from .env file in the root directory
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+// Calculate .env file path
+const envPath = path.resolve(__dirname, '../../../../.env');
+logger.debug(`Loading environment variables from: ${envPath}`);
 
-// Basic validation for required environment variables
-if (!process.env.DISCORD_TOKEN) {
-  throw new Error('DISCORD_TOKEN is not defined in the environment variables');
+// Load environment variables from .env file in the root directory
+const { error, parsed } = dotenv.config({ path: envPath });
+
+if (error) {
+  logger.warn(`Failed to load .env file: ${error.message}`);
+} else if (parsed) {
+  logger.debug(`Loaded environment variables: ${Object.keys(parsed).join(', ')}`);
 }
 
-// Set default NODE_ENV if not set
-process.env.NODE_ENV = process.env.NODE_ENV || 'development';
+// Required environment variables
+const REQUIRED_ENV_VARS = [
+  'DISCORD_TOKEN',
+  'CLIENT_ID',
+  'GUILD_ID',
+  'OPENAI_API_KEY'
+] as const;
+
+// Validate required environment variables
+for (const envVar of REQUIRED_ENV_VARS) {
+  if (!process.env[envVar]) {
+    throw new Error(`Missing required environment variable: ${envVar}`);
+  }
+}
 
 export const config = {
-  token: process.env.DISCORD_TOKEN,
-  env: process.env.NODE_ENV
-};
+  // Bot configuration
+  token: process.env.DISCORD_TOKEN!,
+  clientId: process.env.CLIENT_ID!,
+  guildId: process.env.GUILD_ID!,
+  openaiApiKey: process.env.OPENAI_API_KEY!,
+  
+  // Environment
+  env: process.env.NODE_ENV,
+  isProduction: process.env.NODE_ENV === 'production'
+} as const;

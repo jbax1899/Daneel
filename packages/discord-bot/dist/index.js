@@ -1,31 +1,20 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
-import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
 import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
+import { config } from './utils/env.js';
+import OpenAI from 'openai';
 // ====================
 // Environment Setup
 // ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-// Load environment variables
-dotenv.config({
-    path: path.resolve(__dirname, '../../../.env')
+// Initialize OpenAI
+const openai = new OpenAI({
+    apiKey: config.openaiApiKey
 });
-// Validate required environment variables
-const REQUIRED_ENV_VARS = [
-    'DISCORD_TOKEN',
-    'CLIENT_ID',
-    'GUILD_ID',
-    'OPENAI_API_KEY'
-];
-for (const envVar of REQUIRED_ENV_VARS) {
-    if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-    }
-}
 // ====================
 // Client Configuration
 // ====================
@@ -41,9 +30,26 @@ const client = new Client({
 // Initialize Managers
 // ====================
 const commandHandler = new CommandHandler();
-const eventManager = new EventManager(client);
+const eventManager = new EventManager(client, { openai });
 // ====================
-// Event Registration
+// Load and Register Commands
+// ====================
+try {
+    const commands = await commandHandler.loadCommands();
+    // Deploy commands to Discord
+    await commandHandler.deployCommands(config.token, config.clientId, config.guildId);
+    // Store commands in memory for execution
+    commands.forEach((cmd, name) => {
+        client.commands = client.commands || new Map();
+        client.commands.set(name, cmd);
+    });
+}
+catch (error) {
+    logger.error('Failed to load/deploy commands:', error);
+    process.exit(1);
+}
+// ====================
+// Load Events
 // ====================
 const eventsPath = path.join(__dirname, 'events');
 await eventManager.loadEvents(eventsPath);
@@ -51,7 +57,7 @@ eventManager.registerAll();
 // ====================
 // Start the Bot
 // ====================
-client.login(process.env.DISCORD_TOKEN);
+client.login(config.token);
 // ====================
 // Process Handlers
 // ====================
@@ -63,24 +69,10 @@ process.on('uncaughtException', (error) => {
     process.exit(1);
 });
 // Client ready handler
-client.once(Events.ClientReady, async () => {
-    logger.info(`Logged in as ${client.user?.tag}!`);
-    try {
-        // Load and register commands
-        const commands = await commandHandler.loadCommands();
-        commands.forEach((cmd, name) => {
-            client.commands?.set(name, cmd);
-        });
-        logger.info(`Registered ${commands.size} commands in client`);
-        // Deploy commands to Discord
-        await commandHandler.deployCommands(process.env.DISCORD_TOKEN, process.env.CLIENT_ID, process.env.GUILD_ID);
-    }
-    catch (error) {
-        logger.error('Error during startup:', error);
-        process.exit(1);
-    }
+client.once(Events.ClientReady, () => {
+    logger.info(`Logged in as ${client.user?.tag}`);
 });
-// Handle slash commands
+// Slash commands handler
 client.on(Events.InteractionCreate, async (interaction) => {
     if (!interaction.isChatInputCommand())
         return;

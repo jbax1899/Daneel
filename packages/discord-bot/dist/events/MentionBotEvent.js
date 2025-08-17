@@ -2,12 +2,12 @@ import { Event } from './Event.js';
 import { logger } from '../utils/logger.js';
 export class EventMentionBot extends Event {
     openai;
-    constructor(openai) {
+    constructor(dependencies) {
         super({
             name: 'messageCreate',
             once: false
         });
-        this.openai = openai;
+        this.openai = dependencies.openai;
     }
     async execute(message) {
         if (message.author.bot)

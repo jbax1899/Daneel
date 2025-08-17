@@ -14,6 +14,7 @@ export class CommandHandler {
     commands = new Collection();
     async loadCommands() {
         try {
+            logger.debug('Loading commands...');
             // In development, we need to look in the src directory for .ts files
             const isDev = process.env.NODE_ENV !== 'production';
             const basePath = isDev ? path.join(process.cwd(), 'src/commands') : commandsPath;
@@ -25,24 +26,24 @@ export class CommandHandler {
                 const isNotBaseCommand = !file.includes('BaseCommand');
                 return isCorrectExtension && isNotDeclaration && isNotBaseCommand;
             });
-            logger.info(`Found ${commandFiles.length} command files in ${basePath}`);
+            logger.debug(`Found ${commandFiles.length} command files in ${basePath}`);
             for (const file of commandFiles) {
                 try {
                     const filePath = path.join(basePath, file);
-                    logger.info(`Attempting to load command from: ${filePath}`);
+                    logger.debug(`Attempting to load command from: ${filePath}`);
                     // Use dynamic import with file:// URL for Windows compatibility
                     const fileUrl = new URL(`file://${filePath.replace(/\\/g, '/')}`);
                     const { default: command } = await import(fileUrl.href);
                     if (command?.data) {
                         this.commands.set(command.data.name, command);
-                        logger.info(`✅ Loaded command: ${command.data.name}`);
+                        logger.debug(`Loaded command: ${command.data.name}`);
                     }
                     else {
-                        logger.warn(`❌ Command in ${file} is missing required 'data' property`);
+                        logger.warn(`Command in ${file} is missing required 'data' property`);
                     }
                 }
                 catch (error) {
-                    logger.error(`❌ Error loading command from ${file}:`, error);
+                    logger.error(`Error loading command from ${file}:`, error);
                 }
             }
             logger.info(`Successfully loaded ${this.commands.size} commands.`);
@@ -60,7 +61,7 @@ export class CommandHandler {
             }
             const commands = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
             const rest = new REST({ version: '10' }).setToken(token);
-            logger.info('Started refreshing application (/) commands.');
+            logger.debug('Started refreshing application (/) commands.');
             await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
             logger.info(`Successfully deployed ${commands.length} application (/) commands.`);
             return commands;
