@@ -29,7 +29,7 @@ export class CommandHandler {
    * @returns {Promise<Collection<string, Command>>}
    * @throws {Error} If there's an error loading commands
    */
-  async loadCommands() {
+  async loadCommands(): Promise<Collection<string, Command>> {
     try {
       logger.debug('Loading commands...');
 
@@ -41,7 +41,7 @@ export class CommandHandler {
        * Filters and loads command files based on environment
        * @type {string[]}
        */
-      const commandFiles = (await readdir(basePath))
+      const commandFiles: string[] = (await readdir(basePath))
         .filter(file => {
           // In development, look for .ts files, in production look for .js files
           const isCorrectExtension = isDev ? file.endsWith('.ts') : file.endsWith('.js');
@@ -85,7 +85,7 @@ export class CommandHandler {
    * @param {string} name - Command name
    * @returns {Command|undefined} Command instance or undefined if not found
    */
-  getCommand(name: string) {
+  getCommand(name: string): Command | undefined {
     return this.commands.get(name);
   }
 
@@ -93,7 +93,7 @@ export class CommandHandler {
    * Retrieves all loaded commands
    * @returns {Collection<string, Command>} Collection of commands
    */
-  getAllCommands() {
+  getAllCommands(): Collection<string, Command> {
     return this.commands;
   }
 

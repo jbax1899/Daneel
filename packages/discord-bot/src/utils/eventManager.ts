@@ -96,13 +96,31 @@ export class EventManager {
 
   /**
    * Registers all loaded events with the Discord client.
-   * @returns {void}
+   * Ensures each event is only registered once to prevent duplicates.
    */
-  registerAll(): void {
-    this.events.forEach(event => {
-      event.register(this.client);
+  public registerAll(): void {
+    const registeredEvents = new Set<string>();
+    
+    for (const event of this.events) {
+      // Skip if this event name has already been registered
+      if (registeredEvents.has(event.name)) {
+        logger.warn(`Skipping duplicate registration for event: ${event.name}`);
+        continue;
+      }
+      
+      // Register the event
+      if (event.once) {
+        this.client.once(event.name, (...args) => event.execute(...args));
+      } else {
+        this.client.on(event.name, (...args) => event.execute(...args));
+      }
+      
+      // Track that we've registered this event name
+      registeredEvents.add(event.name);
       logger.debug(`Registered event: ${event.name} (${event.once ? 'once' : 'on'})`);
-    });
+    }
+
+    logger.info(`Registered ${this.events.length} events.`);
   }
 
   /**

@@ -41,7 +41,7 @@ export interface PromptBuilderOptions {
  * @constant
  * @type {string}
  */
-const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant in a Discord server.
+const DEFAULT_SYSTEM_PROMPT: string = `You are a helpful AI assistant in a Discord server.
 You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov.
 Keep responses concise, friendly, and on-topic.`;
 
