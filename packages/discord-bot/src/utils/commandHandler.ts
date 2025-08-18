@@ -1,7 +1,6 @@
 /**
- * Command Handler
- * 
- * Handles deployment and registration of slash commands with the Discord API.
+ * @file commandHandler.ts
+ * @description Handles deployment and registration of slash commands with the Discord API.
  * Manages command discovery, validation, and registration.
  */
 
@@ -12,11 +11,24 @@ import path from 'path';
 import { readdir } from 'fs/promises';
 import { logger } from './logger.js';
 
+/** Path to the commands directory */
 const commandsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../commands');
 
+/**
+ * Handles loading and managing Discord slash commands.
+ * Responsible for discovering, validating, and registering commands with Discord's API.
+ * @class CommandHandler
+ */
 export class CommandHandler {
+  /** Collection of loaded commands, mapped by command name */
   private commands = new Collection<string, Command>();
 
+  /**
+   * Loads all command files from the commands directory.
+   * @async
+   * @returns {Promise<Collection<string, Command>>}
+   * @throws {Error} If there's an error loading commands
+   */
   async loadCommands() {
     try {
       logger.debug('Loading commands...');
@@ -25,6 +37,10 @@ export class CommandHandler {
       const isDev = process.env.NODE_ENV !== 'production';
       const basePath = isDev ? path.join(process.cwd(), 'src/commands') : commandsPath;
       
+      /**
+       * Filters and loads command files based on environment
+       * @type {string[]}
+       */
       const commandFiles = (await readdir(basePath))
         .filter(file => {
           // In development, look for .ts files, in production look for .js files
@@ -52,7 +68,7 @@ export class CommandHandler {
             logger.warn(`Command in ${file} is missing required 'data' property`);
           }
         } catch (error) {
-          logger.error(`Error loading command from ${file}:`, error);
+          logger.error(`Error loading command ${file}:`, error);
         }
       }
 
@@ -64,35 +80,61 @@ export class CommandHandler {
     }
   }
 
-  async deployCommands(token: string, clientId: string, guildId: string) {
+  /**
+   * Retrieves a command by name
+   * @param {string} name - Command name
+   * @returns {Command|undefined} Command instance or undefined if not found
+   */
+  getCommand(name: string) {
+    return this.commands.get(name);
+  }
+
+  /**
+   * Retrieves all loaded commands
+   * @returns {Collection<string, Command>} Collection of commands
+   */
+  getAllCommands() {
+    return this.commands;
+  }
+
+  /**
+   * Registers all commands with Discord's API
+   * @async
+   * @param {string} token - Discord bot token
+   * @param {string} clientId - Discord client ID
+   * @param {string} [guildId] - Optional guild ID for guild-specific commands
+   * @returns {Promise<void>}
+   * @throws {Error} If registration fails
+   */
+  async deployCommands(token: string, clientId: string, guildId?: string): Promise<void> {
     try {
       if (this.commands.size === 0) {
         await this.loadCommands();
       }
 
-      const commands = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
       const rest = new REST({ version: '10' }).setToken(token);
-      
+      const commands = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
+
       logger.debug('Started refreshing application (/) commands.');
 
-      await rest.put(
-        Routes.applicationGuildCommands(clientId, guildId),
-        { body: commands },
-      );
-
-      logger.info(`Successfully deployed ${commands.length} application (/) commands.`);
-      return commands;
+      if (guildId) {
+        // Guild-specific commands
+        await rest.put(
+          Routes.applicationGuildCommands(clientId, guildId),
+          { body: commands }
+        );
+        logger.info(`Successfully reloaded ${commands.length} guild commands.`);
+      } else {
+        // Global commands
+        await rest.put(
+          Routes.applicationCommands(clientId),
+          { body: commands }
+        );
+        logger.info(`Successfully reloaded ${commands.length} global commands.`);
+      }
     } catch (error) {
-      logger.error('Error deploying commands:', error);
+      logger.error('Failed to register commands:', error);
       throw error;
     }
-  }
-
-  getCommand(name: string) {
-    return this.commands.get(name);
-  }
-
-  getAllCommands() {
-    return this.commands;
   }
 }

@@ -1,21 +1,48 @@
+/**
+ * @file eventManager.ts
+ * @description Manages loading and handling Discord.js events.
+ * Handles dynamic loading of event handlers and binding them to Discord client events.
+ */
+
 import { Client } from 'discord.js';
 import path from 'path';
 import { readdir } from 'fs/promises';
 import { logger } from './logger.js';
 import { Event } from '../events/Event.js';
 
+/**
+ * Manages Discord.js events for the bot.
+ * Handles dynamic loading of event handlers and binding them to Discord client events.
+ * @class EventManager
+ */
 export class EventManager {
+  /** Collection of loaded event handlers */
   private events: Event[] = [];
+  
+  /** Dependencies to be injected into event handlers */
   private dependencies: Record<string, any>;
 
+  /**
+   * Creates an instance of EventManager.
+   * @param {Client} client - The Discord.js client instance
+   * @param {Record<string, any>} [dependencies={}] - Dependencies to inject into event handlers
+   */
   constructor(private client: Client, dependencies: Record<string, any> = {}) {
     this.dependencies = dependencies;
   }
 
+  /**
+   * Loads event handlers from the specified directory.
+   * @async
+   * @param {string} eventsPath - Path to the directory containing event handlers
+   * @returns {Promise<void>}
+   * @throws {Error} If there's an error loading events
+   */
   async loadEvents(eventsPath: string): Promise<void> {
     try {
       logger.debug(`Loading events from: ${eventsPath}`);
 
+      // Filter for valid event files (JS/TS files, excluding base Event file)
       const eventFiles = (await readdir(eventsPath))
         .filter(file => {
           const isJsFile = file.endsWith('.js') || file.endsWith('.ts');
@@ -53,8 +80,7 @@ export class EventManager {
               logger.error(`Failed to instantiate event from ${file}:`, error);
             }
           } else {
-            logger.warn(`Skipping ${file} - no valid event class found`);
-            logger.debug('Module exports:', Object.keys(module));
+            logger.warn(`Skipping ${file}: No valid event class found`);
           }
         } catch (error) {
           logger.error(`Error loading event from ${file}:`, error);
@@ -68,6 +94,10 @@ export class EventManager {
     }
   }
 
+  /**
+   * Registers all loaded events with the Discord client.
+   * @returns {void}
+   */
   registerAll(): void {
     this.events.forEach(event => {
       event.register(this.client);
@@ -75,6 +105,10 @@ export class EventManager {
     });
   }
 
+  /**
+   * Gets the number of loaded events.
+   * @returns {number} Number of loaded events
+   */
   getEventCount(): number {
     return this.events.length;
   }

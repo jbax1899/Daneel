@@ -1,12 +1,27 @@
+/**
+ * @file logger.ts
+ * @description Winston-based logging utility with console and file transports
+ */
+
 import { createLogger, format, transports } from 'winston';
 import { format as dateFnsFormat } from 'date-fns';
 
 const { combine, timestamp, printf, colorize } = format;
 
+/**
+ * Custom log format function
+ * @private
+ * @param {Object} log - Log entry object
+ * @returns {string} Formatted log string
+ */
 const logFormat = printf(({ level, message, timestamp }) => {
   return `${timestamp} [${level}]: ${message}`;
 });
 
+/**
+ * Winston logger instance with console and file transports
+ * @type {import('winston').Logger}
+ */
 export const logger = createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: combine(
