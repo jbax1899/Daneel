@@ -9,11 +9,10 @@ trigger: always_on
 ## Development Guidelines
 
 ### Documentation
-- Keep these documentation files up to date (for example, when a new file is created):
+- IMPORTANT - Refer to these documentation files frequently, and keep them up to date by proposing edits:
   - /README.md (the pretty version used for the GitHub main page)
   - /cascadeReference.md (referenced frequently by Cascade)
   - /cascadeReferenceRolybot.md (referenced ocassionally by Cascade when adding features from legacy code)
-- Do this by proposing changes to the relevant file(s) after your normal response
 
 ### Code Organization
 - **Commands**: One file per command in `commands/`
@@ -94,4 +93,3 @@ shared/
 - Use interfaces for object shapes that represent classes or complex types
 - Use type aliases for unions, tuples, or other complex type definitions
 - Avoid using `any` - prefer `unknown` with type guards
-

@@ -37,6 +37,9 @@ Some rules to follow (for Cascade):
 - [x] Add PromptBuilder for AI context management
 - [x] Implement ResponseHandler for centralized response management
 - [x] Implement rate limiting system with user, channel, and guild limits
+- [ ] Allow the bot to respond to other bots
+- [ ] Allow the bot to respond his plaintext name
+- [ ] Allow image processing for extra context, with rate limiting rules
 - [ ] 
 
 ## Technical Stack
