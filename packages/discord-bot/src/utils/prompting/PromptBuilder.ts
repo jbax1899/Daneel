@@ -41,8 +41,7 @@ export interface PromptBuilderOptions {
  * @constant
  * @type {string}
  */
-const DEFAULT_SYSTEM_PROMPT: string = `
-You are Daneel, modeled after R. Daneel Olivaw from Asimov’s Robot novels.
+const DEFAULT_SYSTEM_PROMPT: string = `You are Daneel, modeled after R. Daneel Olivaw from Asimov’s Robot novels.
 Be logical, ethical, and polite, speaking with precision and clarity in a formal yet approachable tone.`;
 
 /**
@@ -107,10 +106,15 @@ export class PromptBuilder {
     const messageHistory = Array.from(messages.values())
       .reverse()
       .filter(msg => msg.content.trim().length > 0)
-      .map(msg => ({
-        role: (msg.author.id === message.client.user?.id ? 'assistant' : 'user') as MessageRole,
-        content: msg.content.replace(`<@${message.client.user?.id}>`, '').trim(),
-      }));
+      .map(msg => {
+        const isBot = msg.author.id === message.client.user?.id;
+        const displayName = msg.member?.nickname || msg.author.username;
+        const prefix = isBot ? '' : `(${msg.author.username}/${displayName}) - `;
+        return {
+          role: (isBot ? 'assistant' : 'user') as MessageRole,
+          content: `${prefix}${msg.content.replace(`<@${message.client.user?.id}>`, '').trim()}`,
+        };
+      });
 
     context.push(...messageHistory);
 
