@@ -82,23 +82,21 @@ export class PromptBuilder {
     message: Message,
     additionalContext: Record<string, any> = {}
   ): Promise<MessageContext[]> {
+    let systemContent = this.getSystemPrompt(); // Create system message with both default prompt and additional context
+
+    if (Object.keys(additionalContext).length > 0) {
+      systemContent += '\nAdditional context for this interaction:\n' +
+        Object.entries(additionalContext)
+          .map(([key, value]) => `- ${key}: ${JSON.stringify(value)}`)
+          .join('\n');
+    }
+
     const context: MessageContext[] = [
       {
         role: 'system',
-        content: this.getSystemPrompt(),
+        content: systemContent,
       },
     ];
-
-    // Add any additional context as system messages
-    if (Object.keys(additionalContext).length > 0) {
-      context.push({
-        role: 'system',
-        content: 'Additional context for this interaction:\n' +
-          Object.entries(additionalContext)
-            .map(([key, value]) => `- ${key}: ${JSON.stringify(value)}`)
-            .join('\n')
-      });
-    }
 
     // Add message history
     const messages = await message.channel.messages.fetch({
@@ -112,7 +110,6 @@ export class PromptBuilder {
       .map(msg => ({
         role: (msg.author.id === message.client.user?.id ? 'assistant' : 'user') as MessageRole,
         content: msg.content.replace(`<@${message.client.user?.id}>`, '').trim(),
-        timestamp: msg.createdTimestamp,
       }));
 
     context.push(...messageHistory);
@@ -120,8 +117,7 @@ export class PromptBuilder {
     // Add current message
     context.push({
       role: 'user',
-      content: message.content.trim(),
-      timestamp: message.createdTimestamp,
+      content: message.content.trim()
     });
 
     return context;
