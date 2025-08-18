@@ -1,16 +1,32 @@
 /**
- * MessageProcessor - Coordinates the message handling flow
- * Manages the process from receiving a message to sending a response
+ * @file MessageProcessor.ts
+ * @description Coordinates the message handling flow for the Discord bot.
+ * Manages the complete process from receiving a message to sending a response,
+ * including validation, context building, and response handling.
  */
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
+/**
+ * Handles the complete message processing pipeline for the Discord bot.
+ * Coordinates validation, context building, AI response generation, and response handling.
+ * @class MessageProcessor
+ */
 export class MessageProcessor {
     promptBuilder;
     openaiService;
-    constructor(dependencies) {
-        this.promptBuilder = dependencies.promptBuilder;
-        this.openaiService = dependencies.openaiService;
+    /**
+     * Creates an instance of MessageProcessor.
+     * @param {MessageProcessorOptions} options - Configuration options
+     */
+    constructor(options) {
+        this.promptBuilder = options.promptBuilder;
+        this.openaiService = options.openaiService;
     }
+    /**
+     * Processes an incoming Discord message.
+     * @param {Message} message - The Discord message to process
+     * @returns {Promise<void>}
+     */
     async processMessage(message) {
         const responseHandler = new ResponseHandler(message, message.channel, message.author);
         try {
@@ -19,7 +35,7 @@ export class MessageProcessor {
                 return;
             }
             // 2. Show typing indicator
-            await responseHandler.indicateTyping(5000);
+            await responseHandler.indicateTyping();
             // 3. Build context and get AI response
             const context = await this.buildMessageContext(message);
             const response = await this.openaiService.generateResponse(context);
@@ -33,9 +49,21 @@ export class MessageProcessor {
             await this.handleError(responseHandler, error);
         }
     }
+    /**
+     * Validates if a message should be processed.
+     * @private
+     * @param {Message} message - The message to validate
+     * @returns {boolean} True if the message is valid, false otherwise
+     */
     isValidMessage(message) {
         return !message.author.bot && message.content.trim().length > 0;
     }
+    /**
+     * Builds the context for an AI response based on the message.
+     * @private
+     * @param {Message} message - The Discord message
+     * @returns {Promise<any[]>} The constructed message context
+     */
     async buildMessageContext(message) {
         return this.promptBuilder.buildContext(message, {
             userId: message.author.id,
@@ -44,6 +72,14 @@ export class MessageProcessor {
             guildId: message.guildId,
         });
     }
+    /**
+     * Handles the AI response, including formatting and chunking if needed.
+     * @private
+     * @param {ResponseHandler} responseHandler - The response handler for sending messages
+     * @param {string} response - The AI-generated response
+     * @param {any[]} context - The context used for the AI response
+     * @returns {Promise<void>}
+     */
     async handleResponse(responseHandler, response, context) {
         let finalResponse = response;
         // In development, prepend the context if available
@@ -62,6 +98,13 @@ export class MessageProcessor {
             await responseHandler.sendText(finalResponse);
         }
     }
+    /**
+     * Handles errors that occur during message processing.
+     * @private
+     * @param {ResponseHandler} responseHandler - The response handler for error messages
+     * @param {unknown} error - The error that occurred
+     * @returns {Promise<void>}
+     */
     async handleError(responseHandler, error) {
         logger.error('Error in MessageProcessor:', error);
         try {

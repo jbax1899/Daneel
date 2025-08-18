@@ -1,18 +1,46 @@
 /**
- * PromptBuilder - Handles building conversation contexts for AI interactions
- * Will contain logic to construct prompts based on message history and context
+ * @file PromptBuilder.ts
+ * @description Handles building conversation contexts for AI interactions in Discord.
+ * Manages message history, system prompts, and context construction for AI model interactions.
+ */
+/**
+ * Default system prompt used when no custom prompt is provided.
+ * @constant
+ * @type {string}
  */
 const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant in a Discord server.
 You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov.
 Keep responses concise, friendly, and on-topic.`;
-export class DiscordPromptBuilder {
+/**
+ * Handles building conversation contexts for AI model interactions.
+ * Manages message history, system prompts, and context construction.
+ * @class PromptBuilder
+ */
+export class PromptBuilder {
     options;
+    /**
+     * Creates an instance of PromptBuilder.
+     * @param {PromptBuilderOptions} [options={}] - Configuration options
+     */
     constructor(options = {}) {
         this.options = {
             maxContextMessages: options.maxContextMessages || 10,
             systemPrompt: options.systemPrompt || DEFAULT_SYSTEM_PROMPT,
         };
     }
+    /**
+     * Gets the current system prompt being used.
+     * @returns {string} The current system prompt
+     */
+    getSystemPrompt() {
+        return this.options.systemPrompt;
+    }
+    /**
+     * Builds a conversation context from a Discord message.
+     * @param {Message} message - The Discord message to build context from
+     * @param {Record<string, any>} [additionalContext={}] - Optional additional context to include
+     * @returns {Promise<MessageContext[]>} Array of message contexts for the AI model
+     */
     async buildContext(message, additionalContext = {}) {
         const context = [
             {
@@ -51,9 +79,6 @@ export class DiscordPromptBuilder {
             timestamp: message.createdTimestamp,
         });
         return context;
-    }
-    getSystemPrompt() {
-        return this.options.systemPrompt;
     }
 }
 //# sourceMappingURL=PromptBuilder.js.map

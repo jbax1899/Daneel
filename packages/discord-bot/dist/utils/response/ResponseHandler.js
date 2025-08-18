@@ -1,17 +1,35 @@
 /**
- * ResponseHandler - Manages how the bot responds to messages
- * Will handle different response types (replies, DMs, embeds) and formatting
+ * @file ResponseHandler.ts
+ * @description Manages how the bot responds to messages in Discord.
+ * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 import { logger } from '../logger.js';
+/**
+ * Handles various types of message responses for Discord interactions.
+ * Manages text responses, embeds, direct messages, reactions, and typing indicators.
+ * @class ResponseHandler
+ */
 export class ResponseHandler {
     message;
     channel;
     user;
+    /**
+     * Creates an instance of ResponseHandler.
+     * @param {Message} message - The original Discord message that triggered the response
+     * @param {TextBasedChannel} channel - The channel where the message was received
+     * @param {User} user - The user who sent the original message
+     */
     constructor(message, channel, user) {
         this.message = message;
         this.channel = channel;
         this.user = user;
     }
+    /**
+     * Sends a text response to the channel where the message was received.
+     * @param {string} content - The text content to send
+     * @param {Omit<MessageReplyOptions, 'content'>} [options] - Additional message options
+     * @returns {Promise<void>}
+     */
     async sendText(content, options = {}) {
         try {
             await this.message.reply({
@@ -25,6 +43,12 @@ export class ResponseHandler {
             throw error;
         }
     }
+    /**
+     * Sends an embedded message to the channel where the message was received.
+     * @param {EmbedBuilder} embed - The embed to send
+     * @param {Omit<MessageReplyOptions, 'embeds'>} [options] - Additional message options
+     * @returns {Promise<void>}
+     */
     async sendEmbed(embed, options = {}) {
         try {
             await this.message.reply({
@@ -38,6 +62,12 @@ export class ResponseHandler {
             throw error;
         }
     }
+    /**
+     * Sends a direct message to the user who sent the original message.
+     * Falls back to a channel message if DMs are disabled.
+     * @param {string | MessageCreateOptions} content - The message content or options
+     * @returns {Promise<void>}
+     */
     async sendDM(content) {
         try {
             const dmChannel = await this.user.createDM();
@@ -47,13 +77,20 @@ export class ResponseHandler {
             logger.error('Failed to send DM:', error);
             // Fall back to public channel if DM fails
             if (typeof content === 'string') {
-                await this.sendText(`I couldn't send you a DM. Please check your privacy settings.\n> ${content}`);
+                await this.sendText(`Sorry, I couldn't send you a DM.\n> ${content}`);
             }
             else {
-                await this.sendText("I couldn't send you a DM. Please check your privacy settings.");
+                await this.sendText("Sorry, I couldn't send you a DM.");
             }
         }
     }
+    /**
+     * Edits an existing message in the channel.
+     * @param {string} messageId - The ID of the message to edit
+     * @param {string | MessageEditOptions} content - The new content or options
+     * @returns {Promise<void>}
+     * @throws Will throw an error if the message cannot be edited
+     */
     async editMessage(messageId, content) {
         try {
             const message = await this.channel.messages.fetch(messageId);
@@ -66,6 +103,11 @@ export class ResponseHandler {
             throw error;
         }
     }
+    /**
+     * Adds a reaction to the original message.
+     * @param {string} emoji - The emoji to react with
+     * @returns {Promise<void>}
+     */
     async addReaction(emoji) {
         try {
             await this.message.react(emoji);
@@ -76,33 +118,21 @@ export class ResponseHandler {
         }
     }
     /**
-     * Send a typing indicator in the channel
-     * @param durationMs How long to show the typing indicator (max 10s)
+     * Shows a typing indicator in the channel.
+     * The indicator will automatically disappear after ~10 seconds or when a message is sent.
+     * @returns {Promise<void>}
      */
-    async indicateTyping(durationMs = 5000) {
+    async indicateTyping() {
+        // Only valid for text-based channels
         if (!this.channel.isTextBased() || this.channel.isDMBased() || this.channel.isThread()) {
             return;
         }
         try {
             await this.channel.sendTyping();
-            // Automatically stop typing after duration (max 10s as per Discord's limit)
-            const typingDuration = Math.min(durationMs, 10000);
-            if (typingDuration > 0) {
-                setTimeout(() => this.stopTyping(), typingDuration);
-            }
         }
         catch (error) {
             logger.warn('Failed to send typing indicator:', error);
         }
-    }
-    /**
-     * Stop the typing indicator
-     * Note: Discord.js doesn't provide a direct way to stop typing,
-     * so this is a no-op. The typing indicator will automatically
-     * stop after ~10 seconds or when a message is sent.
-     */
-    stopTyping() {
-        // No-op - typing indicator stops automatically
     }
 }
 //# sourceMappingURL=ResponseHandler.js.map

@@ -1,33 +1,51 @@
 /**
- * MessageProcessor - Coordinates the message handling flow
- * Manages the process from receiving a message to sending a response
+ * @file MessageProcessor.ts
+ * @description Coordinates the message handling flow for the Discord bot.
+ * Manages the complete process from receiving a message to sending a response,
+ * including validation, context building, and response handling.
  */
 
 import type { Message } from 'discord.js';
-import { DiscordPromptBuilder } from './prompting/PromptBuilder.js';
+import { PromptBuilder } from './prompting/PromptBuilder.js';
 import { OpenAIService } from './openaiService.js';
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
 
-export interface IMessageProcessor {
-  processMessage(message: Message): Promise<void>;
-}
-
-export interface MessageProcessorDependencies {
-  promptBuilder: DiscordPromptBuilder;
+/**
+ * Configuration object for initializing MessageProcessor.
+ * @typedef {Object} MessageProcessorOptions
+ * @property {PromptBuilder} promptBuilder - The prompt builder for creating message contexts
+ * @property {OpenAIService} openaiService - The service for generating AI responses
+ */
+type MessageProcessorOptions = {
+  promptBuilder: PromptBuilder;
   openaiService: OpenAIService;
-}
+};
 
-export class MessageProcessor implements IMessageProcessor {
-  private readonly promptBuilder: DiscordPromptBuilder;
+/**
+ * Handles the complete message processing pipeline for the Discord bot.
+ * Coordinates validation, context building, AI response generation, and response handling.
+ * @class MessageProcessor
+ */
+export class MessageProcessor {
+  private readonly promptBuilder: PromptBuilder;
   private readonly openaiService: OpenAIService;
 
-  constructor(dependencies: MessageProcessorDependencies) {
-    this.promptBuilder = dependencies.promptBuilder;
-    this.openaiService = dependencies.openaiService;
+  /**
+   * Creates an instance of MessageProcessor.
+   * @param {MessageProcessorOptions} options - Configuration options
+   */
+  constructor(options: MessageProcessorOptions) {
+    this.promptBuilder = options.promptBuilder;
+    this.openaiService = options.openaiService;
   }
 
-  async processMessage(message: Message): Promise<void> {
+  /**
+   * Processes an incoming Discord message.
+   * @param {Message} message - The Discord message to process
+   * @returns {Promise<void>}
+   */
+  public async processMessage(message: Message): Promise<void> {
     const responseHandler = new ResponseHandler(message, message.channel, message.author);
     
     try {
@@ -37,7 +55,7 @@ export class MessageProcessor implements IMessageProcessor {
       }
 
       // 2. Show typing indicator
-      await responseHandler.indicateTyping(5000);
+      await responseHandler.indicateTyping();
 
       // 3. Build context and get AI response
       const context = await this.buildMessageContext(message);
@@ -53,11 +71,23 @@ export class MessageProcessor implements IMessageProcessor {
     }
   }
 
+  /**
+   * Validates if a message should be processed.
+   * @private
+   * @param {Message} message - The message to validate
+   * @returns {boolean} True if the message is valid, false otherwise
+   */
   private isValidMessage(message: Message): boolean {
     return !message.author.bot && message.content.trim().length > 0;
   }
 
-  private async buildMessageContext(message: Message) {
+  /**
+   * Builds the context for an AI response based on the message.
+   * @private
+   * @param {Message} message - The Discord message
+   * @returns {Promise<any[]>} The constructed message context
+   */
+  private async buildMessageContext(message: Message): Promise<any[]> {
     return this.promptBuilder.buildContext(message, {
       userId: message.author.id,
       username: message.author.username,
@@ -66,6 +96,14 @@ export class MessageProcessor implements IMessageProcessor {
     });
   }
 
+  /**
+   * Handles the AI response, including formatting and chunking if needed.
+   * @private
+   * @param {ResponseHandler} responseHandler - The response handler for sending messages
+   * @param {string} response - The AI-generated response
+   * @param {any[]} context - The context used for the AI response
+   * @returns {Promise<void>}
+   */
   private async handleResponse(
     responseHandler: ResponseHandler, 
     response: string, 
@@ -93,6 +131,13 @@ export class MessageProcessor implements IMessageProcessor {
     }
   }
 
+  /**
+   * Handles errors that occur during message processing.
+   * @private
+   * @param {ResponseHandler} responseHandler - The response handler for error messages
+   * @param {unknown} error - The error that occurred
+   * @returns {Promise<void>}
+   */
   private async handleError(responseHandler: ResponseHandler, error: unknown): Promise<void> {
     logger.error('Error in MessageProcessor:', error);
     try {
