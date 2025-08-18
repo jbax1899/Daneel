@@ -212,19 +212,20 @@ export class MessageProcessor {
 
       // Handle the response
       if (response.length > 2000) {
-        // For long responses, split into chunks and attach context to the first chunk
+        // For long responses, split into chunks
         const chunks = response.match(/[\s\S]{1,2000}/g) || [];
         
-        // Send first chunk with debug context if any
-        if (chunks.length > 0) {
-          await responseHandler.sendMessage(chunks[0], files);
-          
-          // Send remaining chunks without debug context
-          for (let i = 1; i < chunks.length; i++) {
+        // Send all chunks first
+        for (let i = 0; i < chunks.length; i++) {
+          if (i === chunks.length - 1) {
+            // Attach any files, like debug context, to the last chunk
+            await responseHandler.sendMessage(chunks[i], files);
+          } else {
             await responseHandler.sendText(chunks[i]);
           }
         }
       } else {
+        // For short responses, just send with debug context if any
         await responseHandler.sendMessage(response, files);
       }
     } catch (error) {
