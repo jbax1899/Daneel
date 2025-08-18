@@ -37,8 +37,10 @@ Some rules to follow (for Cascade):
 - [x] Add PromptBuilder for AI context management
 - [x] Implement ResponseHandler for centralized response management
 - [x] Implement rate limiting system with user, channel, and guild limits
+- [x] Upgrade to GPT-5 for improved responses
+- [x] Add detailed token usage tracking and cost estimation
 - [ ] Allow the bot to respond to other bots
-- [ ] Allow the bot to respond his plaintext name
+- [ ] Allow the bot to respond to plaintext name
 - [ ] Allow image processing for extra context, with rate limiting rules
 - [ ] 
 
@@ -135,14 +137,21 @@ frontend/
 #### 1. MessageProcessor
 - Handles incoming messages and orchestrates the response flow
 - Integrates with PromptBuilder and ResponseHandler
-- Manages conversation state
+- Manages conversation state and token usage tracking
+- Provides detailed debug information in development mode
 
-#### 2. PromptBuilder
+#### 2. OpenAIService
+- Manages communication with OpenAI's API
+- Handles token usage tracking and cost estimation
+- Supports GPT-5 and other OpenAI models
+- Provides detailed logging of API interactions
+
+#### 3. PromptBuilder
 - Constructs prompts for the AI
 - Manages conversation history
 - Handles context injection
 
-#### 3. ResponseHandler
+#### 4. ResponseHandler
 - Manages all bot responses
 - Handles different response types (text, embeds, DMs, reactions)
 - Provides consistent error handling
@@ -151,7 +160,9 @@ frontend/
 1. `MentionBotEvent` receives and validates the message
 2. `MessageProcessor` handles the message:
    - Builds context using `PromptBuilder`
-   - Generates AI response
+   - Tracks token usage for each component
+   - Generates AI response using `OpenAIService`
+   - Logs detailed token usage and cost information
    - Manages response through `ResponseHandler`
 3. `ResponseHandler` sends the response to Discord
 

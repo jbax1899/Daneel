@@ -116,9 +116,53 @@ export class MessageProcessor {
             channelId: message.channelId,
             guildId: message.guildId,
         }, {
-        // You can override default GPT-5 options here if needed
+        // Placeholder to override default GPT-5 options
         // For example, to set higher verbosity for certain channels or users
         });
+    }
+    /**
+     * Splits a message into chunks, respecting word boundaries and natural breaks
+     * @private
+     * @param {string} text - The text to split
+     * @param {number} maxLength - Maximum length of each chunk
+     * @returns {string[]} Array of message chunks
+     */
+    splitMessage(text, maxLength = 2000) {
+        if (text.length <= maxLength)
+            return [text];
+        const chunks = [];
+        let start = 0;
+        let end = maxLength;
+        while (start < text.length) {
+            // Try to find a natural break point (newline, sentence end, or word boundary)
+            if (end < text.length) {
+                // Look for the last newline in the chunk
+                let lastNewline = text.lastIndexOf('\n', end - 1);
+                if (lastNewline > start && lastNewline < end) {
+                    end = lastNewline + 1;
+                }
+                else {
+                    // If no newline, look for sentence end (.!? followed by space or end of string)
+                    const sentenceEnd = text.substring(start, end).search(/[.!?][\s\n]|\n|\s+[^\s]*$/);
+                    if (sentenceEnd > 0) {
+                        end = start + sentenceEnd + 1;
+                    }
+                    else {
+                        // If no good breakpoint, just split at the last space in the chunk
+                        const lastSpace = text.lastIndexOf(' ', end);
+                        if (lastSpace > start)
+                            end = lastSpace + 1;
+                    }
+                }
+            }
+            // Ensure we don't go past the end of the string
+            end = Math.min(end, text.length);
+            // Add the chunk and update the start position
+            chunks.push(text.substring(start, end).trim());
+            start = end;
+            end = start + maxLength;
+        }
+        return chunks;
     }
     /**
      * Handles the AI response, including formatting and chunking if needed.
@@ -138,19 +182,20 @@ export class MessageProcessor {
                 const filename = `context-${timestamp}.txt`;
                 // Format each message in the context
                 const formattedContext = [
-                    `[OPTS] ${JSON.stringify(options, null, 2)}`,
+                    `[OPTS] ${Object.entries(options)
+                        .filter(([_, v]) => v !== undefined)
+                        .map(([k, v]) => `${k}: ${v}`)
+                        .join(' | ')}`,
                     ...context.map(msg => {
                         const maxLength = 4000; // Discord's message limit is 4000 characters
                         let content = msg.content;
                         if (content.length > maxLength) {
                             content = content.substring(0, maxLength) + '... [truncated]';
                         }
-                        // Get first 4 characters of role in uppercase
-                        const rolePrefix = msg.role.toUpperCase().substring(0, 4);
-                        // Format as [ROLE] content with newlines preserved
-                        return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
+                        const rolePrefix = msg.role.toUpperCase().substring(0, 4); // Get first 4 characters of role in uppercase
+                        return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`; // Format as [ROLE] content with newlines preserved
                     })
-                ].join('\n\n');
+                ].filter(Boolean).join('\n\n');
                 files.push({
                     filename,
                     data: formattedContext
@@ -158,19 +203,20 @@ export class MessageProcessor {
             }
             // Handle the response
             if (response.length > 2000) {
-                // For long responses, split into chunks and attach context to the first chunk
-                const chunks = response.match(/[\s\S]{1,2000}/g) || [];
-                // Send first chunk with debug context if any
-                if (chunks.length > 0) {
-                    await responseHandler.sendMessage(chunks[0], files);
-                    // Send remaining chunks without debug context
-                    for (let i = 1; i < chunks.length; i++) {
+                // For long responses, split into chunks at natural breakpoints
+                const chunks = this.splitMessage(response);
+                // Send all chunks first
+                for (let i = 0; i < chunks.length; i++) {
+                    if (i === chunks.length - 1) {
+                        await responseHandler.sendMessage(chunks[i], files); // Attach any files, like debug context, to the last chunk
+                    }
+                    else {
                         await responseHandler.sendText(chunks[i]);
                     }
                 }
             }
             else {
-                await responseHandler.sendMessage(response, files);
+                await responseHandler.sendMessage(response, files); // For short responses, just send with debug context if any
             }
         }
         catch (error) {

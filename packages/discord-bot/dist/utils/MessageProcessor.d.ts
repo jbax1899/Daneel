@@ -52,6 +52,14 @@ export declare class MessageProcessor {
      */
     private buildMessageContext;
     /**
+     * Splits a message into chunks, respecting word boundaries and natural breaks
+     * @private
+     * @param {string} text - The text to split
+     * @param {number} maxLength - Maximum length of each chunk
+     * @returns {string[]} Array of message chunks
+     */
+    private splitMessage;
+    /**
      * Handles the AI response, including formatting and chunking if needed.
      * @private
      * @param {ResponseHandler} responseHandler - The response handler for sending messages

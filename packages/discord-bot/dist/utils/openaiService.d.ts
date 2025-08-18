@@ -25,7 +25,6 @@ export interface GenerateResponseOptions {
  * @class OpenAIService
  */
 export declare class OpenAIService {
-    /** OpenAI client instance */
     private openai;
     /**
      * Creates an instance of OpenAIService
@@ -42,5 +41,14 @@ export declare class OpenAIService {
      * @throws {Error} If there's an error communicating with the OpenAI API
      */
     generateResponse(messages: Message[], model?: string, options?: GenerateResponseOptions): Promise<string | null>;
+    /**
+     * Calculate the estimated cost for a given model and token usage
+     * @private
+     * @param {string} model - The model used
+     * @param {number} promptTokens - Number of tokens in the prompt
+     * @param {number} completionTokens - Number of tokens in the completion
+     * @returns {string} Formatted cost string or 'N/A' if model pricing is unknown
+     */
+    private calculateCost;
 }
 export {};

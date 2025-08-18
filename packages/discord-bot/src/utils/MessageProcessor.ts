@@ -103,7 +103,7 @@ export class MessageProcessor {
 
       // 4. Build context and get AI response
       const { context, options } = await this.buildMessageContext(message);
-      const response = await this.openaiService.generateResponse(
+      const { response, usage } = await this.openaiService.generateResponse(
         context,
         'gpt-5-mini',
         {
@@ -119,7 +119,15 @@ export class MessageProcessor {
         context.push({
           role: 'assistant',
           content: response,
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          metadata: usage ? {
+            tokens: {
+              input: usage.input_tokens,
+              output: usage.output_tokens,
+              total: usage.total_tokens,
+              cost: usage.cost
+            }
+          } : undefined
         });
         
         await this.handleResponse(responseHandler, response, context, options);
@@ -237,6 +245,12 @@ export class MessageProcessor {
             .filter(([_, v]) => v !== undefined)
             .map(([k, v]) => `${k}: ${v}`)
             .join(' | ')}`,
+          
+          // Add token usage information if available
+          ...(context[context.length - 1]?.metadata?.tokens ? [
+            `[RESP] tokens: ${context[context.length - 1].metadata.tokens.input} in | ${context[context.length - 1].metadata.tokens.output} out | ${context[context.length - 1].metadata.tokens.total} total | Cost: ${context[context.length - 1].metadata.tokens.cost}`
+          ] : []),
+
           ...context.map(msg => {
             const maxLength = 4000; // Discord's message limit is 4000 characters
             let content = msg.content;
