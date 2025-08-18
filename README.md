@@ -14,9 +14,9 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Implemented MessageProcessor for handling message flow
 - Added PromptBuilder for AI context management
 - Implemented ResponseHandler for centralized response management
+- Added configurable rate limiting system with user, channel, and guild limits
 
 #### In Progress
-- Rate limiting system
 - Basic moderation commands
 
 ## Features
@@ -27,6 +27,7 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Advanced message processing pipeline
 - AI-powered responses with conversation context
 - Robust error handling and logging
+- Configurable rate limiting to prevent abuse
 
 ### 🌐 Web Client
 - Next.js 15 with React 19
@@ -93,6 +94,45 @@ daneel/
 ├── .gitignore
 ├── package.json        # Root package.json with workspace config
 └── README.md
+```
+
+## Configuration
+
+### Required Environment Variables
+
+These environment variables must be set in your `.env` file for the bot to function:
+
+```env
+# Discord Bot Configuration
+DISCORD_TOKEN=your_discord_bot_token  # Required for bot authentication
+CLIENT_ID=your_discord_client_id      # Your Discord application's client ID
+GUILD_ID=your_discord_guild_id       # The server (guild) ID where the bot will operate
+
+# OpenAI Configuration
+OPENAI_API_KEY=your_openai_api_key   # Required for AI functionality
+```
+
+### Optional Environment Variables
+
+#### Rate Limiting
+
+Daneel includes a configurable rate limiting system to prevent abuse. You can configure the following settings in your `.env` file:
+
+```env
+# User rate limiting (per user)
+RATE_LIMIT_USER=true  # Enable/disable user rate limiting
+USER_RATE_LIMIT=5     # Max requests per user per time window
+USER_RATE_WINDOW_MS=60000  # Time window in milliseconds (60 seconds)
+
+# Channel rate limiting (per channel)
+RATE_LIMIT_CHANNEL=true  # Enable/disable channel rate limiting
+CHANNEL_RATE_LIMIT=10    # Max requests per channel per time window
+CHANNEL_RATE_WINDOW_MS=60000  # Time window in milliseconds (60 seconds)
+
+# Guild rate limiting (per server)
+RATE_LIMIT_GUILD=true  # Enable/disable guild rate limiting
+GUILD_RATE_LIMIT=20    # Max requests per guild per time window
+GUILD_RATE_WINDOW_MS=60000  # Time window in milliseconds (60 seconds)
 ```
 
 ## 📝 License

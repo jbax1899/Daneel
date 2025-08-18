@@ -43,6 +43,7 @@ discord-bot/
 │   │   ├── commandHandler.ts # Command loading and registration
 │   │   ├── env.ts          # Environment variable validation
 │   │   ├── logger.ts       # Logging utilities
+│   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
 │   │   │
 │   │   ├── prompting/      # Prompt construction and management
 │   │   │   └── PromptBuilder.ts # Builds conversation contexts for AI

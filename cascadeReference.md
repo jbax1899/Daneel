@@ -36,9 +36,8 @@ Some rules to follow (for Cascade):
 - [x] Implement MessageProcessor for handling message flow
 - [x] Add PromptBuilder for AI context management
 - [x] Implement ResponseHandler for centralized response management
-- [ ] Implement rate limiting system
-- [ ] Add basic moderation commands
-- [ ] Implement user feedback system
+- [x] Implement rate limiting system with user, channel, and guild limits
+- [ ] 
 
 ## Technical Stack
 
@@ -89,6 +88,7 @@ discord-bot/
 │   │   ├── commandHandler.ts # Command loading and registration
 │   │   ├── env.ts          # Environment variable validation
 │   │   ├── logger.ts       # Logging utilities
+│   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
 │   │   │
 │   │   ├── prompting/      # Prompt construction and management
 │   │   │   └── PromptBuilder.ts # Builds conversation contexts for AI
@@ -155,7 +155,6 @@ frontend/
 ## Future Improvements
 
 ### Core Features
-- [ ] Rate limiting system
 - [ ] Moderation commands
 - [ ] User feedback system
 - [ ] Database integration
@@ -174,7 +173,6 @@ frontend/
 - [ ] Metrics collection
 
 ### Security
-- [ ] Rate limiting
 - [ ] Input validation
 - [ ] Audit logging
 - [ ] Security headers
