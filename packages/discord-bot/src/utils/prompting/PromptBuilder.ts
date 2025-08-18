@@ -108,7 +108,7 @@ export class PromptBuilder {
 
     const messageHistory = Array.from(messages.values())
       .reverse()
-      .filter(msg => (msg.author.id === message.client.user?.id || !msg.author.bot) && msg.content.trim().length > 0)
+      .filter(msg => msg.content.trim().length > 0)
       .map(msg => ({
         role: (msg.author.id === message.client.user?.id ? 'assistant' : 'user') as MessageRole,
         content: msg.content.replace(`<@${message.client.user?.id}>`, '').trim(),
