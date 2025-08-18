@@ -30,12 +30,31 @@ if (error) {
  * List of required environment variables that must be set for the application to run.
  * @type {readonly string[]}
  */
-const REQUIRED_ENV_VARS = [
+const REQUIRED_ENV_VARS: readonly string[] = [
   'DISCORD_TOKEN',    // Discord bot token for authentication
   'CLIENT_ID',        // Discord application client ID
   'GUILD_ID',         // Discord server (guild) ID
   'OPENAI_API_KEY'    // OpenAI API key for AI functionality
 ] as const;
+
+/**
+ * Default rate limit configurations
+ */
+const DEFAULT_RATE_LIMITS: Record<string, any> = {
+  // Per-user: 5 messages per 10 seconds
+  USER_LIMIT: 1,
+  USER_WINDOW_MS: 10_000,
+  // Per-channel: 20 messages per 30 seconds
+  CHANNEL_LIMIT: 20,
+  CHANNEL_WINDOW_MS: 30_000,
+  // Per-guild: 100 messages per minute
+  GUILD_LIMIT: 100,
+  GUILD_WINDOW_MS: 60_000,
+  // Whether to enable each type of rate limiting
+  RATE_LIMIT_USER: 'true',
+  RATE_LIMIT_CHANNEL: 'true',
+  RATE_LIMIT_GUILD: 'true'
+} as const;
 
 /**
  * Validates that all required environment variables are set.
@@ -47,10 +66,30 @@ function validateEnvironment() {
       throw new Error(`Missing required environment variable: ${envVar}`);
     }
   }
+
+  // Log set rate limits
+  logger.debug(`Rate limits: ${JSON.stringify(DEFAULT_RATE_LIMITS)}`);
 }
 
 // Validate environment variables on startup
 validateEnvironment();
+
+/**
+ * Gets a number from environment variables with a default value
+ */
+function getNumberEnv(key: string, defaultValue: number): number {
+  const value = process.env[key];
+  return value ? Number(value) : defaultValue;
+}
+
+/**
+ * Gets a boolean from environment variables with a default value
+ */
+function getBooleanEnv(key: string, defaultValue: boolean): boolean {
+  const value = process.env[key];
+  if (value === undefined) return defaultValue;
+  return value.toLowerCase() === 'true';
+}
 
 /**
  * Application configuration object containing all environment-based settings.
@@ -61,6 +100,7 @@ validateEnvironment();
  * @property {string} openaiApiKey - OpenAI API key
  * @property {string|undefined} env - Current environment (e.g., 'development', 'production')
  * @property {boolean} isProduction - Whether the current environment is production
+ * @property {Object} rateLimits - Rate limiting configuration
  */
 export const config = {
   // Bot configuration
@@ -70,6 +110,25 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY!,
   
   // Environment
-  env: process.env.NODE_ENV,
-  isProduction: process.env.NODE_ENV === 'production'
+  env: process.env.NODE_ENV || 'development',
+  isProduction: (process.env.NODE_ENV || 'development') === 'production',
+  
+  // Rate limiting configuration
+  rateLimits: {
+    user: {
+      enabled: getBooleanEnv('RATE_LIMIT_USER', DEFAULT_RATE_LIMITS.RATE_LIMIT_USER === 'true'),
+      limit: getNumberEnv('USER_RATE_LIMIT', DEFAULT_RATE_LIMITS.USER_LIMIT),
+      windowMs: getNumberEnv('USER_RATE_WINDOW_MS', DEFAULT_RATE_LIMITS.USER_WINDOW_MS)
+    },
+    channel: {
+      enabled: getBooleanEnv('RATE_LIMIT_CHANNEL', DEFAULT_RATE_LIMITS.RATE_LIMIT_CHANNEL === 'true'),
+      limit: getNumberEnv('CHANNEL_RATE_LIMIT', DEFAULT_RATE_LIMITS.CHANNEL_LIMIT),
+      windowMs: getNumberEnv('CHANNEL_RATE_WINDOW_MS', DEFAULT_RATE_LIMITS.CHANNEL_WINDOW_MS)
+    },
+    guild: {
+      enabled: getBooleanEnv('RATE_LIMIT_GUILD', DEFAULT_RATE_LIMITS.RATE_LIMIT_GUILD === 'true'),
+      limit: getNumberEnv('GUILD_RATE_LIMIT', DEFAULT_RATE_LIMITS.GUILD_LIMIT),
+      windowMs: getNumberEnv('GUILD_RATE_WINDOW_MS', DEFAULT_RATE_LIMITS.GUILD_WINDOW_MS)
+    }
+  }
 } as const;

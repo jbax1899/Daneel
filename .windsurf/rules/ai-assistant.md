@@ -6,9 +6,23 @@ trigger: always_on
 
 *This document outlines the project structure and organization for the AI Assistant project (Daneel).*
 
-## Project Organization
+## Development Guidelines
 
-### 1. Discord Bot (`/packages/discord-bot`)
+### Documentation
+- Keep these documentation files up to date (for example, when a new file is created):
+  - /README.md (the pretty version used for the GitHub main page)
+  - /cascadeReference.md (referenced frequently by Cascade)
+  - /cascadeReferenceRolybot.md (referenced ocassionally by Cascade when adding features from legacy code)
+- Do this by proposing changes to the relevant file(s) after your normal response
+
+### Code Organization
+- **Commands**: One file per command in `commands/`
+- **Events**: One file per event in `events/`
+- **Components**: One component per file in `components/`
+- **Utils**: Group related utility functions in appropriate files under `utils/`
+- **Types**: Keep type definitions close to where they're used, with shared types in the shared package
+
+#### 1. Discord Bot (`/packages/discord-bot`)
 ```
 discord-bot/
 ├── src/
@@ -40,7 +54,7 @@ discord-bot/
 │   └── index.ts            # Bot entry point
 ```
 
-### 2. Frontend (`/packages/frontend`)
+#### 2. Frontend (`/packages/frontend`)
 ```
 frontend/
 └── web/                    # Next.js application
@@ -61,20 +75,11 @@ frontend/
         └── utils.ts         # Shared utility functions
 ```
 
-### 3. Shared (`/packages/shared`)
+#### 3. Shared (`/packages/shared`)
 ```
 shared/
 └── src/
 ```
-
-## Development Guidelines
-
-### Code Organization
-- **Commands**: One file per command in `commands/`
-- **Events**: One file per event in `events/`
-- **Components**: One component per file in `components/`
-- **Utils**: Group related utility functions in appropriate files under `utils/`
-- **Types**: Keep type definitions close to where they're used, with shared types in the shared package
 
 ### Naming Conventions
 - **Files**: Use kebab-case for file names (e.g., `message-processor.ts`)
@@ -89,9 +94,3 @@ shared/
 - Use type aliases for unions, tuples, or other complex type definitions
 - Avoid using `any` - prefer `unknown` with type guards
 
-### Documentation
-- Keep these documentation files up to date (for example, when a new file is created):
-  - /README.md (the pretty version used for the GitHub main page)
-  - /cascadeReference.md (referenced frequently by Cascade)
-  - /cascadeReferenceRolybot.md (referenced ocassionally by Cascade when adding features from legacy code)
-- Do this by proposing changes to the relevant file(s) after your normal response

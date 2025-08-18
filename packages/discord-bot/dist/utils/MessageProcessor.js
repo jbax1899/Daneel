@@ -6,6 +6,8 @@
  */
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
+import { RateLimiter } from './RateLimiter.js';
+import { config } from './env.js';
 /**
  * Handles the complete message processing pipeline for the Discord bot.
  * Coordinates validation, context building, AI response generation, and response handling.
@@ -14,6 +16,7 @@ import { ResponseHandler } from './response/ResponseHandler.js';
 export class MessageProcessor {
     promptBuilder;
     openaiService;
+    rateLimiters;
     /**
      * Creates an instance of MessageProcessor.
      * @param {MessageProcessorOptions} options - Configuration options
@@ -21,6 +24,32 @@ export class MessageProcessor {
     constructor(options) {
         this.promptBuilder = options.promptBuilder;
         this.openaiService = options.openaiService;
+        // Initialize rate limiters from config
+        this.rateLimiters = {};
+        if (config.rateLimits.user.enabled) {
+            this.rateLimiters.user = new RateLimiter({
+                limit: config.rateLimits.user.limit,
+                window: config.rateLimits.user.windowMs,
+                scope: 'user',
+                errorMessage: 'You are sending messages too quickly. Please slow down.'
+            });
+        }
+        if (config.rateLimits.channel.enabled) {
+            this.rateLimiters.channel = new RateLimiter({
+                limit: config.rateLimits.channel.limit,
+                window: config.rateLimits.channel.windowMs,
+                scope: 'channel',
+                errorMessage: 'Hit the rate limit for this channel. Please try again later.'
+            });
+        }
+        if (config.rateLimits.guild.enabled) {
+            this.rateLimiters.guild = new RateLimiter({
+                limit: config.rateLimits.guild.limit,
+                window: config.rateLimits.guild.windowMs,
+                scope: 'guild',
+                errorMessage: 'Hit the rate limit for this server/guild. Please try again later.'
+            });
+        }
     }
     /**
      * Processes an incoming Discord message.
@@ -34,12 +63,18 @@ export class MessageProcessor {
             if (!this.isValidMessage(message)) {
                 return;
             }
-            // 2. Show typing indicator
+            // 2. Check rate limits
+            const rateLimitResult = await this.checkRateLimits(message);
+            if (!rateLimitResult.allowed) {
+                await responseHandler.sendMessage(rateLimitResult.error || 'Rate limit exceeded. Please try again later.');
+                return;
+            }
+            // 3. Show typing indicator
             await responseHandler.indicateTyping();
-            // 3. Build context and get AI response
+            // 4. Build context and get AI response
             const context = await this.buildMessageContext(message);
             const response = await this.openaiService.generateResponse(context);
-            // 4. Handle the response
+            // 5. Handle the response
             if (response) {
                 // Add the assistant's response to the context for future reference
                 context.push({
@@ -121,6 +156,36 @@ export class MessageProcessor {
             logger.error('Error in handleResponse:', error);
             await responseHandler.sendText('An error occurred while processing your response.');
         }
+    }
+    /**
+     * Checks all applicable rate limits for a message.
+     * @private
+     * @param {Message} message - The Discord message
+     * @returns {{allowed: boolean, error?: string}} Rate limit check result
+     */
+    async checkRateLimits(message) {
+        // Check user rate limit
+        if (this.rateLimiters.user) {
+            const userLimit = this.rateLimiters.user.check(message.author.id, message.channel.id, message.guild?.id);
+            if (!userLimit.allowed) {
+                return userLimit;
+            }
+        }
+        // Check channel rate limit
+        if (this.rateLimiters.channel) {
+            const channelLimit = this.rateLimiters.channel.check(message.author.id, message.channel.id, message.guild?.id);
+            if (!channelLimit.allowed) {
+                return channelLimit;
+            }
+        }
+        // Check guild rate limit (if in a guild)
+        if (this.rateLimiters.guild && message.guild) {
+            const guildLimit = this.rateLimiters.guild.check(message.author.id, message.channel.id, message.guild.id);
+            if (!guildLimit.allowed) {
+                return guildLimit;
+            }
+        }
+        return { allowed: true };
     }
     /**
      * Handles errors that occur during message processing.

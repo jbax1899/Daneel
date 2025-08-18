@@ -25,6 +25,7 @@ type MessageProcessorOptions = {
 export declare class MessageProcessor {
     private readonly promptBuilder;
     private readonly openaiService;
+    private readonly rateLimiters;
     /**
      * Creates an instance of MessageProcessor.
      * @param {MessageProcessorOptions} options - Configuration options
@@ -59,6 +60,13 @@ export declare class MessageProcessor {
      * @returns {Promise<void>}
      */
     private handleResponse;
+    /**
+     * Checks all applicable rate limits for a message.
+     * @private
+     * @param {Message} message - The Discord message
+     * @returns {{allowed: boolean, error?: string}} Rate limit check result
+     */
+    private checkRateLimits;
     /**
      * Handles errors that occur during message processing.
      * @private
