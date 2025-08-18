@@ -1,17 +1,42 @@
+/**
+ * @file eventManager.ts
+ * @description Manages loading and handling Discord.js events.
+ * Handles dynamic loading of event handlers and binding them to Discord client events.
+ */
 import path from 'path';
 import { readdir } from 'fs/promises';
 import { logger } from './logger.js';
+/**
+ * Manages Discord.js events for the bot.
+ * Handles dynamic loading of event handlers and binding them to Discord client events.
+ * @class EventManager
+ */
 export class EventManager {
     client;
+    /** Collection of loaded event handlers */
     events = [];
+    /** Dependencies to be injected into event handlers */
     dependencies;
+    /**
+     * Creates an instance of EventManager.
+     * @param {Client} client - The Discord.js client instance
+     * @param {Record<string, any>} [dependencies={}] - Dependencies to inject into event handlers
+     */
     constructor(client, dependencies = {}) {
         this.client = client;
         this.dependencies = dependencies;
     }
+    /**
+     * Loads event handlers from the specified directory.
+     * @async
+     * @param {string} eventsPath - Path to the directory containing event handlers
+     * @returns {Promise<void>}
+     * @throws {Error} If there's an error loading events
+     */
     async loadEvents(eventsPath) {
         try {
             logger.debug(`Loading events from: ${eventsPath}`);
+            // Filter for valid event files (JS/TS files, excluding base Event file)
             const eventFiles = (await readdir(eventsPath))
                 .filter(file => {
                 const isJsFile = file.endsWith('.js') || file.endsWith('.ts');
@@ -45,8 +70,7 @@ export class EventManager {
                         }
                     }
                     else {
-                        logger.warn(`Skipping ${file} - no valid event class found`);
-                        logger.debug('Module exports:', Object.keys(module));
+                        logger.warn(`Skipping ${file}: No valid event class found`);
                     }
                 }
                 catch (error) {
@@ -60,12 +84,20 @@ export class EventManager {
             throw error;
         }
     }
+    /**
+     * Registers all loaded events with the Discord client.
+     * @returns {void}
+     */
     registerAll() {
         this.events.forEach(event => {
             event.register(this.client);
             logger.debug(`Registered event: ${event.name} (${event.once ? 'once' : 'on'})`);
         });
     }
+    /**
+     * Gets the number of loaded events.
+     * @returns {number} Number of loaded events
+     */
     getEventCount() {
         return this.events.length;
     }
