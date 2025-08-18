@@ -3,6 +3,7 @@
  * @description Manages how the bot responds to messages in Discord.
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
+import { AttachmentBuilder } from 'discord.js';
 import { logger } from '../logger.js';
 /**
  * Handles various types of message responses for Discord interactions.
@@ -25,23 +26,45 @@ export class ResponseHandler {
         this.user = user;
     }
     /**
-     * Sends a text response to the channel where the message was received.
-     * @param {string} content - The text content to send
-     * @param {Omit<MessageReplyOptions, 'content'>} [options] - Additional message options
-     * @returns {Promise<void>}
+     * Sends a message with optional text and file attachments.
+     * @param {string} content - The text content to send (can be empty string)
+     * @param {Array<{filename: string, data: string | Buffer}>} files - Array of files to attach
+     * @returns {Promise<Message | null>} The sent message or null if sending failed
      */
-    async sendText(content, options = {}) {
+    async sendMessage(content = '', files = []) {
         try {
-            await this.message.reply({
-                content,
-                ...options,
-                allowedMentions: { repliedUser: false, ...options.allowedMentions }
-            });
+            if (!this.channel.isTextBased() || this.channel.isDMBased()) {
+                return null;
+            }
+            const attachments = files.map(file => new AttachmentBuilder(Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data), { name: file.filename }));
+            const messageOptions = {
+                content: content || undefined,
+                files: attachments.length > 0 ? attachments : undefined
+            };
+            return await this.channel.send(messageOptions);
         }
         catch (error) {
-            logger.error('Failed to send text response:', error);
+            logger.error('Failed to send message:', error);
             throw error;
         }
+    }
+    /**
+     * Sends a text response to the channel where the message was received.
+     * @param {string} content - The text content to send
+     * @returns {Promise<Message | null>} The sent message or null if sending failed
+     */
+    async sendText(content) {
+        return this.sendMessage(content);
+    }
+    /**
+     * Sends a file as an attachment to the channel.
+     * @param {string} content - The content to include with the file
+     * @param {string} filename - The name of the file
+     * @param {string | Buffer} data - The file data as a string or Buffer
+     * @returns {Promise<Message | null>} The sent message or null if sending failed
+     */
+    async sendFile(content, filename, data) {
+        return this.sendMessage(content, [{ filename, data }]);
     }
     /**
      * Sends an embedded message to the channel where the message was received.

@@ -5,7 +5,7 @@
  * including validation, context building, and response handling.
  */
 
-import type { Message } from 'discord.js';
+import { Message } from 'discord.js';
 import { PromptBuilder } from './prompting/PromptBuilder.js';
 import { OpenAIService } from './openaiService.js';
 import { logger } from './logger.js';
@@ -63,6 +63,13 @@ export class MessageProcessor {
 
       // 4. Handle the response
       if (response) {
+        // Add the assistant's response to the context for future reference
+        context.push({
+          role: 'assistant',
+          content: response,
+          timestamp: Date.now()
+        });
+        
         await this.handleResponse(responseHandler, response, context);
       }
     } catch (error) {
@@ -109,25 +116,42 @@ export class MessageProcessor {
     response: string, 
     context: any[]
   ): Promise<void> {
-    let finalResponse = response;
-    
-    // In development, prepend the context if available
-    if (process.env.NODE_ENV === 'development' && context) {
-      const contextString = context.map(c => 
-        typeof c === 'string' ? c : JSON.stringify(c, null, 2)
-      ).join('\n\n---\n\n');
-      
-      finalResponse = `Full context:\n\`\`\`\n${contextString}\n\`\`\`\n\n${response}`;
-    }
+    try {
+      const files: {filename: string, data: string | Buffer}[] = [];
 
-    // Handle long messages by splitting them into chunks
-    if (finalResponse.length > 2000) {
-      const chunks = finalResponse.match(/[\s\S]{1,2000}/g) || [];
-      for (const chunk of chunks) {
-        await responseHandler.sendText(chunk);
+      // Prepare debug context as an attachment if in development mode
+      if (process.env.NODE_ENV === 'development' && context?.length > 0) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `context-${timestamp}.json`;
+        const contextData = JSON.stringify(context, null, 2);
+        
+        files.push({
+          filename,
+          data: contextData
+        });
       }
-    } else {
-      await responseHandler.sendText(finalResponse);
+
+      // Handle the response
+      if (response.length > 2000) {
+        // For long responses, split into chunks and attach context to the first chunk
+        const chunks = response.match(/[\s\S]{1,2000}/g) || [];
+        
+        // Send first chunk with debug context if any
+        if (chunks.length > 0) {
+          await responseHandler.sendMessage(chunks[0], files);
+          
+          // Send remaining chunks without debug context
+          for (let i = 1; i < chunks.length; i++) {
+            await responseHandler.sendText(chunks[i]);
+          }
+        }
+      } else {
+        // Single message with debug context if any
+        await responseHandler.sendMessage(response, files);
+      }
+    } catch (error) {
+      logger.error('Error in handleResponse:', error);
+      await responseHandler.sendText('An error occurred while processing your response.');
     }
   }
 
