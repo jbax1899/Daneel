@@ -32,8 +32,7 @@ export interface GenerateResponseOptions {
  * @class OpenAIService
  */
 export class OpenAIService {
-  /** OpenAI client instance */
-  private openai: OpenAI;
+  private openai: OpenAI; // OpenAI client instance
 
   /**
    * Creates an instance of OpenAIService

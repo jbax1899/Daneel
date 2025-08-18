@@ -156,10 +156,56 @@ export class MessageProcessor {
         guildId: message.guildId,
       },
       {
-        // You can override default GPT-5 options here if needed
+        // Placeholder to override default GPT-5 options
         // For example, to set higher verbosity for certain channels or users
       }
     );
+  }
+
+  /**
+   * Splits a message into chunks, respecting word boundaries and natural breaks
+   * @private
+   * @param {string} text - The text to split
+   * @param {number} maxLength - Maximum length of each chunk
+   * @returns {string[]} Array of message chunks
+   */
+  private splitMessage(text: string, maxLength: number = 2000): string[] {
+    if (text.length <= maxLength) return [text];
+
+    const chunks: string[] = [];
+    let start = 0;
+    let end = maxLength;
+
+    while (start < text.length) {
+      // Try to find a natural break point (newline, sentence end, or word boundary)
+      if (end < text.length) {
+        // Look for the last newline in the chunk
+        let lastNewline = text.lastIndexOf('\n', end - 1);
+        if (lastNewline > start && lastNewline < end) {
+          end = lastNewline + 1;
+        } else {
+          // If no newline, look for sentence end (.!? followed by space or end of string)
+          const sentenceEnd = text.substring(start, end).search(/[.!?][\s\n]|\n|\s+[^\s]*$/);
+          if (sentenceEnd > 0) {
+            end = start + sentenceEnd + 1;
+          } else {
+            // If no good breakpoint, just split at the last space in the chunk
+            const lastSpace = text.lastIndexOf(' ', end);
+            if (lastSpace > start) end = lastSpace + 1;
+          }
+        }
+      }
+
+      // Ensure we don't go past the end of the string
+      end = Math.min(end, text.length);
+      
+      // Add the chunk and update the start position
+      chunks.push(text.substring(start, end).trim());
+      start = end;
+      end = start + maxLength;
+    }
+
+    return chunks;
   }
 
   /**
@@ -197,10 +243,8 @@ export class MessageProcessor {
             if (content.length > maxLength) {
               content = content.substring(0, maxLength) + '... [truncated]';
             }
-            // Get first 4 characters of role in uppercase
-            const rolePrefix = msg.role.toUpperCase().substring(0, 4);
-            // Format as [ROLE] content with newlines preserved
-            return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
+            const rolePrefix = msg.role.toUpperCase().substring(0, 4); // Get first 4 characters of role in uppercase
+            return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`; // Format as [ROLE] content with newlines preserved
           })
         ].filter(Boolean).join('\n\n');
         
@@ -212,21 +256,19 @@ export class MessageProcessor {
 
       // Handle the response
       if (response.length > 2000) {
-        // For long responses, split into chunks
-        const chunks = response.match(/[\s\S]{1,2000}/g) || [];
+        // For long responses, split into chunks at natural breakpoints
+        const chunks = this.splitMessage(response);
         
         // Send all chunks first
         for (let i = 0; i < chunks.length; i++) {
           if (i === chunks.length - 1) {
-            // Attach any files, like debug context, to the last chunk
-            await responseHandler.sendMessage(chunks[i], files);
+            await responseHandler.sendMessage(chunks[i], files); // Attach any files, like debug context, to the last chunk
           } else {
             await responseHandler.sendText(chunks[i]);
           }
         }
       } else {
-        // For short responses, just send with debug context if any
-        await responseHandler.sendMessage(response, files);
+        await responseHandler.sendMessage(response, files); // For short responses, just send with debug context if any
       }
     } catch (error) {
       logger.error('Error in handleResponse:', error);

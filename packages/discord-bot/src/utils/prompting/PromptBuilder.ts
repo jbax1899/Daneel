@@ -87,7 +87,7 @@ export class PromptBuilder {
       maxContextMessages: options.maxContextMessages || 10,
       systemPrompt: options.systemPrompt || DEFAULT_SYSTEM_PROMPT,
       defaultReasoningEffort: options.defaultReasoningEffort || 'medium',
-      defaultVerbosity: options.defaultVerbosity || 'medium',
+      defaultVerbosity: options.defaultVerbosity || 'low',
     };
   }
 
