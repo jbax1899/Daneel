@@ -41,14 +41,14 @@ const REQUIRED_ENV_VARS: readonly string[] = [
  * Default rate limit configurations
  */
 const DEFAULT_RATE_LIMITS: Record<string, any> = {
-  // Per-user: 5 messages per 10 seconds
-  USER_LIMIT: 1,
-  USER_WINDOW_MS: 10_000,
-  // Per-channel: 20 messages per 30 seconds
-  CHANNEL_LIMIT: 20,
-  CHANNEL_WINDOW_MS: 30_000,
-  // Per-guild: 100 messages per minute
-  GUILD_LIMIT: 100,
+  // Per-user: 5 messages per minute
+  USER_LIMIT: 5,
+  USER_WINDOW_MS: 60_000,
+  // Per-channel: 10 messages per minute
+  CHANNEL_LIMIT: 10,
+  CHANNEL_WINDOW_MS: 60_000,
+  // Per-guild: 20 messages per minute
+  GUILD_LIMIT: 20,
   GUILD_WINDOW_MS: 60_000,
   // Whether to enable each type of rate limiting
   RATE_LIMIT_USER: 'true',
