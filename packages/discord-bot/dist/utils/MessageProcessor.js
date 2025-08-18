@@ -88,8 +88,8 @@ export class MessageProcessor {
      */
     async handleResponse(responseHandler, response, context) {
         try {
-            // Prepare debug context as an attachment if in development mode
             const files = [];
+            // Prepare debug context as an attachment if in development mode
             if (process.env.NODE_ENV === 'development' && context?.length > 0) {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
                 const filename = `context-${timestamp}.json`;
@@ -99,7 +99,7 @@ export class MessageProcessor {
                     data: contextData
                 });
             }
-            // Handle the response with optional debug context attachment
+            // Handle the response
             if (response.length > 2000) {
                 // For long responses, split into chunks and attach context to the first chunk
                 const chunks = response.match(/[\s\S]{1,2000}/g) || [];

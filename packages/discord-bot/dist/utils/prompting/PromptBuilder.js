@@ -8,9 +8,9 @@
  * @constant
  * @type {string}
  */
-const DEFAULT_SYSTEM_PROMPT = `You are a helpful AI assistant in a Discord server.
-You are named after R. Daneel Olivaw, a fictional robot created by Isaac Asimov.
-Keep responses concise, friendly, and on-topic.`;
+const DEFAULT_SYSTEM_PROMPT = `
+You are Daneel, modeled after R. Daneel Olivaw from Asimov’s Robot novels.
+Be logical, ethical, and polite, speaking with precision and clarity in a formal yet approachable tone.`;
 /**
  * Handles building conversation contexts for AI model interactions.
  * Manages message history, system prompts, and context construction.
@@ -42,22 +42,19 @@ export class PromptBuilder {
      * @returns {Promise<MessageContext[]>} Array of message contexts for the AI model
      */
     async buildContext(message, additionalContext = {}) {
+        let systemContent = this.getSystemPrompt(); // Create system message with both default prompt and additional context
+        if (Object.keys(additionalContext).length > 0) {
+            systemContent += '\nAdditional context for this interaction:\n' +
+                Object.entries(additionalContext)
+                    .map(([key, value]) => `- ${key}: ${JSON.stringify(value)}`)
+                    .join('\n');
+        }
         const context = [
             {
                 role: 'system',
-                content: this.getSystemPrompt(),
+                content: systemContent,
             },
         ];
-        // Add any additional context as system messages
-        if (Object.keys(additionalContext).length > 0) {
-            context.push({
-                role: 'system',
-                content: 'Additional context for this interaction:\n' +
-                    Object.entries(additionalContext)
-                        .map(([key, value]) => `- ${key}: ${JSON.stringify(value)}`)
-                        .join('\n')
-            });
-        }
         // Add message history
         const messages = await message.channel.messages.fetch({
             limit: this.options.maxContextMessages,
@@ -65,18 +62,16 @@ export class PromptBuilder {
         });
         const messageHistory = Array.from(messages.values())
             .reverse()
-            .filter(msg => !msg.author.bot && msg.content.trim().length > 0)
+            .filter(msg => msg.content.trim().length > 0)
             .map(msg => ({
             role: (msg.author.id === message.client.user?.id ? 'assistant' : 'user'),
             content: msg.content.replace(`<@${message.client.user?.id}>`, '').trim(),
-            timestamp: msg.createdTimestamp,
         }));
         context.push(...messageHistory);
         // Add current message
         context.push({
             role: 'user',
-            content: message.content.trim(),
-            timestamp: message.createdTimestamp,
+            content: message.content.trim()
         });
         return context;
     }

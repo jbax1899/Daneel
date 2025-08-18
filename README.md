@@ -1,98 +1,100 @@
 # Daneel
 
-Daneel is an advanced AI assistant built with a modern TypeScript stack, featuring both a web interface and a Discord bot. The project is built on a monorepo architecture using npm workspaces for better code organization and sharing.
+Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comprehensive AI assistant system featuring both a web interface and a Discord bot. Built with modern TypeScript and a monorepo architecture using npm workspaces for code organization and sharing.
+
+## Project Status
+
+### Current Phase: Core Functionality (Q3 2025)
+
+#### Completed
+- Set up monorepo structure
+- Implemented basic Discord bot with slash commands
+- Created Next.js frontend with basic chat interface
+- Set up CI/CD pipeline with GitHub Actions
+- Implemented MessageProcessor for handling message flow
+- Added PromptBuilder for AI context management
+- Implemented ResponseHandler for centralized response management
+
+#### In Progress
+- Rate limiting system
+- Basic moderation commands
 
 ## Features
 
-### Discord Bot
-- Powered by discord.js for seamless Discord integration
-- Utilizes a fine-tuned OpenAI model for personalized responses
-- Maintains conversation context for more natural interactions
-- Supports both direct mentions and replies for interaction
+### 🤖 Discord Bot
+- Powered by Discord.js 14 with TypeScript
+- Custom command and event system
+- Advanced message processing pipeline
+- AI-powered responses with conversation context
+- Robust error handling and logging
 
-### Web Client
-- Modern React-based frontend with TypeScript
-- Responsive UI with Tailwind CSS
-- Real-time chat interface
-- File upload capabilities
+### 🌐 Web Client
+- Next.js 15 with React 19
+- Modern UI with Tailwind CSS and shadcn/ui
+- Real-time chat interface with AI SDK
+- Secure authentication with Clerk
+- Responsive design for all devices
 
-### Shared Core
+### 🧩 Shared Core
 - TypeScript-based shared utilities and types
-- Consistent AI model integration across platforms
-- Centralized configuration
+- Centralized configuration and logging
+- Consistent AI model integration
+- Common validation schemas
 
-## Project Structure
+## 🛠️ Technical Stack
+
+### Core
+- **Runtime**: Node.js 18+
+- **Language**: TypeScript 5.0+
+- **Package Manager**: npm 10+
+- **Version Control**: Git/GitHub
+
+### Frontend
+- Next.js 15, React 19
+- Styling: Tailwind CSS, shadcn/ui
+- State: React Context + AI SDK
+- Auth: Clerk
+- Chat: @assistant-ui/react
+
+### Discord Bot
+- Discord.js 14
+- Custom command/event system
+- Winston logging
+- TSX for development
+
+### Development Tools
+- Bundler: Turbopack
+- Linting: ESLint + Prettier
+- CI/CD: GitHub Actions
+- Deployment: Fly.io
+
+## 📁 Project Structure
 
 ```
 daneel/
 ├── packages/
 │   ├── discord-bot/    # Discord bot implementation
+│   │   ├── src/
+│   │   │   ├── commands/     # Bot command handlers
+│   │   │   ├── events/       # Discord event handlers
+│   │   │   ├── types/        # TypeScript type definitions
+│   │   │   ├── utils/        # Utility functions
+│   │   │   └── index.ts      # Bot entry point
+│   │
 │   ├── frontend/       # Web client application
-│   └── shared/         # Shared code and utilities
+│   │   └── web/        # Next.js application
+│   │       ├── app/    # App router
+│   │       ├── components/  # UI components
+│   │       └── lib/    # Utility libraries
+│   │
+│   └── shared/         # Shared code between packages
+│       └── src/        # Shared types and utilities
+├── .github/            # GitHub workflows
 ├── .gitignore
 ├── package.json        # Root package.json with workspace config
 └── README.md
 ```
 
-## Getting Started
-
-### Prerequisites
-- Node.js 18+
-- npm 9+
-- OpenAI API key
-- Discord Bot Token
-
-### Installation
-
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd daneel
-   ```
-
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-3. Set up environment variables:
-   - Create a `.env` file in the root directory
-   - Add your OpenAI API key and Discord bot token
-
-### Development
-
-Start the development servers for both frontend and backend:
-```bash
-npm run start:dev
-```
-
-Build all packages for production:
-```bash
-npm run build
-```
-
-## Configuration
-
-### Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
-
-```
-# OpenAI
-OPENAI_API_KEY=your_openai_api_key
-
-# Discord
-DISCORD_TOKEN=your_discord_bot_token
-```
-
-## Contributing
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
-4. Push to the branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-## License
+## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
