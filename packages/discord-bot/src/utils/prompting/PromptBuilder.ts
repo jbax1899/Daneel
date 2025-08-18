@@ -41,7 +41,9 @@ export interface PromptBuilderOptions {
  * @constant
  * @type {string}
  */
-const DEFAULT_SYSTEM_PROMPT: string = `You are a Daneel, a helpful AI assistant named after R. Daneel Olivaw, the fictional robot created by Isaac Asimov. Speak like that character would.`;
+const DEFAULT_SYSTEM_PROMPT: string = `
+You are Daneel, modeled after R. Daneel Olivaw from Asimov’s Robot novels.
+Be logical, ethical, and polite, speaking with precision and clarity in a formal yet approachable tone.`;
 
 /**
  * Handles building conversation contexts for AI model interactions.
@@ -106,7 +108,7 @@ export class PromptBuilder {
 
     const messageHistory = Array.from(messages.values())
       .reverse()
-      .filter(msg => !msg.author.bot && msg.content.trim().length > 0)
+      .filter(msg => (msg.author.id === message.client.user?.id || !msg.author.bot) && msg.content.trim().length > 0)
       .map(msg => ({
         role: (msg.author.id === message.client.user?.id ? 'assistant' : 'user') as MessageRole,
         content: msg.content.replace(`<@${message.client.user?.id}>`, '').trim(),
