@@ -1,7 +1,7 @@
 /**
  * @file openaiService.ts
  * @description Service for interacting with the OpenAI API to generate AI responses.
- * Handles message formatting and API communication with OpenAI's chat completions.
+ * Handles message formatting and API communication with OpenAI's Responses API.
  */
 
 import OpenAI from 'openai';
@@ -10,13 +10,22 @@ import { logger } from './logger.js';
 /**
  * Represents a message in a conversation with the AI
  * @typedef {Object} Message
- * @property {'user'|'assistant'|'system'} role - The role of the message sender
+ * @property {'user'|'assistant'|'system'|'developer'} role - The role of the message sender
  * @property {string} content - The content of the message
  */
 type Message = {
-  role: 'user' | 'assistant' | 'system';
+  role: 'user' | 'assistant' | 'system' | 'developer';
   content: string;
 };
+
+type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+type VerbosityLevel = 'low' | 'medium' | 'high';
+
+export interface GenerateResponseOptions {
+  reasoningEffort?: ReasoningEffort; // Controls the depth of reasoning (more reasoning = better quality but slower)
+  verbosity?: VerbosityLevel; // Controls the verbosity of the response
+  instructions?: string; // System instructions for the model
+}
 
 /**
  * Service for interacting with the OpenAI API
@@ -38,55 +47,33 @@ export class OpenAIService {
    * Generates a response from the OpenAI API based on the provided messages
    * @async
    * @param {Message[]} messages - Array of message objects for the conversation context
-   * @param {string} [model='gpt-4.1-mini'] - The OpenAI model to use for generation
-   * @param {number} [maxTokens=500] - Maximum number of tokens to generate
+   * @param {string} [model='gpt-5-mini'] - The OpenAI model to use for generation
+   * @param {GenerateResponseOptions} [options] - Additional options for the generation
    * @returns {Promise<string|null>} The generated response or null if no response
    * @throws {Error} If there's an error communicating with the OpenAI API
    */
   async generateResponse(
     messages: Message[],
-    model: string = 'gpt-4.1-mini',
-    maxTokens: number = 500
+    model: string = 'gpt-5-mini',
+    options: GenerateResponseOptions = {}
   ): Promise<string | null> {
     try {
       logger.debug('Sending request to OpenAI');
-      const completion = await this.openai.chat.completions.create({
+      
+      const { reasoningEffort, verbosity, instructions } = options;
+      
+      const response = await this.openai.responses.create({
         model,
-        messages,
-        max_tokens: maxTokens,
+        input: messages,
+        ...(instructions && { instructions }),
+        ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
+        ...(verbosity && { text: { verbosity } })
       });
 
-      return completion.choices[0]?.message?.content || null;
+      return response.output_text || null;
     } catch (error) {
       logger.error('Error in OpenAI service:', error);
       throw error;
     }
-  }
-
-  /**
-   * Creates a user message object
-   * @param {string} content - The message content
-   * @returns {Message} Formatted user message object
-   */
-  createUserMessage(content: string): Message {
-    return { role: 'user', content };
-  }
-
-  /**
-   * Creates an assistant message object
-   * @param {string} content - The message content
-   * @returns {Message} Formatted assistant message object
-   */
-  createAssistantMessage(content: string): Message {
-    return { role: 'assistant', content };
-  }
-
-  /**
-   * Creates a system message object
-   * @param {string} content - The message content
-   * @returns {Message} Formatted system message object
-   */
-  createSystemMessage(content: string): Message {
-    return { role: 'system', content };
   }
 }

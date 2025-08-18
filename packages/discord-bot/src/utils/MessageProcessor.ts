@@ -6,7 +6,7 @@
  */
 
 import { Message } from 'discord.js';
-import { PromptBuilder } from './prompting/PromptBuilder.js';
+import { PromptBuilder, BuildPromptOptions } from './prompting/PromptBuilder.js';
 import { OpenAIService } from './openaiService.js';
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
@@ -102,8 +102,16 @@ export class MessageProcessor {
       await responseHandler.indicateTyping();
 
       // 4. Build context and get AI response
-      const context = await this.buildMessageContext(message);
-      const response = await this.openaiService.generateResponse(context);
+      const { context, options } = await this.buildMessageContext(message);
+      const response = await this.openaiService.generateResponse(
+        context,
+        'gpt-5-mini',
+        {
+          reasoningEffort: options.reasoningEffort,
+          verbosity: options.verbosity,
+          instructions: options.instructions
+        }
+      );
 
       // 5. Handle the response
       if (response) {
@@ -114,7 +122,7 @@ export class MessageProcessor {
           timestamp: Date.now()
         });
         
-        await this.handleResponse(responseHandler, response, context);
+        await this.handleResponse(responseHandler, response, context, options);
       }
     } catch (error) {
       logger.error('Error processing message:', error);
@@ -136,15 +144,22 @@ export class MessageProcessor {
    * Builds the context for an AI response based on the message.
    * @private
    * @param {Message} message - The Discord message
-   * @returns {Promise<any[]>} The constructed message context
+   * @returns {Promise<{context: any[], options: BuildPromptOptions}>} The constructed message context and options
    */
-  private async buildMessageContext(message: Message): Promise<any[]> {
-    return this.promptBuilder.buildContext(message, {
-      userId: message.author.id,
-      username: message.author.username,
-      channelId: message.channelId,
-      guildId: message.guildId,
-    });
+  private async buildMessageContext(message: Message): Promise<{context: any[], options: BuildPromptOptions}> {
+    return this.promptBuilder.buildContext(
+      message, 
+      {
+        userId: message.author.id,
+        username: message.author.username,
+        channelId: message.channelId,
+        guildId: message.guildId,
+      },
+      {
+        // You can override default GPT-5 options here if needed
+        // For example, to set higher verbosity for certain channels or users
+      }
+    );
   }
 
   /**
@@ -153,12 +168,14 @@ export class MessageProcessor {
    * @param {ResponseHandler} responseHandler - The response handler for sending messages
    * @param {string} response - The AI-generated response
    * @param {any[]} context - The context used for the AI response
+   * @param {BuildPromptOptions} options - The options used for the AI response
    * @returns {Promise<void>}
    */
   private async handleResponse(
     responseHandler: ResponseHandler, 
     response: string, 
-    context: any[]
+    context: any[],
+    options: BuildPromptOptions = {}
   ): Promise<void> {
     try {
       const files: {filename: string, data: string | Buffer}[] = [];
@@ -169,17 +186,23 @@ export class MessageProcessor {
         const filename = `context-${timestamp}.txt`;
         
         // Format each message in the context
-        const formattedContext = context.map(msg => {
-          const maxLength = Infinity; // Maximum length per message
-          let content = msg.content;
-          if (content.length > maxLength) {
-            content = content.substring(0, maxLength) + '... [truncated]';
-          }
-          // Get first 4 characters of role in uppercase
-          const rolePrefix = msg.role.toUpperCase().substring(0, 4);
-          // Format as [ROLE] content with newlines preserved
-          return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
-        }).join('\n\n');
+        const formattedContext = [
+          `[OPTS] ${Object.entries(options)
+            .filter(([_, v]) => v !== undefined)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(' | ')}`,
+          ...context.map(msg => {
+            const maxLength = 4000; // Discord's message limit is 4000 characters
+            let content = msg.content;
+            if (content.length > maxLength) {
+              content = content.substring(0, maxLength) + '... [truncated]';
+            }
+            // Get first 4 characters of role in uppercase
+            const rolePrefix = msg.role.toUpperCase().substring(0, 4);
+            // Format as [ROLE] content with newlines preserved
+            return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
+          })
+        ].filter(Boolean).join('\n\n');
         
         files.push({
           filename,

@@ -8,9 +8,9 @@ import { Message } from 'discord.js';
 
 /**
  * Represents the role of a message in the conversation context.
- * @typedef {'user' | 'assistant' | 'system'} MessageRole
+ * @typedef {'user' | 'assistant' | 'system' | 'developer'} MessageRole
  */
-export type MessageRole = 'user' | 'assistant' | 'system';
+export type MessageRole = 'user' | 'assistant' | 'system' | 'developer';
 
 /**
  * Represents a single message in the conversation context.
@@ -25,15 +25,41 @@ export interface MessageContext {
   timestamp?: number;
 }
 
+type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+type VerbosityLevel = 'low' | 'medium' | 'high';
+
+/**
+ * Options for generating a response with GPT-5
+ * @interface GenerateResponseOptions
+ */
+export interface GenerateResponseOptions {
+  reasoningEffort?: ReasoningEffort;
+  verbosity?: VerbosityLevel;
+  instructions?: string;
+}
+
+/**
+ * Options for building a prompt with GPT-5 specific settings
+ * @interface BuildPromptOptions
+ * @extends {GenerateResponseOptions}
+ */
+export interface BuildPromptOptions extends GenerateResponseOptions {
+  // Inherits reasoningEffort, verbosity, and instructions from GenerateResponseOptions
+}
+
 /**
  * Configuration options for the PromptBuilder.
  * @interface PromptBuilderOptions
  * @property {number} [maxContextMessages=10] - Maximum number of messages to include in the context
  * @property {string} [systemPrompt] - Custom system prompt to use for the conversation
+ * @property {ReasoningEffort} [defaultReasoningEffort] - Default reasoning effort for GPT-5
+ * @property {VerbosityLevel} [defaultVerbosity] - Default verbosity level for GPT-5 responses
  */
 export interface PromptBuilderOptions {
   maxContextMessages?: number;
   systemPrompt?: string;
+  defaultReasoningEffort?: ReasoningEffort;
+  defaultVerbosity?: VerbosityLevel;
 }
 
 /**
@@ -60,6 +86,8 @@ export class PromptBuilder {
     this.options = {
       maxContextMessages: options.maxContextMessages || 10,
       systemPrompt: options.systemPrompt || DEFAULT_SYSTEM_PROMPT,
+      defaultReasoningEffort: options.defaultReasoningEffort || 'medium',
+      defaultVerbosity: options.defaultVerbosity || 'medium',
     };
   }
 
@@ -80,26 +108,35 @@ export class PromptBuilder {
    */
   private formatMessage(msg: Message, botUserId: string): { role: MessageRole, content: string } {
     const isBot = msg.author.id === botUserId;
+    const isDeveloper = msg.author.id === process.env.DEVELOPER_USER_ID;
     const displayName = msg.member?.nickname || msg.author.username;
     const prefix = isBot ? '' : `(${msg.author.username}/${displayName}) - `;
     const content = `${prefix}${msg.content.replace(`<@${botUserId}>`, '').trim()}`;
     
-    return {
-      role: isBot ? 'assistant' : 'user',
-      content: content
-    };
+    if (isBot) return { role: 'assistant', content };
+    if (isDeveloper) return { role: 'developer', content };
+    return { role: 'user', content };
   }
 
   /**
-   * Builds a conversation context from a Discord message.
+   * Builds a conversation context from a Discord message with GPT-5 specific options.
    * @param {Message} message - The Discord message to build context from
    * @param {Record<string, any>} [additionalContext={}] - Optional additional context to include
-   * @returns {Promise<MessageContext[]>} Array of message contexts for the AI model
+   * @param {BuildPromptOptions} [options] - GPT-5 specific options
+   * @returns {Promise<{context: MessageContext[], options: BuildPromptOptions}>} The constructed message context and options
    */
   public async buildContext(
     message: Message,
-    additionalContext: Record<string, any> = {}
-  ): Promise<MessageContext[]> {
+    additionalContext: Record<string, any> = {},
+    options: BuildPromptOptions = {}
+  ): Promise<{context: MessageContext[], options: BuildPromptOptions}> {
+    // Apply defaults if not provided
+    const mergedOptions: BuildPromptOptions = {
+      reasoningEffort: this.options.defaultReasoningEffort,
+      verbosity: this.options.defaultVerbosity,
+      ...options
+    };
+
     let systemContent = this.getSystemPrompt();
 
     if (Object.keys(additionalContext).length > 0) {
@@ -135,6 +172,9 @@ export class PromptBuilder {
       content: this.formatMessage(message, message.client.user!.id).content
     });
 
-    return context;
+    return {
+      context,
+      options: mergedOptions
+    };
   }
 }

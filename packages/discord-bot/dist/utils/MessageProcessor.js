@@ -72,8 +72,12 @@ export class MessageProcessor {
             // 3. Show typing indicator
             await responseHandler.indicateTyping();
             // 4. Build context and get AI response
-            const context = await this.buildMessageContext(message);
-            const response = await this.openaiService.generateResponse(context);
+            const { context, options } = await this.buildMessageContext(message);
+            const response = await this.openaiService.generateResponse(context, 'gpt-5-mini', {
+                reasoningEffort: options.reasoningEffort,
+                verbosity: options.verbosity,
+                instructions: options.instructions
+            });
             // 5. Handle the response
             if (response) {
                 // Add the assistant's response to the context for future reference
@@ -82,7 +86,7 @@ export class MessageProcessor {
                     content: response,
                     timestamp: Date.now()
                 });
-                await this.handleResponse(responseHandler, response, context);
+                await this.handleResponse(responseHandler, response, context, options);
             }
         }
         catch (error) {
@@ -103,7 +107,7 @@ export class MessageProcessor {
      * Builds the context for an AI response based on the message.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {Promise<any[]>} The constructed message context
+     * @returns {Promise<{context: any[], options: BuildPromptOptions}>} The constructed message context and options
      */
     async buildMessageContext(message) {
         return this.promptBuilder.buildContext(message, {
@@ -111,6 +115,9 @@ export class MessageProcessor {
             username: message.author.username,
             channelId: message.channelId,
             guildId: message.guildId,
+        }, {
+        // You can override default GPT-5 options here if needed
+        // For example, to set higher verbosity for certain channels or users
         });
     }
     /**
@@ -119,19 +126,34 @@ export class MessageProcessor {
      * @param {ResponseHandler} responseHandler - The response handler for sending messages
      * @param {string} response - The AI-generated response
      * @param {any[]} context - The context used for the AI response
+     * @param {BuildPromptOptions} options - The options used for the AI response
      * @returns {Promise<void>}
      */
-    async handleResponse(responseHandler, response, context) {
+    async handleResponse(responseHandler, response, context, options = {}) {
         try {
             const files = [];
             // Prepare debug context as an attachment if in development mode
             if (process.env.NODE_ENV === 'development' && context?.length > 0) {
                 const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `context-${timestamp}.json`;
-                const contextData = JSON.stringify(context, null, 2);
+                const filename = `context-${timestamp}.txt`;
+                // Format each message in the context
+                const formattedContext = [
+                    `[OPTS] ${JSON.stringify(options, null, 2)}`,
+                    ...context.map(msg => {
+                        const maxLength = 4000; // Discord's message limit is 4000 characters
+                        let content = msg.content;
+                        if (content.length > maxLength) {
+                            content = content.substring(0, maxLength) + '... [truncated]';
+                        }
+                        // Get first 4 characters of role in uppercase
+                        const rolePrefix = msg.role.toUpperCase().substring(0, 4);
+                        // Format as [ROLE] content with newlines preserved
+                        return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
+                    })
+                ].join('\n\n');
                 files.push({
                     filename,
-                    data: contextData
+                    data: formattedContext
                 });
             }
             // Handle the response
@@ -148,7 +170,6 @@ export class MessageProcessor {
                 }
             }
             else {
-                // Single message with debug context if any
                 await responseHandler.sendMessage(response, files);
             }
         }

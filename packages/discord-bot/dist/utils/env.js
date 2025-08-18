@@ -29,20 +29,21 @@ const REQUIRED_ENV_VARS = [
     'DISCORD_TOKEN', // Discord bot token for authentication
     'CLIENT_ID', // Discord application client ID
     'GUILD_ID', // Discord server (guild) ID
-    'OPENAI_API_KEY' // OpenAI API key for AI functionality
+    'OPENAI_API_KEY', // OpenAI API key for AI functionality
+    'DEVELOPER_USER_ID' // Discord user ID of the developer for privileged access
 ];
 /**
  * Default rate limit configurations
  */
 const DEFAULT_RATE_LIMITS = {
-    // Per-user: 5 messages per 10 seconds
-    USER_LIMIT: 1,
-    USER_WINDOW_MS: 10_000,
-    // Per-channel: 20 messages per 30 seconds
-    CHANNEL_LIMIT: 20,
-    CHANNEL_WINDOW_MS: 30_000,
-    // Per-guild: 100 messages per minute
-    GUILD_LIMIT: 100,
+    // Per-user: 5 messages per minute
+    USER_LIMIT: 5,
+    USER_WINDOW_MS: 60_000,
+    // Per-channel: 10 messages per minute
+    CHANNEL_LIMIT: 10,
+    CHANNEL_WINDOW_MS: 60_000,
+    // Per-guild: 20 messages per minute
+    GUILD_LIMIT: 20,
     GUILD_WINDOW_MS: 60_000,
     // Whether to enable each type of rate limiting
     RATE_LIMIT_USER: 'true',
@@ -59,6 +60,8 @@ function validateEnvironment() {
             throw new Error(`Missing required environment variable: ${envVar}`);
         }
     }
+    // Log set rate limits
+    logger.debug(`Rate limits: ${JSON.stringify(DEFAULT_RATE_LIMITS)}`);
 }
 // Validate environment variables on startup
 validateEnvironment();

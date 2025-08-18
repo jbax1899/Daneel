@@ -48,7 +48,7 @@ export declare class MessageProcessor {
      * Builds the context for an AI response based on the message.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {Promise<any[]>} The constructed message context
+     * @returns {Promise<{context: any[], options: BuildPromptOptions}>} The constructed message context and options
      */
     private buildMessageContext;
     /**
@@ -57,6 +57,7 @@ export declare class MessageProcessor {
      * @param {ResponseHandler} responseHandler - The response handler for sending messages
      * @param {string} response - The AI-generated response
      * @param {any[]} context - The context used for the AI response
+     * @param {BuildPromptOptions} options - The options used for the AI response
      * @returns {Promise<void>}
      */
     private handleResponse;

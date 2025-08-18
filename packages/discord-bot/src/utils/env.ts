@@ -34,7 +34,8 @@ const REQUIRED_ENV_VARS: readonly string[] = [
   'DISCORD_TOKEN',    // Discord bot token for authentication
   'CLIENT_ID',        // Discord application client ID
   'GUILD_ID',         // Discord server (guild) ID
-  'OPENAI_API_KEY'    // OpenAI API key for AI functionality
+  'OPENAI_API_KEY',   // OpenAI API key for AI functionality
+  'DEVELOPER_USER_ID' // Discord user ID of the developer for privileged access
 ] as const;
 
 /**

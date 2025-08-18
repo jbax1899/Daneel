@@ -3,22 +3,35 @@
  * @description Service for interacting with the OpenAI API to generate AI responses.
  * Handles message formatting and API communication with OpenAI's Responses API.
  */
-import OpenAI from 'openai';
-import { logger } from './logger.js';
+/**
+ * Represents a message in a conversation with the AI
+ * @typedef {Object} Message
+ * @property {'user'|'assistant'|'system'|'developer'} role - The role of the message sender
+ * @property {string} content - The content of the message
+ */
+type Message = {
+    role: 'user' | 'assistant' | 'system' | 'developer';
+    content: string;
+};
+type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
+type VerbosityLevel = 'low' | 'medium' | 'high';
+export interface GenerateResponseOptions {
+    reasoningEffort?: ReasoningEffort;
+    verbosity?: VerbosityLevel;
+    instructions?: string;
+}
 /**
  * Service for interacting with the OpenAI API
  * @class OpenAIService
  */
-export class OpenAIService {
+export declare class OpenAIService {
     /** OpenAI client instance */
-    openai;
+    private openai;
     /**
      * Creates an instance of OpenAIService
      * @param {string} apiKey - OpenAI API key for authentication
      */
-    constructor(apiKey) {
-        this.openai = new OpenAI({ apiKey });
-    }
+    constructor(apiKey: string);
     /**
      * Generates a response from the OpenAI API based on the provided messages
      * @async
@@ -28,23 +41,6 @@ export class OpenAIService {
      * @returns {Promise<string|null>} The generated response or null if no response
      * @throws {Error} If there's an error communicating with the OpenAI API
      */
-    async generateResponse(messages, model = 'gpt-5-mini', options = {}) {
-        try {
-            logger.debug('Sending request to OpenAI');
-            const { reasoningEffort, verbosity, instructions } = options;
-            const response = await this.openai.responses.create({
-                model,
-                input: messages,
-                ...(instructions && { instructions }),
-                ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
-                ...(verbosity && { text: { verbosity } })
-            });
-            return response.output_text || null;
-        }
-        catch (error) {
-            logger.error('Error in OpenAI service:', error);
-            throw error;
-        }
-    }
+    generateResponse(messages: Message[], model?: string, options?: GenerateResponseOptions): Promise<string | null>;
 }
-//# sourceMappingURL=openaiService.js.map
+export {};
