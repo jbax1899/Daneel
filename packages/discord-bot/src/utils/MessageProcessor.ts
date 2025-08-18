@@ -166,12 +166,24 @@ export class MessageProcessor {
       // Prepare debug context as an attachment if in development mode
       if (process.env.NODE_ENV === 'development' && context?.length > 0) {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `context-${timestamp}.json`;
-        const contextData = JSON.stringify(context, null, 2);
+        const filename = `context-${timestamp}.txt`;
+        
+        // Format each message in the context
+        const formattedContext = context.map(msg => {
+          const maxLength = Infinity; // Maximum length per message
+          let content = msg.content;
+          if (content.length > maxLength) {
+            content = content.substring(0, maxLength) + '... [truncated]';
+          }
+          // Get first 4 characters of role in uppercase
+          const rolePrefix = msg.role.toUpperCase().substring(0, 4);
+          // Format as [ROLE] content with newlines preserved
+          return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`;
+        }).join('\n\n');
         
         files.push({
           filename,
-          data: contextData
+          data: formattedContext
         });
       }
 
@@ -190,7 +202,6 @@ export class MessageProcessor {
           }
         }
       } else {
-        // Single message with debug context if any
         await responseHandler.sendMessage(response, files);
       }
     } catch (error) {
