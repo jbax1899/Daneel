@@ -72,6 +72,25 @@ export class PromptBuilder {
   }
 
   /**
+   * Formats a message for the AI context
+   * @private
+   * @param {Message} msg - The message to format
+   * @param {string} botUserId - The bot's user ID
+   * @returns {{role: MessageRole, content: string}} Formatted message context
+   */
+  private formatMessage(msg: Message, botUserId: string): { role: MessageRole, content: string } {
+    const isBot = msg.author.id === botUserId;
+    const displayName = msg.member?.nickname || msg.author.username;
+    const prefix = isBot ? '' : `(${msg.author.username}/${displayName}) - `;
+    const content = `${prefix}${msg.content.replace(`<@${botUserId}>`, '').trim()}`;
+    
+    return {
+      role: isBot ? 'assistant' : 'user',
+      content: content
+    };
+  }
+
+  /**
    * Builds a conversation context from a Discord message.
    * @param {Message} message - The Discord message to build context from
    * @param {Record<string, any>} [additionalContext={}] - Optional additional context to include
@@ -81,7 +100,7 @@ export class PromptBuilder {
     message: Message,
     additionalContext: Record<string, any> = {}
   ): Promise<MessageContext[]> {
-    let systemContent = this.getSystemPrompt(); // Create system message with both default prompt and additional context
+    let systemContent = this.getSystemPrompt();
 
     if (Object.keys(additionalContext).length > 0) {
       systemContent += '\nAdditional context for this interaction:\n' +
@@ -106,22 +125,14 @@ export class PromptBuilder {
     const messageHistory = Array.from(messages.values())
       .reverse()
       .filter(msg => msg.content.trim().length > 0)
-      .map(msg => {
-        const isBot = msg.author.id === message.client.user?.id;
-        const displayName = msg.member?.nickname || msg.author.username;
-        const prefix = isBot ? '' : `(${msg.author.username}/${displayName}) - `;
-        return {
-          role: (isBot ? 'assistant' : 'user') as MessageRole,
-          content: `${prefix}${msg.content.replace(`<@${message.client.user?.id}>`, '').trim()}`,
-        };
-      });
+      .map(msg => this.formatMessage(msg, message.client.user!.id));
 
     context.push(...messageHistory);
 
     // Add current message
     context.push({
       role: 'user',
-      content: message.content.trim()
+      content: this.formatMessage(message, message.client.user!.id).content
     });
 
     return context;
