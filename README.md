@@ -5,19 +5,21 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 ## Project Status
 
 ### Current Phase: Core Functionality (Q3 2025)
-
-#### Completed
-- Set up monorepo structure
-- Implemented basic Discord bot with slash commands
-- Created Next.js frontend with basic chat interface
-- Set up CI/CD pipeline with GitHub Actions
-- Implemented MessageProcessor for handling message flow
-- Added PromptBuilder for AI context management
-- Implemented ResponseHandler for centralized response management
-- Added configurable rate limiting system with user, channel, and guild limits
-
-#### In Progress
-- Basic moderation commands
+- [x] Set up monorepo structure
+- [x] Implement basic Discord bot with slash commands
+- [x] Create Next.js frontend with basic chat interface
+- [x] Set up CI/CD pipeline with GitHub Actions
+- [x] Implement MessageProcessor for handling message flow
+- [x] Add PromptBuilder for AI context management
+- [x] Implement ResponseHandler for centralized response management
+- [x] Implement rate limiting system with user, channel, and guild limits
+- [x] Upgrade to GPT-5 for improved responses
+- [x] Add detailed token usage tracking and cost estimation
+- [ ] Custom embed builder
+- [ ] LLM pre-pass system
+- [ ] Allow the bot to respond to other bots
+- [ ] Allow the bot to respond to plaintext name
+- [ ] Allow image processing for extra context, with rate limiting rules
 
 ## Features
 

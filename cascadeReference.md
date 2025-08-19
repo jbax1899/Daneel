@@ -39,10 +39,11 @@ Some rules to follow (for Cascade):
 - [x] Implement rate limiting system with user, channel, and guild limits
 - [x] Upgrade to GPT-5 for improved responses
 - [x] Add detailed token usage tracking and cost estimation
+- [ ] Custom embed builder
+- [ ] LLM pre-pass system
 - [ ] Allow the bot to respond to other bots
 - [ ] Allow the bot to respond to plaintext name
 - [ ] Allow image processing for extra context, with rate limiting rules
-- [ ] 
 
 ## Technical Stack
 
