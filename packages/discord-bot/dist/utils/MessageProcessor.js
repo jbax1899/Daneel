@@ -8,22 +8,34 @@ import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
 import { RateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
+import { Planner } from './prompting/Planner.js';
+/**
+ * Default system prompt used when no custom prompt is provided.
+ * @constant
+ * @type {string}
+ */
+const DEFAULT_SYSTEM_PROMPT = `You are Daneel, modeled after R. Daneel Olivaw from Asimov's Robot novels.
+Speak in similar style to this character from the source writing.
+Act like any other user in this Discord server - Be helpful, but not overly so. 
+Do not end your messages with chatbot-style questions like "Is there anything else I can help you with?"`;
 /**
  * Handles the complete message processing pipeline for the Discord bot.
  * Coordinates validation, context building, AI response generation, and response handling.
  * @class MessageProcessor
  */
 export class MessageProcessor {
-    promptBuilder;
+    systemPrompt;
     openaiService;
+    planner;
     rateLimiters;
     /**
      * Creates an instance of MessageProcessor.
      * @param {MessageProcessorOptions} options - Configuration options
      */
     constructor(options) {
-        this.promptBuilder = options.promptBuilder;
+        this.systemPrompt = options.systemPrompt || DEFAULT_SYSTEM_PROMPT;
         this.openaiService = options.openaiService;
+        this.planner = options.planner || new Planner(this.openaiService);
         // Initialize rate limiters from config
         this.rateLimiters = {};
         if (config.rateLimits.user.enabled) {
@@ -59,200 +71,201 @@ export class MessageProcessor {
     async processMessage(message) {
         const responseHandler = new ResponseHandler(message, message.channel, message.author);
         try {
-            // 1. Validate message
-            if (!this.isValidMessage(message)) {
+            // Input validation
+            if (!message?.content?.trim()) {
+                logger.warn('Received empty message', { messageId: message.id });
                 return;
             }
-            // 2. Check rate limits
-            const rateLimitResult = await this.checkRateLimits(message);
-            if (!rateLimitResult.allowed) {
-                await responseHandler.sendMessage(rateLimitResult.error || 'Rate limit exceeded. Please try again later.');
-                return;
+            // Check rate limits
+            try {
+                const rateLimitResult = await this.checkRateLimits(message);
+                if (!rateLimitResult.allowed) {
+                    if (rateLimitResult.error) {
+                        await responseHandler.sendMessage(rateLimitResult.error);
+                    }
+                    return;
+                }
             }
-            // 3. Show typing indicator
-            await responseHandler.indicateTyping();
-            // 4. Build context and get AI response
-            const { context, options } = await this.buildMessageContext(message);
-            const response = await this.openaiService.generateResponse(context, 'gpt-5-mini', {
-                reasoningEffort: options.reasoningEffort,
-                verbosity: options.verbosity,
-                instructions: options.instructions
-            });
-            // 5. Handle the response
-            if (response) {
-                // Add the assistant's response to the context for future reference
-                context.push({
-                    role: 'assistant',
-                    content: response,
-                    timestamp: Date.now()
-                });
-                await this.handleResponse(responseHandler, response, context, options);
+            catch (error) {
+                logger.error('Error checking rate limits:', error); // Continue processing even if rate limit check fails
+            }
+            // Show typing indicator
+            try {
+                await responseHandler.indicateTyping();
+            }
+            catch (typingError) {
+                logger.warn('Failed to send typing indicator:', typingError); // Continue processing even if typing indicator fails
+            }
+            // Build message context
+            let context;
+            try {
+                const result = await this.buildMessageContext(message);
+                context = result.context;
+            }
+            catch (contextError) {
+                throw Error("Error building message context: " + contextError);
+            }
+            // Generate plan
+            let plan;
+            try {
+                plan = await this.planner.generatePlan(message, context);
+                if (!plan) {
+                    throw new Error('Failed to generate plan');
+                }
+            }
+            catch (planError) {
+                throw Error("Error generating plan: " + planError);
+            }
+            // Handle different response types based on the plan
+            switch (plan.action) {
+                case 'noop':
+                    return;
+                case 'reply':
+                case 'dm':
+                    // Get AI response for text-based replies
+                    const { response, usage } = await this.openaiService.generateResponse(context, 'gpt-5-mini', {
+                        reasoningEffort: plan.openaiOptions?.reasoningEffort,
+                        verbosity: plan.openaiOptions?.verbosity
+                    });
+                    if (response) {
+                        logger.debug(`Response recieved. Tokens used: ${usage?.input_tokens} in | ${usage?.output_tokens} out | ${usage?.total_tokens} total | Cost: ${usage?.cost}`);
+                        // Update context with assistant's response
+                        context.push({
+                            role: 'assistant',
+                            content: response,
+                        });
+                        // Handle the response
+                        await this.handleResponse(responseHandler, response);
+                    }
+                    break;
+                case 'react':
+                    if (plan.reaction) {
+                        try {
+                            logger.debug(`Reacting to message with emoji: ${plan.reaction}`);
+                            await responseHandler.addReaction(plan.reaction);
+                        }
+                        catch (error) {
+                            logger.error('Failed to react with emoji:', error);
+                        }
+                    }
+                    break;
+                default:
+                    // No operation needed
+                    break;
             }
         }
         catch (error) {
-            logger.error('Error processing message:', error);
             await this.handleError(responseHandler, error);
         }
-    }
-    /**
-     * Validates if a message should be processed.
-     * @private
-     * @param {Message} message - The message to validate
-     * @returns {boolean} True if the message is valid, false otherwise
-     */
-    isValidMessage(message) {
-        return !message.author.bot && message.content.trim().length > 0;
     }
     /**
      * Builds the context for an AI response based on the message.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {Promise<{context: any[], options: BuildPromptOptions}>} The constructed message context and options
+     * @returns {Promise<MessageContext>} The constructed message context and options
      */
     async buildMessageContext(message) {
-        return this.promptBuilder.buildContext(message, {
-            userId: message.author.id,
-            username: message.author.username,
-            channelId: message.channelId,
-            guildId: message.guildId,
-        }, {
-        // Placeholder to override default GPT-5 options
-        // For example, to set higher verbosity for certain channels or users
-        });
-    }
-    /**
-     * Splits a message into chunks, respecting word boundaries and natural breaks
-     * @private
-     * @param {string} text - The text to split
-     * @param {number} maxLength - Maximum length of each chunk
-     * @returns {string[]} Array of message chunks
-     */
-    splitMessage(text, maxLength = 2000) {
-        if (text.length <= maxLength)
-            return [text];
-        const chunks = [];
-        let start = 0;
-        let end = maxLength;
-        while (start < text.length) {
-            // Try to find a natural break point (newline, sentence end, or word boundary)
-            if (end < text.length) {
-                // Look for the last newline in the chunk
-                let lastNewline = text.lastIndexOf('\n', end - 1);
-                if (lastNewline > start && lastNewline < end) {
-                    end = lastNewline + 1;
-                }
-                else {
-                    // If no newline, look for sentence end (.!? followed by space or end of string)
-                    const sentenceEnd = text.substring(start, end).search(/[.!?][\s\n]|\n|\s+[^\s]*$/);
-                    if (sentenceEnd > 0) {
-                        end = start + sentenceEnd + 1;
-                    }
-                    else {
-                        // If no good breakpoint, just split at the last space in the chunk
-                        const lastSpace = text.lastIndexOf(' ', end);
-                        if (lastSpace > start)
-                            end = lastSpace + 1;
-                    }
-                }
+        const context = [
+            {
+                role: 'system',
+                content: this.systemPrompt
             }
-            // Ensure we don't go past the end of the string
-            end = Math.min(end, text.length);
-            // Add the chunk and update the start position
-            chunks.push(text.substring(start, end).trim());
-            start = end;
-            end = start + maxLength;
-        }
-        return chunks;
+        ];
+        // Add message history
+        const messages = await message.channel.messages.fetch({
+            limit: 10, // Default limit, can be made configurable
+            before: message.id,
+        });
+        const messageHistory = Array.from(messages.values())
+            .reverse()
+            .filter(msg => msg.content.trim().length > 0)
+            .map(msg => ({
+            role: 'user', // TODO: correctly discern user, assistant, system, developer
+            content: msg.content
+        }));
+        context.push(...messageHistory);
+        // Add current message
+        context.push({
+            role: 'user',
+            content: message.content
+        });
+        return {
+            context,
+        };
     }
     /**
-     * Handles the AI response, including formatting and chunking if needed.
+     * Handles the response by sending it through the response handler
      * @private
-     * @param {ResponseHandler} responseHandler - The response handler for sending messages
+     * @param {ResponseHandler} responseHandler - The response handler to use
      * @param {string} response - The AI-generated response
-     * @param {any[]} context - The context used for the AI response
-     * @param {BuildPromptOptions} options - The options used for the AI response
      * @returns {Promise<void>}
      */
-    async handleResponse(responseHandler, response, context, options = {}) {
+    async handleResponse(responseHandler, response) {
         try {
-            const files = [];
-            // Prepare debug context as an attachment if in development mode
-            if (process.env.NODE_ENV === 'development' && context?.length > 0) {
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-                const filename = `context-${timestamp}.txt`;
-                // Format each message in the context
-                const formattedContext = [
-                    `[OPTS] ${Object.entries(options)
-                        .filter(([_, v]) => v !== undefined)
-                        .map(([k, v]) => `${k}: ${v}`)
-                        .join(' | ')}`,
-                    ...context.map(msg => {
-                        const maxLength = 4000; // Discord's message limit is 4000 characters
-                        let content = msg.content;
-                        if (content.length > maxLength) {
-                            content = content.substring(0, maxLength) + '... [truncated]';
-                        }
-                        const rolePrefix = msg.role.toUpperCase().substring(0, 4); // Get first 4 characters of role in uppercase
-                        return `[${rolePrefix}] ${content.replace(/\n/g, '\\n')}`; // Format as [ROLE] content with newlines preserved
-                    })
-                ].filter(Boolean).join('\n\n');
-                files.push({
-                    filename,
-                    data: formattedContext
-                });
-            }
-            // Handle the response
-            if (response.length > 2000) {
-                // For long responses, split into chunks at natural breakpoints
-                const chunks = this.splitMessage(response);
-                // Send all chunks first
-                for (let i = 0; i < chunks.length; i++) {
-                    if (i === chunks.length - 1) {
-                        await responseHandler.sendMessage(chunks[i], files); // Attach any files, like debug context, to the last chunk
-                    }
-                    else {
-                        await responseHandler.sendText(chunks[i]);
-                    }
+            // Try to parse the response as JSON to check if it contains an embed
+            let parsedResponse;
+            let embedData = null;
+            try {
+                parsedResponse = JSON.parse(response);
+                if (parsedResponse.embed) {
+                    embedData = parsedResponse.embed;
                 }
             }
-            else {
-                await responseHandler.sendMessage(response, files); // For short responses, just send with debug context if any
+            catch (e) {
+                // Not a JSON response, treat as plain text
+            }
+            // If we have embed data, create and send the embed
+            if (embedData) {
+                // TODO: implement embed sending
+                await responseHandler.sendMessage(response);
+            }
+            else if (response) {
+                // If no embed, send as regular message
+                await responseHandler.sendMessage(response);
             }
         }
         catch (error) {
             logger.error('Error in handleResponse:', error);
-            await responseHandler.sendText('An error occurred while processing your response.');
+            await responseHandler.sendMessage('An error occurred while processing your response.');
         }
     }
     /**
-     * Checks all applicable rate limits for a message.
+     * Checks all applicable rate limits for a message in parallel.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {{allowed: boolean, error?: string}} Rate limit check result
+     * @returns {Promise<{allowed: boolean, error?: string}>} Rate limit check result
      */
     async checkRateLimits(message) {
-        // Check user rate limit
+        const checks = [];
         if (this.rateLimiters.user) {
-            const userLimit = this.rateLimiters.user.check(message.author.id, message.channel.id, message.guild?.id);
-            if (!userLimit.allowed) {
-                return userLimit;
-            }
+            checks.push(Promise.resolve(this.rateLimiters.user.check(message.author.id, message.channel.id, message.guild?.id)));
         }
-        // Check channel rate limit
         if (this.rateLimiters.channel) {
-            const channelLimit = this.rateLimiters.channel.check(message.author.id, message.channel.id, message.guild?.id);
-            if (!channelLimit.allowed) {
-                return channelLimit;
-            }
+            checks.push(Promise.resolve(this.rateLimiters.channel.check(message.author.id, message.channel.id, message.guild?.id)));
         }
-        // Check guild rate limit (if in a guild)
         if (this.rateLimiters.guild && message.guild) {
-            const guildLimit = this.rateLimiters.guild.check(message.author.id, message.channel.id, message.guild.id);
-            if (!guildLimit.allowed) {
-                return guildLimit;
-            }
+            checks.push(Promise.resolve(this.rateLimiters.guild.check(message.author.id, message.channel.id, message.guild.id)));
         }
-        return { allowed: true };
+        // If no rate limiters are configured, allow the request
+        if (checks.length === 0) {
+            return { allowed: true };
+        }
+        try {
+            // Execute all rate limit checks in parallel
+            const results = await Promise.allSettled(checks);
+            // Check for the first rate limit that was hit
+            for (const result of results) {
+                if (result.status === 'fulfilled' && !result.value.allowed) {
+                    return result.value;
+                }
+            }
+            return { allowed: true };
+        }
+        catch (error) {
+            logger.error('Error checking rate limits:', error);
+            // Fail open to prevent blocking legitimate requests during errors
+            return { allowed: true };
+        }
     }
     /**
      * Handles errors that occur during message processing.
@@ -264,7 +277,7 @@ export class MessageProcessor {
     async handleError(responseHandler, error) {
         logger.error('Error in MessageProcessor:', error);
         try {
-            await responseHandler.sendText('Sorry, I encountered an error processing your message.');
+            await responseHandler.sendText('Sorry, I failed to think of a response.');
         }
         catch (replyError) {
             logger.error('Failed to send error reply:', replyError);

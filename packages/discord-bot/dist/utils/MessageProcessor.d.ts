@@ -5,17 +5,19 @@
  * including validation, context building, and response handling.
  */
 import { Message } from 'discord.js';
-import { PromptBuilder } from './prompting/PromptBuilder.js';
 import { OpenAIService } from './openaiService.js';
+import { Planner } from './prompting/Planner.js';
 /**
  * Configuration object for initializing MessageProcessor.
  * @typedef {Object} MessageProcessorOptions
- * @property {PromptBuilder} promptBuilder - The prompt builder for creating message contexts
  * @property {OpenAIService} openaiService - The service for generating AI responses
+ * @property {Planner} [planner] - The planner for generating response plans
+ * @property {string} [systemPrompt] - Optional custom system prompt
  */
 type MessageProcessorOptions = {
-    promptBuilder: PromptBuilder;
     openaiService: OpenAIService;
+    planner?: Planner;
+    systemPrompt?: string;
 };
 /**
  * Handles the complete message processing pipeline for the Discord bot.
@@ -23,8 +25,9 @@ type MessageProcessorOptions = {
  * @class MessageProcessor
  */
 export declare class MessageProcessor {
-    private readonly promptBuilder;
+    private readonly systemPrompt;
     private readonly openaiService;
+    private readonly planner;
     private readonly rateLimiters;
     /**
      * Creates an instance of MessageProcessor.
@@ -38,42 +41,25 @@ export declare class MessageProcessor {
      */
     processMessage(message: Message): Promise<void>;
     /**
-     * Validates if a message should be processed.
-     * @private
-     * @param {Message} message - The message to validate
-     * @returns {boolean} True if the message is valid, false otherwise
-     */
-    private isValidMessage;
-    /**
      * Builds the context for an AI response based on the message.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {Promise<{context: any[], options: BuildPromptOptions}>} The constructed message context and options
+     * @returns {Promise<MessageContext>} The constructed message context and options
      */
     private buildMessageContext;
     /**
-     * Splits a message into chunks, respecting word boundaries and natural breaks
+     * Handles the response by sending it through the response handler
      * @private
-     * @param {string} text - The text to split
-     * @param {number} maxLength - Maximum length of each chunk
-     * @returns {string[]} Array of message chunks
-     */
-    private splitMessage;
-    /**
-     * Handles the AI response, including formatting and chunking if needed.
-     * @private
-     * @param {ResponseHandler} responseHandler - The response handler for sending messages
+     * @param {ResponseHandler} responseHandler - The response handler to use
      * @param {string} response - The AI-generated response
-     * @param {any[]} context - The context used for the AI response
-     * @param {BuildPromptOptions} options - The options used for the AI response
      * @returns {Promise<void>}
      */
     private handleResponse;
     /**
-     * Checks all applicable rate limits for a message.
+     * Checks all applicable rate limits for a message in parallel.
      * @private
      * @param {Message} message - The Discord message
-     * @returns {{allowed: boolean, error?: string}} Rate limit check result
+     * @returns {Promise<{allowed: boolean, error?: string}>} Rate limit check result
      */
     private checkRateLimits;
     /**

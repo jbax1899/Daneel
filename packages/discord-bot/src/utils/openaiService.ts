@@ -7,33 +7,40 @@
 import OpenAI from 'openai';
 import { logger } from './logger.js';
 
-/**
- * Represents a message in a conversation with the AI
- * @typedef {Object} Message
- * @property {'user'|'assistant'|'system'|'developer'} role - The role of the message sender
- * @property {string} content - The content of the message
- */
-type Message = {
-  role: 'user' | 'assistant' | 'system' | 'developer';
-  content: string;
-};
+const DEFAULT_MODEL = 'gpt-5-mini';
 
 type ReasoningEffort = 'minimal' | 'low' | 'medium' | 'high';
 type VerbosityLevel = 'low' | 'medium' | 'high';
 
-export interface GenerateResponseOptions {
-  reasoningEffort?: ReasoningEffort; // Controls the depth of reasoning (more reasoning = better quality but slower)
-  verbosity?: VerbosityLevel; // Controls the verbosity of the response
-  instructions?: string; // System instructions for the model
+/**
+ * Represents a single message in the conversation context for OpenAI
+ */
+export interface OpenAIMessage {
+  role: 'user' | 'assistant' | 'system' | 'developer';
+  content: string
 }
 
-export interface GenerateResponseResult {
+/**
+ * Options for generating a response with the OpenAI API
+ */
+export interface OpenAIOptions {
+  /** Controls the depth of reasoning (more reasoning = better quality but slower) */
+  reasoningEffort?: ReasoningEffort;
+  /** Controls the verbosity of the response */
+  verbosity?: VerbosityLevel;
+}
+
+export interface OpenAIResponse {
   response: string | null;
   usage?: {
     input_tokens: number;
     output_tokens: number;
     total_tokens: number;
     cost: string;
+  };
+  debugContext?: {
+    filename: string;
+    content: string;
   };
 }
 
@@ -55,31 +62,34 @@ export class OpenAIService {
   /**
    * Generates a response from the OpenAI API based on the provided messages
    * @async
-   * @param {Message[]} messages - Array of message objects for the conversation context
+   * @param {OpenAIMessage[]} messages - Array of message objects for the conversation context
    * @param {string} [model='gpt-5-mini'] - The OpenAI model to use for generation
-   * @param {GenerateResponseOptions} [options] - Additional options for the generation
-   * @returns {Promise<GenerateResponseResult>} The generated response and token usage data
+   * @param {OpenAIOptions} [options] - Additional options for the generation
+   * @returns {Promise<OpenAIResponse>} The generated response and token usage data
    * @throws {Error} If there's an error communicating with the OpenAI API
    */
   async generateResponse(
-    messages: Message[],
-    model: string = 'gpt-5-mini',
-    options: GenerateResponseOptions = {}
-  ): Promise<GenerateResponseResult> {
+    messages: OpenAIMessage[],
+    model: string = DEFAULT_MODEL,
+    options: OpenAIOptions = {}
+  ): Promise<OpenAIResponse> {
     try {
-      logger.debug('Sending request to OpenAI');
+      logger.debug('Requesting response from OpenAI...');
       
-      const { reasoningEffort, verbosity, instructions } = options;
+      const { reasoningEffort = 'minimal', verbosity = 'low' } = options;
       
       const response = await this.openai.responses.create({
         model,
         input: messages,
-        ...(instructions && { instructions }),
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
-        ...(verbosity && { text: { verbosity } })
+        ...(verbosity ? { 
+          text: { 
+            ...(verbosity && { verbosity })
+          } 
+        } : {}),
       });
 
-      let result: GenerateResponseResult = {
+      let result: OpenAIResponse = {
         response: response.output_text || null
       };
 
@@ -94,8 +104,20 @@ export class OpenAIService {
           total_tokens,
           cost
         };
+      }
 
-        logger.debug(`Token usage: ${JSON.stringify(result.usage, null, 2)}`);
+      // Add debug context if in development mode
+      if (process.env.NODE_ENV === 'development') {
+        result.debugContext = this.generateDebugContext(
+          messages,
+          options,
+          {
+            input_tokens: response.usage?.input_tokens || 0,
+            output_tokens: response.usage?.output_tokens || 0,
+            total_tokens: response.usage?.total_tokens || 0,
+            cost: this.calculateCost(model, response.usage?.input_tokens || 0, response.usage?.output_tokens || 0)
+          }
+        );
       }
 
       return result;
@@ -123,6 +145,7 @@ export class OpenAIService {
     // Updated 2025-08-18
     const PRICING: Record<string, { prompt: number; completion: number }> = {
       'gpt-5-mini': { prompt: 0.25, completion: 2.00 },
+      'gpt-5-nano': { prompt: 0.05, completion: 0.40 },
     };
 
     const modelPricing = Object.entries(PRICING).find(([key]) => 
@@ -136,5 +159,51 @@ export class OpenAIService {
     const totalCost = promptCost + completionCost;
 
     return `$${totalCost.toFixed(6)}`;
+  }
+
+  /**
+   * Generates debug context for development purposes
+   * @private
+   * @param {OpenAIMessage[]} messages - The messages sent to the API
+   * @param {OpenAIOptions} options - The options used for the API call
+   * @param {Object} usage - Token usage information
+   * @param {number} usage.input_tokens - Number of input tokens
+   * @param {number} usage.output_tokens - Number of output tokens
+   * @param {number} usage.total_tokens - Total number of tokens
+   * @param {string} usage.cost - Estimated cost of the API call
+   * @returns {{filename: string, content: string}} Debug context with filename and content
+   */
+  private generateDebugContext(
+    messages: OpenAIMessage[],
+    options: OpenAIOptions,
+    usage: {
+      input_tokens: number;
+      output_tokens: number;
+      total_tokens: number;
+      cost: string;
+    }
+  ): { filename: string; content: string } {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `context-${timestamp}.txt`;
+    
+    const content = [
+      // Options
+      `[OPTS] ${Object.entries(options)
+        .filter(([_, v]) => v !== undefined)
+        .map(([k, v]) => `${k}: ${v}`)
+        .join(' | ')}`,
+      
+      // Token usage information
+      `[USAGE] tokens: ${usage.input_tokens} in | ${usage.output_tokens} out | ${usage.total_tokens} total | Cost: ${usage.cost}`,
+      
+      // Messages
+      ...messages.map(msg => {
+        const rolePrefix = msg.role.toUpperCase().substring(0, 4);
+        const content = msg.content.replace(/\n/g, '\\n');
+        return `[${rolePrefix}] ${content}`;
+      })
+    ].join('\n\n');
+
+    return { filename, content };
   }
 }

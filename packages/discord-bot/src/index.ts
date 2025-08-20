@@ -5,13 +5,16 @@ import { CommandHandler } from './utils/commandHandler.js';
 import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
+import { OpenAIService } from './utils/openaiService.js';
 
 // ====================
 // Environment Setup
 // ====================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const openai = { apiKey: config.openaiApiKey };
+
+// Initialize OpenAI service
+const openaiService = new OpenAIService(config.openaiApiKey);
 
 // ====================
 // Client Configuration
@@ -31,7 +34,10 @@ const client = new Client({
 // Initialize Managers
 // ====================
 const commandHandler = new CommandHandler();
-const eventManager = new EventManager(client, { openai });
+const eventManager = new EventManager(client, { 
+  openai: { apiKey: config.openaiApiKey },
+  openaiService 
+});
 
 // ====================
 // Load and Register Commands

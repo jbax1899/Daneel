@@ -82,6 +82,7 @@ export class RateLimiter {
      * Clears expired rate limit records.
      * Should be called periodically to prevent memory leaks.
      */
+    // TODO: Implement cleanup
     cleanup() {
         const now = Date.now();
         for (const [key, record] of this.limits.entries()) {

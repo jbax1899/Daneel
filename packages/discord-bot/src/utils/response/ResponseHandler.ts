@@ -4,8 +4,9 @@
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 
-import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder, TextBasedChannel, User, MessageEditOptions, AttachmentBuilder } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
 import { logger } from '../logger.js';
+import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 
 /**
  * Handles various types of message responses for Discord interactions.
@@ -26,33 +27,60 @@ export class ResponseHandler {
   ) {}
 
   /**
-   * Sends a message with optional text and file attachments.
-   * @param {string} content - The text content to send (can be empty string)
-   * @param {Array<{filename: string, data: string | Buffer}>} files - Array of files to attach
-   * @returns {Promise<Message | null>} The sent message or null if sending failed
+   * Sends a message to the channel with optional file attachments
+   * @param {string} content - The message content to send
+   * @param {Array<{filename: string, data: string | Buffer}>} [files=[]] - Optional files to attach
+   * @returns {Promise<Message | Message[]>} The sent message(s)
    */
   public async sendMessage(
-    content: string = '',
-    files: {filename: string, data: string | Buffer}[] = []
-  ): Promise<Message | null> {
+    content: string,
+    files: Array<{filename: string, data: string | Buffer}> = []
+  ): Promise<Message | Message[]> {
+    if (!this.channel.isSendable()) {
+      throw new Error('Channel is not sendable');
+    }
+
     try {
-      if (!this.channel.isTextBased() || this.channel.isDMBased()) {
-        return null;
+      // If we have no content but have files, just send the files
+      if (!content.trim() && files.length > 0) {
+        const messageOptions: MessageCreateOptions = {
+          files: files.map(f => ({
+            attachment: Buffer.from(f.data),
+            name: f.filename
+          }))
+        };
+        return await this.channel.send(messageOptions);
       }
 
-      const attachments = files.map(file => 
-        new AttachmentBuilder(
-          Buffer.isBuffer(file.data) ? file.data : Buffer.from(file.data),
-          { name: file.filename }
-        )
-      );
+      // Split content into chunks using the splitMessage method
+      const chunks = this.splitMessage(content);
+      const messages: Message[] = [];
 
-      const messageOptions = {
-        content: content || undefined,
-        files: attachments.length > 0 ? attachments : undefined
+      // If we have no files, just send all chunks as separate messages
+      if (files.length === 0) {
+        for (const chunk of chunks) {
+          messages.push(await this.channel.send({ content: chunk }));
+        }
+        return messages.length === 1 ? messages[0] : messages;
+      }
+
+      // If we have files, send all but the last chunk as regular messages
+      for (let i = 0; i < chunks.length - 1; i++) {
+        messages.push(await this.channel.send({ content: chunks[i] }));
+      }
+
+      // Send the last chunk with files
+      const lastChunk = chunks[chunks.length - 1];
+      const messageOptions: MessageCreateOptions = { 
+        content: lastChunk,
+        files: files.map(f => ({
+          attachment: Buffer.from(f.data),
+          name: f.filename
+        }))
       };
 
-      return await this.channel.send(messageOptions);
+      messages.push(await this.channel.send(messageOptions));
+      return messages.length === 1 ? messages[0] : messages;
     } catch (error) {
       logger.error('Failed to send message:', error);
       throw error;
@@ -62,10 +90,15 @@ export class ResponseHandler {
   /**
    * Sends a text response to the channel where the message was received.
    * @param {string} content - The text content to send
-   * @returns {Promise<Message | null>} The sent message or null if sending failed
+   * @returns {Promise<Message | null>} The last sent message or null if sending failed
    */
   public async sendText(content: string): Promise<Message | null> {
-    return this.sendMessage(content);
+    if (!this.channel.isSendable()) {
+      throw new Error('Channel is not sendable');
+    }
+    
+    const result = await this.sendMessage(content);
+    return Array.isArray(result) ? result[result.length - 1] : result;
   }
 
   /**
@@ -73,31 +106,48 @@ export class ResponseHandler {
    * @param {string} content - The content to include with the file
    * @param {string} filename - The name of the file
    * @param {string | Buffer} data - The file data as a string or Buffer
-   * @returns {Promise<Message | null>} The sent message or null if sending failed
+   * @returns {Promise<Message | null>} The last sent message or null if sending failed
    */
   public async sendFile(
     content: string,
     filename: string,
     data: string | Buffer,
   ): Promise<Message | null> {
-    return this.sendMessage(content, [{ filename, data }]);
+    if (!this.channel.isSendable()) {
+      throw new Error('Channel is not sendable');
+    }
+    
+    const result = await this.sendMessage(content, [{ filename, data }]);
+    return Array.isArray(result) ? result[result.length - 1] : result;
   }
 
   /**
    * Sends an embedded message to the channel where the message was received.
-   * @param {EmbedBuilder} embed - The embed to send
+   * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send
    * @param {Omit<MessageReplyOptions, 'embeds'>} [options] - Additional message options
    * @returns {Promise<void>}
    */
-  public async sendEmbed(embed: EmbedBuilder, options: Omit<MessageReplyOptions, 'embeds'> = {}): Promise<void> {
+  public async sendEmbed(
+    embed: CustomEmbedBuilder | DiscordEmbedBuilder,
+    options: Omit<MessageReplyOptions, 'embeds'> = {}
+  ): Promise<void> {
+    let discordEmbed: DiscordEmbedBuilder;
+    
     try {
-      await this.message.reply({
-        embeds: [embed],
-        ...options,
-        allowedMentions: { repliedUser: false, ...options.allowedMentions }
-      });
+      discordEmbed = embed instanceof CustomEmbedBuilder 
+        ? new DiscordEmbedBuilder(embed.toJSON())
+        : embed;
+
+      if (this.channel.isSendable()) {
+        await this.channel.send({
+          ...options,
+          embeds: [discordEmbed]
+        });
+      } else {
+        throw new Error('Channel is not sendable'); // TODO: Handle non-text channels
+      }
     } catch (error) {
-      logger.error('Failed to send embed response:', error);
+      logger.error('Failed to send embed:', error);
       throw error;
     }
   }
@@ -148,11 +198,37 @@ export class ResponseHandler {
    * @returns {Promise<void>}
    */
   public async addReaction(emoji: string): Promise<void> {
+    if (!emoji?.trim()) return;
+  
+    // Simple function to check if a string is a single emoji
+    const isSingleEmoji = (str: string): boolean => {
+      // Unicode emoji regex that matches a single emoji
+      const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u;
+      return emojiRegex.test(str);
+    };
+  
     try {
-      await this.message.react(emoji);
+      // First try to react with the entire string as a single emoji
+      if (isSingleEmoji(emoji.trim())) {
+        await this.message.react(emoji.trim());
+        return;
+      }
+  
+      // If not a single emoji, try to split by spaces and react to each
+      const emojis = emoji.split(/\s+/).filter(Boolean);
+      
+      for (const e of emojis) {
+        try {
+          await this.message.react(e);
+          // Add a small delay between reactions to respect rate limits
+          await new Promise(resolve => setTimeout(resolve, 250));
+        } catch (error) {
+          logger.warn(`Failed to react with emoji ${e}:`, error);
+          continue;
+        }
+      }
     } catch (error) {
-      logger.error('Failed to add reaction:', error);
-      // Silently fail for reactions as they're not critical
+      logger.error('Failed to process reaction:', error);
     }
   }
 
@@ -172,5 +248,91 @@ export class ResponseHandler {
     } catch (error) {
       logger.warn('Failed to send typing indicator:', error);
     }
+  }
+
+  /**
+   * Splits a message into chunks that fit within Discord's message limits
+   * @private
+   */
+  private splitMessage(text: string): string[] {
+    const maxLength = 2000;
+    const chunks: string[] = [];
+    let currentChunk = '';
+    
+    // Split by paragraphs first to maintain readability
+    const paragraphs = text.split(/\n\s*\n/);
+    
+    for (const paragraph of paragraphs) {
+      // If adding this paragraph would exceed the limit, push current chunk and start a new one
+      if (currentChunk.length + paragraph.length + 2 > maxLength) {
+        if (currentChunk) {
+          chunks.push(currentChunk.trim());
+          currentChunk = '';
+        }
+        
+        // If a single paragraph is too long, split it by sentences
+        if (paragraph.length > maxLength) {
+          const sentences = paragraph.split(/(?<=[.!?])\s+/);
+          let sentenceChunk = '';
+          
+          for (const sentence of sentences) {
+            if (sentenceChunk.length + sentence.length + 1 > maxLength) {
+              if (sentenceChunk) {
+                chunks.push(sentenceChunk.trim());
+                sentenceChunk = '';
+              }
+              
+              // If a single sentence is still too long, split by words
+              if (sentence.length > maxLength) {
+                const words = sentence.split(/\s+/);
+                let wordChunk = '';
+                
+                for (const word of words) {
+                  if (wordChunk.length + word.length + 1 > maxLength) {
+                    if (wordChunk) {
+                      chunks.push(wordChunk.trim());
+                      wordChunk = '';
+                    }
+                    
+                    // If a single word is too long, split it
+                    if (word.length > maxLength) {
+                      for (let i = 0; i < word.length; i += maxLength) {
+                        chunks.push(word.substring(i, i + maxLength));
+                      }
+                    } else {
+                      wordChunk = word;
+                    }
+                  } else {
+                    wordChunk += (wordChunk ? ' ' : '') + word;
+                  }
+                }
+                
+                if (wordChunk) {
+                  chunks.push(wordChunk.trim());
+                }
+              } else {
+                sentenceChunk = sentence;
+              }
+            } else {
+              sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
+            }
+          }
+          
+          if (sentenceChunk) {
+            chunks.push(sentenceChunk.trim());
+          }
+        } else {
+          currentChunk = paragraph;
+        }
+      } else {
+        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+      }
+    }
+    
+    if (currentChunk) {
+      chunks.push(currentChunk.trim());
+    }
+    
+    return chunks;
   }
 }

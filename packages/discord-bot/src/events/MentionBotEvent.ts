@@ -8,19 +8,21 @@ import { Message } from 'discord.js';
 import { Event } from './Event.js';
 import { logger } from '../utils/logger.js';
 import { OpenAIService } from '../utils/openaiService.js';
-import { PromptBuilder } from '../utils/prompting/PromptBuilder.js';
 import { MessageProcessor } from '../utils/MessageProcessor.js';
+import { Planner } from '../utils/prompting/Planner.js';
 
 /**
  * Dependencies required for the MentionBotEvent
  * @interface Dependencies
  * @property {Object} openai - Configuration for the OpenAI service
  * @property {string} openai.apiKey - The API key for OpenAI
+ * @property {OpenAIService} openaiService - The OpenAI service instance
  */
 interface Dependencies {
   openai: {
     apiKey: string;
   };
+  openaiService: OpenAIService;
 }
 
 /**
@@ -46,8 +48,8 @@ export class MentionBotEvent extends Event {
   constructor(dependencies: Dependencies) {
     super({ name: 'messageCreate', once: false });
     this.messageProcessor = new MessageProcessor({
-      promptBuilder: new PromptBuilder(),
-      openaiService: new OpenAIService(dependencies.openai.apiKey)
+      openaiService: dependencies.openaiService,
+      planner: new Planner(dependencies.openaiService)
     });
   }
 
@@ -74,11 +76,13 @@ export class MentionBotEvent extends Event {
    * @returns {boolean} True if the message should be ignored, false otherwise
    */
   private shouldIgnoreMessage(message: Message): boolean {
-    // Logic for ignoring messages
-    // 1. Ignore messages from other bots
-    // 2. Ignore messages that don't either mention the bot or reply to the bot
-    if (message.author.bot) return true;
-    return !this.isBotMentioned(message) && !this.isReplyToBot(message);
+    // Ignore messages from self
+    if (message.author.id === message.client.user!.id) return true;
+    // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
+    if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
+      return false;
+    }
+    return true;
   }
 
   /**
@@ -88,7 +92,7 @@ export class MentionBotEvent extends Event {
    * @returns {boolean} True if the bot is mentioned, false otherwise
    */
   private isBotMentioned(message: Message): boolean {
-    return message.mentions.users.has(message.client.user!.id);
+    return message.mentions.users.has(message.client.user!.id); // Discord converts @Daneel to the bot's ID
   }
 
   /**

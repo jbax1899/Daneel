@@ -5,6 +5,7 @@
  */
 import OpenAI from 'openai';
 import { logger } from './logger.js';
+const DEFAULT_MODEL = 'gpt-5-mini';
 /**
  * Service for interacting with the OpenAI API
  * @class OpenAIService
@@ -21,37 +22,50 @@ export class OpenAIService {
     /**
      * Generates a response from the OpenAI API based on the provided messages
      * @async
-     * @param {Message[]} messages - Array of message objects for the conversation context
+     * @param {OpenAIMessage[]} messages - Array of message objects for the conversation context
      * @param {string} [model='gpt-5-mini'] - The OpenAI model to use for generation
-     * @param {GenerateResponseOptions} [options] - Additional options for the generation
-     * @returns {Promise<string|null>} The generated response or null if no response
+     * @param {OpenAIOptions} [options] - Additional options for the generation
+     * @returns {Promise<OpenAIResponse>} The generated response and token usage data
      * @throws {Error} If there's an error communicating with the OpenAI API
      */
-    async generateResponse(messages, model = 'gpt-5-mini', options = {}) {
+    async generateResponse(messages, model = DEFAULT_MODEL, options = {}) {
         try {
-            logger.debug('Sending request to OpenAI');
-            const { reasoningEffort, verbosity, instructions } = options;
+            logger.debug('Requesting response from OpenAI...');
+            const { reasoningEffort = 'minimal', verbosity = 'low' } = options;
             const response = await this.openai.responses.create({
                 model,
                 input: messages,
-                ...(instructions && { instructions }),
                 ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
-                ...(verbosity && { text: { verbosity } })
+                ...(verbosity ? {
+                    text: {
+                        ...(verbosity && { verbosity })
+                    }
+                } : {}),
             });
-            // Log token usage if available
+            let result = {
+                response: response.output_text || null
+            };
+            // Add token usage if available
             if (response.usage) {
-                const prompt_tokens = response.usage.input_tokens ?? 0;
-                const completion_tokens = response.usage.output_tokens ?? 0;
-                const total_tokens = response.usage.total_tokens ?? 0;
-                logger.debug('Token usage:', {
-                    model,
-                    prompt_tokens,
-                    completion_tokens,
+                const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = response.usage;
+                const cost = this.calculateCost(model, input_tokens, output_tokens);
+                result.usage = {
+                    input_tokens,
+                    output_tokens,
                     total_tokens,
-                    cost: this.calculateCost(model, prompt_tokens, completion_tokens)
+                    cost
+                };
+            }
+            // Add debug context if in development mode
+            if (process.env.NODE_ENV === 'development') {
+                result.debugContext = this.generateDebugContext(messages, options, {
+                    input_tokens: response.usage?.input_tokens || 0,
+                    output_tokens: response.usage?.output_tokens || 0,
+                    total_tokens: response.usage?.total_tokens || 0,
+                    cost: this.calculateCost(model, response.usage?.input_tokens || 0, response.usage?.output_tokens || 0)
                 });
             }
-            return response.output_text || null;
+            return result;
         }
         catch (error) {
             logger.error('Error in OpenAI service:', error);
@@ -72,6 +86,7 @@ export class OpenAIService {
         // Updated 2025-08-18
         const PRICING = {
             'gpt-5-mini': { prompt: 0.25, completion: 2.00 },
+            'gpt-5-nano': { prompt: 0.05, completion: 0.40 },
         };
         const modelPricing = Object.entries(PRICING).find(([key]) => model.toLowerCase().includes(key))?.[1];
         if (!modelPricing)
@@ -80,6 +95,38 @@ export class OpenAIService {
         const completionCost = (completionTokens / 1_000_000) * modelPricing.completion;
         const totalCost = promptCost + completionCost;
         return `$${totalCost.toFixed(6)}`;
+    }
+    /**
+     * Generates debug context for development purposes
+     * @private
+     * @param {OpenAIMessage[]} messages - The messages sent to the API
+     * @param {OpenAIOptions} options - The options used for the API call
+     * @param {Object} usage - Token usage information
+     * @param {number} usage.input_tokens - Number of input tokens
+     * @param {number} usage.output_tokens - Number of output tokens
+     * @param {number} usage.total_tokens - Total number of tokens
+     * @param {string} usage.cost - Estimated cost of the API call
+     * @returns {{filename: string, content: string}} Debug context with filename and content
+     */
+    generateDebugContext(messages, options, usage) {
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = `context-${timestamp}.txt`;
+        const content = [
+            // Options
+            `[OPTS] ${Object.entries(options)
+                .filter(([_, v]) => v !== undefined)
+                .map(([k, v]) => `${k}: ${v}`)
+                .join(' | ')}`,
+            // Token usage information
+            `[USAGE] tokens: ${usage.input_tokens} in | ${usage.output_tokens} out | ${usage.total_tokens} total | Cost: ${usage.cost}`,
+            // Messages
+            ...messages.map(msg => {
+                const rolePrefix = msg.role.toUpperCase().substring(0, 4);
+                const content = msg.content.replace(/\n/g, '\\n');
+                return `[${rolePrefix}] ${content}`;
+            })
+        ].join('\n\n');
+        return { filename, content };
     }
 }
 //# sourceMappingURL=openaiService.js.map
