@@ -115,7 +115,18 @@ export async function POST(req: Request) {
       async start(controller) {
         const encoder = new TextEncoder();
         try {
-          for await (const chunk of response as any) {
+          interface Chunk {
+            choices: Array<{
+              delta: {
+                content?: string;
+                role?: string;
+              };
+              finish_reason?: string;
+              index: number;
+            }>;
+          }
+
+          for await (const chunk of response as AsyncIterable<Chunk>) {
             const data = `data: ${JSON.stringify(chunk)}\n\n`;
             controller.enqueue(encoder.encode(data));
           }

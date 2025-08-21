@@ -8,40 +8,43 @@ import {
     useLocalRuntime, 
     type ChatModelAdapter,
     type ChatModelRunOptions,
-    type ChatModelRunResult,
     type AttachmentAdapter
   } from "@assistant-ui/react";
 
 // Custom AttachmentAdapter implementation
+/*
 class CustomAttachmentAdapter implements AttachmentAdapter {
   accept = "image/*,application/pdf";
   multiple = true;
 
-  async add(file: File): Promise<{
+  async add(state: { file: File }): Promise<{
     id: string;
-    type: string;
+    type: "file" | "image" | "document";
     name: string;
     url: string;
+    contentType: string;
   }> {
     const formData = new FormData();
-    formData.append('file', file);
+    formData.append('file', state.file);
     
     const response = await fetch('/api/upload', {
       method: 'POST',
       body: formData,
     });
 
+    const result = await response.json();
+
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to upload file');
+      throw new Error(result.error || 'Failed to upload file');
     }
 
-    const { id, url } = await response.json();
     return {
-      id,
-      type: file.type.startsWith('image/') ? 'image' : 'document',
-      name: file.name,
-      url,
+      id: result.id,
+      type: state.file.type.startsWith('image/') ? 'image' : 
+            state.file.type === 'application/pdf' ? 'document' : 'file',
+      name: state.file.name,
+      url: result.url,
+      contentType: state.file.type
     };
   }
 
@@ -56,9 +59,9 @@ class CustomAttachmentAdapter implements AttachmentAdapter {
     }
   }
 }
-
+*/
 export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
-  const { userId, isLoaded } = useAuth();
+  const { isLoaded } = useAuth();
   const [cloud, setCloud] = useState<AssistantCloud | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,12 +77,14 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
             messages, 
             system: context?.system, 
             // Include attachments in the request
+            /*
             attachments: context?.attachments?.map(a => ({
               id: a.id,
               type: a.type,
               name: a.name,
               url: a.url,
             })),
+            */
           }),
           signal: abortSignal,
         });
@@ -127,16 +132,16 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
     },
-  }), [userId]);
+  }), []);
 
   // Initialize the cloud instance
   useEffect(() => {
-    if (!isLoaded || !userId) return;
+    if (!isLoaded) return;
 
     try {
       const cloudInstance = new AssistantCloud({
         apiKey: process.env.NEXT_PUBLIC_ASSISTANT_CLOUD_API_KEY || '',
-        userId,
+        userId: useAuth().userId || '',
         workspaceId: process.env.NEXT_PUBLIC_ASSISTANT_CLOUD_WORKSPACE_ID || '',
       });
       setCloud(cloudInstance);
@@ -145,13 +150,13 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to initialize Assistant Cloud:', err);
       setError('Failed to initialize Assistant. Please try again.');
     }
-  }, [isLoaded, userId]);
+  }, [isLoaded]);
 
   // Initialize the runtime after cloud is ready
   const runtime = useLocalRuntime(modelAdapter, {
     cloud: cloud || undefined,
     adapters: { 
-      attachments: new CustomAttachmentAdapter(),
+      //attachments: new CustomAttachmentAdapter(),
     },
   });
 
