@@ -67,7 +67,7 @@ export class Planner {
     try {
       const messages: OpenAIMessage[] = [...context];
 
-      const response: OpenAIResponse = await this.openaiService.generateResponse(
+      const openaiResponse = await this.openaiService.generateResponse(
         PLANNING_MODEL,
         [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages],
         { 
@@ -76,6 +76,14 @@ export class Planner {
           function_call: { name: 'generate-plan' }
         }
       );
+      //logger.debug(`Raw OpenAI response: ${JSON.stringify(openaiResponse)}`);
+
+      const response: OpenAIResponse = {
+        normalizedText: openaiResponse.message.content,
+        message: openaiResponse.message,
+        finish_reason: openaiResponse.finish_reason,
+        usage: openaiResponse.usage
+      }
       logger.debug(`Plan generated. Usage: ${JSON.stringify(response.usage)}`);
 
       const funcCall = response.message.function_call;

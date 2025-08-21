@@ -15,6 +15,8 @@ export class ResponseHandler {
     message;
     channel;
     user;
+    typingInterval = null;
+    TYPING_INTERVAL_MS = 8000; // Discord typing indicator lasts ~10s, so we'll refresh at 8s
     /**
      * Creates an instance of ResponseHandler.
      * @param {Message} message - The original Discord message that triggered the response
@@ -219,6 +221,45 @@ export class ResponseHandler {
         }
         catch (error) {
             logger.warn('Failed to send typing indicator:', error);
+        }
+    }
+    /**
+     * Shows a typing indicator in the channel and keeps it active until stopTyping is called
+     * @returns {Promise<void>}
+     */
+    async startTyping() {
+        if (!this.channel.isTextBased() || this.channel.isDMBased() || this.channel.isThread()) {
+            return;
+        }
+        // Type guard to ensure we have a text channel that supports sendTyping
+        const textChannel = this.channel;
+        // Send initial typing indicator
+        try {
+            await textChannel.sendTyping();
+        }
+        catch (error) {
+            logger.warn('Failed to send typing indicator:', error);
+            return;
+        }
+        // Set up interval to keep typing active
+        this.typingInterval = setInterval(async () => {
+            try {
+                await textChannel.sendTyping();
+            }
+            catch (error) {
+                logger.warn('Failed to refresh typing indicator:', error);
+                this.stopTyping();
+            }
+        }, this.TYPING_INTERVAL_MS);
+    }
+    /**
+     * Stops the typing indicator
+     * @returns {void}
+     */
+    stopTyping() {
+        if (this.typingInterval) {
+            clearInterval(this.typingInterval);
+            this.typingInterval = null;
         }
     }
     /**

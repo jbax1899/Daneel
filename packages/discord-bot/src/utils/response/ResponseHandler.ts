@@ -14,6 +14,9 @@ import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
  * @class ResponseHandler
  */
 export class ResponseHandler {
+  private typingInterval: NodeJS.Timeout | null = null;
+  private readonly TYPING_INTERVAL_MS = 8000; // Discord typing indicator lasts ~10s, so we'll refresh at 8s
+
   /**
    * Creates an instance of ResponseHandler.
    * @param {Message} message - The original Discord message that triggered the response
@@ -238,6 +241,48 @@ export class ResponseHandler {
       await this.channel.sendTyping();
     } catch (error) {
       logger.warn('Failed to send typing indicator:', error);
+    }
+  }
+
+  /**
+   * Shows a typing indicator in the channel and keeps it active until stopTyping is called
+   * @returns {Promise<void>}
+   */
+  public async startTyping(): Promise<void> {
+    if (!this.channel.isTextBased() || this.channel.isDMBased() || this.channel.isThread()) {
+      return;
+    }
+
+    // Type guard to ensure we have a text channel that supports sendTyping
+    const textChannel = this.channel as Extract<TextBasedChannel, { sendTyping: unknown }>;
+    
+    // Send initial typing indicator
+    try {
+      await textChannel.sendTyping();
+    } catch (error) {
+      logger.warn('Failed to send typing indicator:', error);
+      return;
+    }
+
+    // Set up interval to keep typing active
+    this.typingInterval = setInterval(async () => {
+      try {
+        await textChannel.sendTyping();
+      } catch (error) {
+        logger.warn('Failed to refresh typing indicator:', error);
+        this.stopTyping();
+      }
+    }, this.TYPING_INTERVAL_MS);
+  }
+
+  /**
+   * Stops the typing indicator
+   * @returns {void}
+   */
+  public stopTyping(): void {
+    if (this.typingInterval) {
+      clearInterval(this.typingInterval);
+      this.typingInterval = null;
     }
   }
 

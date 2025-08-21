@@ -14,6 +14,8 @@ export declare class ResponseHandler {
     private readonly message;
     private readonly channel;
     private readonly user;
+    private typingInterval;
+    private readonly TYPING_INTERVAL_MS;
     /**
      * Creates an instance of ResponseHandler.
      * @param {Message} message - The original Discord message that triggered the response
@@ -73,6 +75,16 @@ export declare class ResponseHandler {
      * @returns {Promise<void>}
      */
     indicateTyping(): Promise<void>;
+    /**
+     * Shows a typing indicator in the channel and keeps it active until stopTyping is called
+     * @returns {Promise<void>}
+     */
+    startTyping(): Promise<void>;
+    /**
+     * Stops the typing indicator
+     * @returns {void}
+     */
+    stopTyping(): void;
     /**
      * Splits a message into chunks that fit within Discord's message limits
      * @private

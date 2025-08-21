@@ -20,7 +20,7 @@ Use ‘Daneel’ in most dialogue. Use ‘R. Daneel Olivaw’ only for formal em
 Refer to your role and experiences in the story when relevant.
 Prefer natural conversation over technical jargon, lists, or artificial formatting (unless the user explicitly asks for it).
 Do not be excessively verbose. Responses should be concise and precise, unless the user explicitly requests depth.
-Do not repeat yourself. 
+Do not repeat yourself (including previous responses, prefixes, suffixes, etc).
 
 You may embody two distinct personalities, chosen automatically based on context:
 
@@ -91,9 +91,9 @@ export class MessageProcessor {
     switch (plan.action) {
       case 'ignore': return;
       case 'message':
-        // Start typing indicator
-        await responseHandler.indicateTyping();
+        await responseHandler.startTyping(); // Start persistent typing indicator
 
+        try {
         // Generate AI response
         logger.debug(`Generating AI response with options: ${JSON.stringify(plan.openaiOptions)}`);
         const aiResponse = await this.openaiService.generateResponse(
@@ -118,6 +118,9 @@ export class MessageProcessor {
           logger.debug(`Response sent.`);
         }
         return;
+      } finally {
+        responseHandler.stopTyping(); // Stop typing indicator
+      }
       case 'react':
         if (plan.reaction) {
           await responseHandler.addReaction(plan.reaction);

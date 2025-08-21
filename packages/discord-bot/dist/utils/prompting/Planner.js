@@ -20,12 +20,12 @@ const planFunction = {
             action: {
                 type: "string",
                 enum: ["message", "react", "ignore"],
-                description: "The action to take. 'message' sends a text response, 'react' adds an emoji reaction(s), 'ignore' does nothing (use when its best to ignore the message)"
+                description: "The action to take. 'message' sends a text response, 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (use when its best to ignore the message)"
             },
             modality: { type: "string", enum: ["text"] },
             reaction: {
                 type: "string",
-                description: "A string containing only emoji characters (no text). Required when action is 'react'. Examples: 🤖👍",
+                description: "A string containing only emoji characters (no text). Required when action is 'react'. Example: 🤖👍",
             },
             openaiOptions: {
                 type: "object",
@@ -33,12 +33,12 @@ const planFunction = {
                     reasoningEffort: {
                         type: "string",
                         enum: ["minimal", "low", "medium", "high"],
-                        description: "The level of reasoning to use. Prefer 'high', then 'medium', then 'low', then 'minimal'"
+                        description: "The level of reasoning to use. Prefer 'low', then 'medium', then 'high'. Only use 'minimal' if asked to think fast etc."
                     },
                     verbosity: {
                         type: "string",
                         enum: ["low", "medium", "high"],
-                        description: "The level of verbosity to use. Prefer 'medium', then 'low'. Only use 'high' when explicitly asked to."
+                        description: "The level of verbosity to use. Prefer 'low', then 'medium'. Only use 'high' when asked to be verbose etc."
                     }
                 },
                 required: ["reasoningEffort", "verbosity"]
@@ -55,11 +55,18 @@ export class Planner {
     async generatePlan(context = []) {
         try {
             const messages = [...context];
-            const response = await this.openaiService.generateResponse(PLANNING_MODEL, [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages], {
+            const openaiResponse = await this.openaiService.generateResponse(PLANNING_MODEL, [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages], {
                 ...PLANNING_OPTIONS,
                 functions: [planFunction],
                 function_call: { name: 'generate-plan' }
             });
+            //logger.debug(`Raw OpenAI response: ${JSON.stringify(openaiResponse)}`);
+            const response = {
+                normalizedText: openaiResponse.message.content,
+                message: openaiResponse.message,
+                finish_reason: openaiResponse.finish_reason,
+                usage: openaiResponse.usage
+            };
             logger.debug(`Plan generated. Usage: ${JSON.stringify(response.usage)}`);
             const funcCall = response.message.function_call;
             if (funcCall?.arguments) {

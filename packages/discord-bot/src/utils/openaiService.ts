@@ -124,6 +124,8 @@ export class OpenAIService {
       // Generate response
       const response = await this.openai.responses.create(requestPayload);
 
+      //logger.debug(`Raw OpenAI response: ${JSON.stringify(response)}`);
+
       // Get output items from response
       const outputItems = response.output as ResponseOutputItemExtended[];
 
