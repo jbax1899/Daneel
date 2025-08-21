@@ -11,3 +11,11 @@ packages/discord-bot/logs/
 
 # Reference code
 reference
+
+# VSCode settings
+.vscode
+
+# Windsurf/Cascade
+.windsurf/
+cascadeReference.md
+cascadeReferenceRolybot.md
