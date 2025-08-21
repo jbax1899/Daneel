@@ -8,7 +8,6 @@ import {
     useLocalRuntime, 
     type ChatModelAdapter,
     type ChatModelRunOptions,
-    type AttachmentAdapter
   } from "@assistant-ui/react";
 
 // Custom AttachmentAdapter implementation
