@@ -1,5 +1,5 @@
 import { logger } from '../Logger.js';
-import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel } from '../OpenAIService.js';
+import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel } from '../openaiService.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
 const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', verbosity: 'low' };

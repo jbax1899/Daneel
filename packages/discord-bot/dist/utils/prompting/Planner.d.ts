@@ -1,4 +1,4 @@
-import { OpenAIService, OpenAIMessage, OpenAIOptions } from '../OpenAIService.js';
+import { OpenAIService, OpenAIMessage, OpenAIOptions } from '../openaiService.js';
 export interface Plan {
     action: 'message' | 'react' | 'ignore';
     modality: 'text';

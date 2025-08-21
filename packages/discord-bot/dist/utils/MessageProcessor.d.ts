@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { OpenAIService } from './OpenAIService';
+import { OpenAIService } from './openaiService';
 import { Planner } from './prompting/Planner';
 type MessageProcessorOptions = {
     openaiService: OpenAIService;

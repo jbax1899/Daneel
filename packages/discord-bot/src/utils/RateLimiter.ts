@@ -14,7 +14,7 @@ interface RateLimitOptions {
 }
 
 interface RateLimitRecord {
-  count: number;
+  count: number;ild
   resetTime: number;
 }
 

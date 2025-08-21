@@ -30,8 +30,16 @@ const planFunction = {
             openaiOptions: {
                 type: "object",
                 properties: {
-                    reasoningEffort: { type: "string", enum: ["minimal", "low", "medium", "high"] },
-                    verbosity: { type: "string", enum: ["low", "medium", "high"] }
+                    reasoningEffort: {
+                        type: "string",
+                        enum: ["minimal", "low", "medium", "high"],
+                        description: "The level of reasoning to use. Prefer 'high', then 'medium', then 'low', then 'minimal'"
+                    },
+                    verbosity: {
+                        type: "string",
+                        enum: ["low", "medium", "high"],
+                        description: "The level of verbosity to use. Prefer 'medium', then 'low'. Only use 'high' when explicitly asked to."
+                    }
                 },
                 required: ["reasoningEffort", "verbosity"]
             }
