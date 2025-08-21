@@ -1,6 +1,6 @@
 # Daneel
 
-Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comprehensive AI assistant system featuring both a web interface and a Discord bot. Built with modern TypeScript and a monorepo architecture using npm workspaces for code organization and sharing.
+Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comprehensive AI assistant system featuring both a web interface and a Discord bot, built with modern TypeScript.
 
 ## Project Status
 
