@@ -9,7 +9,7 @@ import { Command } from '../commands/BaseCommand.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { readdir } from 'fs/promises';
-import { logger } from './Logger';
+import { logger } from './Logger.js';
 
 /** Path to the commands directory */
 const commandsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../commands');

@@ -1,10 +1,10 @@
 import { Message } from 'discord.js';
 import { OpenAIService, OpenAIMessage, SupportedModel } from './openaiService';
-import { logger } from './Logger';
-import { ResponseHandler } from './response/ResponseHandler';
-import { RateLimiter } from './RateLimiter';
-import { config } from './env';
-import { Planner, Plan } from './prompting/Planner';
+import { logger } from './Logger.js';
+import { ResponseHandler } from './response/ResponseHandler.js';
+import { RateLimiter } from './RateLimiter.js';
+import { config } from './env.js';
+import { Planner, Plan } from './prompting/Planner.js';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
