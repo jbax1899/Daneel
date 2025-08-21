@@ -7,7 +7,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logger } from './Logger.js';
+import { logger } from './logger.js';
 
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);

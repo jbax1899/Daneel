@@ -5,7 +5,7 @@
  */
 
 import { Client, ClientEvents } from 'discord.js';
-import { logger } from '../utils/Logger.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Abstract base class for Discord.js event handlers.

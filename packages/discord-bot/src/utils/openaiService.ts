@@ -1,5 +1,5 @@
 import OpenAI from 'openai';
-import { logger } from './Logger.js';
+import { logger } from './logger.js';
 
 // ====================
 // Type Declarations

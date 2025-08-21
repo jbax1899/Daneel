@@ -1,5 +1,5 @@
 import { Message } from 'discord.js';
-import { OpenAIService, OpenAIMessage, SupportedModel } from './openaiService';
+import { OpenAIService, OpenAIMessage, SupportedModel } from './openaiService.js';
 import { logger } from './Logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
 import { RateLimiter } from './RateLimiter.js';

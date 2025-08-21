@@ -5,7 +5,7 @@
  */
 
 import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
-import { logger } from '../Logger.js';
+import { logger } from '../logger.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 
 /**
