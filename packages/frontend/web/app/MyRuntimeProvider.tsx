@@ -59,8 +59,9 @@ class CustomAttachmentAdapter implements AttachmentAdapter {
   }
 }
 */
+
 export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
-  const { isLoaded } = useAuth();
+  const { isLoaded, userId } = useAuth();
   const [cloud, setCloud] = useState<AssistantCloud | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,7 +141,7 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
     try {
       const cloudInstance = new AssistantCloud({
         apiKey: process.env.NEXT_PUBLIC_ASSISTANT_CLOUD_API_KEY || '',
-        userId: useAuth().userId || '',
+        userId: userId || '',
         workspaceId: process.env.NEXT_PUBLIC_ASSISTANT_CLOUD_WORKSPACE_ID || '',
       });
       setCloud(cloudInstance);
@@ -149,7 +150,7 @@ export function MyRuntimeProvider({ children }: { children: React.ReactNode }) {
       console.error('Failed to initialize Assistant Cloud:', err);
       setError('Failed to initialize Assistant. Please try again.');
     }
-  }, [isLoaded]);
+  }, [isLoaded, userId]);
 
   // Initialize the runtime after cloud is ready
   const runtime = useLocalRuntime(modelAdapter, {
