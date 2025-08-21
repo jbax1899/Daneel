@@ -1,111 +1,103 @@
-import type { Message as DiscordMessage } from 'discord.js';
-import { logger } from '../logger.js';
-import { OpenAIService, OpenAIMessage, OpenAIResponse, OpenAIOptions } from '../openaiService';
+import { logger } from '../Logger.js';
+import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel } from '../OpenAIService.js';
 
-const PLANNING_MODEL = 'gpt-5-mini';
-const PLANNING_REASONING_EFFORT = 'medium';
-const PLANNING_VERBOSITY = 'low';
-const PLAN_SYSTEM_PROMPT = `You are a helpful AI assistant that helps manage and respond to Discord messages.
-Analyze the conversation and determine the best response strategy.
+const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
+const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', verbosity: 'low' };
 
-Respond with only a JSON object, following the format below:
-{
-    "action": "reply", // What action should we take? Valid options: reply, dm, react, noop
-    "modality": "text",
-    "reaction": "", // If we're reacting to the message, what emoji should we use? Valid options: any emoji as a string
-    "openaiOptions": {
-        "reasoningEffort": "medium", // Controls the depth of reasoning (more reasoning = better quality but slower). Valid options: low, medium, high
-        "verbosity": "low" // Controls the amount of detail in the response. Valid options: low, medium, high
-    }
-}
-    
-Do not include any additional text or explanation in your response. Only return the JSON object, filling out all fields, with valid options as specified.`;
+const PLAN_SYSTEM_PROMPT = `Only return a function call to "generate-plan"`;
 
-/**
- * Represents the generated plan for how the bot should respond
- */
 export interface Plan {
-    action?: 'reply' | 'dm' | 'react' | 'noop'; // What action should we take?
-    modality?: 'text'// TODO: | 'embed'; // Should we respond with text or an embed?
-    reaction?: string; // If we're reacting to the message, what emoji should we use?
-    openaiOptions?: OpenAIOptions; // Options for the OpenAI API
+  action: 'message' | 'react' | 'ignore';
+  modality: 'text';
+  reaction?: string;
+  openaiOptions: OpenAIOptions;
 }
 
-const defaultPlan: Plan = { 
-    action: 'noop'
+const defaultPlan: Plan = {
+  action: 'ignore',
+  modality: 'text',
+  reaction: '',
+  openaiOptions: {
+    reasoningEffort: 'low',
+    verbosity: 'low'
+  }
 };
 
-/**
- * Planner service that determines the best way to respond to messages
- */
-export class Planner {  
-  constructor(private readonly openaiService: OpenAIService) {}
-  
-  /**
-   * Generates a response plan based on the message and conversation context
-   * @param message - The Discord message to respond to
-   * @param context - Conversation context including previous messages
-   * @returns A Promise that resolves to a GeneratePlan object
-   */
-  public async generatePlan(
-    message: DiscordMessage,
-    context: OpenAIMessage[] = []
-  ): Promise<Plan> {
-    try {
-      logger.debug('Generating plan...');
+const planFunction = {
+  name: "generate-plan",
+  description: "Generates a structured plan for responding to a message",
+  parameters: {
+    type: "object",
+    properties: {
+      action: { 
+        type: "string", 
+        enum: ["message", "react", "ignore"],
+        description: "The action to take. 'message' sends a text response, 'react' adds an emoji reaction(s), 'ignore' does nothing (use when its best to ignore the message)"
+      },
+      modality: { type: "string", enum: ["text"] },
+      reaction: { 
+        type: "string",
+        description: "A string containing only emoji characters (no text). Required when action is 'react'. Examples: 🤖👍",
+      },
+      openaiOptions: {
+        type: "object",
+        properties: {
+          reasoningEffort: { type: "string", enum: ["minimal", "low", "medium", "high"] },
+          verbosity: { type: "string", enum: ["low","medium","high"] }
+        },
+        required: ["reasoningEffort","verbosity"]
+      }
+    },
+    required: ["action","modality","openaiOptions"]
+  }
+};
 
-      // Prepare messages for the LLM
-      const messages: OpenAIMessage[] = [
-        ...context,
-        {
-          role: 'user',
-          content: message.content
-        }
-      ];
+export class Planner {
+  constructor(private readonly openaiService: OpenAIService) {}
+
+  public async generatePlan(context: OpenAIMessage[] = []): Promise<Plan> {
+    try {
+      const messages: OpenAIMessage[] = [...context];
 
       const response: OpenAIResponse = await this.openaiService.generateResponse(
-        [
-          { 
-            role: 'system' as const, 
-            content: PLAN_SYSTEM_PROMPT
-          },
-          ...messages.map(msg => ({
-            role: msg.role,
-            content: typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content)
-          }))
-        ],
         PLANNING_MODEL,
-        {
-          reasoningEffort: PLANNING_REASONING_EFFORT,
-          verbosity: PLANNING_VERBOSITY
+        [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages],
+        { 
+          ...PLANNING_OPTIONS, 
+          functions: [planFunction], 
+          function_call: { name: 'generate-plan' }
         }
       );
+      logger.debug(`Plan generated. Usage: ${JSON.stringify(response.usage)}`);
 
-      let plan: Plan = defaultPlan;
-      try {
-        // Parse and validate the response
-        plan = JSON.parse(response.response || '{}');
-        
-        // Log plan
-        logger.debug('Recieved plan:' + JSON.stringify(plan));
-        logger.debug(`Tokens used: ${response.usage?.input_tokens} in | ${response.usage?.output_tokens} out | ${response.usage?.total_tokens} total | Cost: ${response.usage?.cost}`);
-      } catch (error) {
-        logger.error('Error parsing plan:', error);
-        logger.warn('Returning default plan');
-        return defaultPlan;
+      const funcCall = response.message.function_call;
+      if (funcCall?.arguments) {
+        try {
+          const parsed = JSON.parse(funcCall.arguments) as Partial<Plan>;
+          return this.validatePlan(parsed);
+        } catch {
+          logger.warn('Failed to parse plan arguments, using default');
+          return defaultPlan;
+        }
       }
 
-      // Return the plan
-      return {
-        ...defaultPlan,
-        action: plan.action,
-        modality: plan.modality,
-        reaction: plan.reaction,
-        openaiOptions: plan.openaiOptions
-      };
+      return defaultPlan;
     } catch (error) {
-      logger.error('Error in generatePlan:', error);
+      logger.error('Planner.generatePlan error:', error);
       return defaultPlan;
     }
+  }
+
+  private validatePlan(plan: Partial<Plan>): Plan {
+    const validated: Plan = { ...defaultPlan, ...plan };
+
+    validated.action = ['message','react','ignore'].includes(validated.action) ? validated.action : defaultPlan.action;
+    validated.modality = validated.modality === 'text' ? 'text' : defaultPlan.modality;
+    validated.reaction = validated.reaction ?? defaultPlan.reaction;
+    validated.openaiOptions = validated.openaiOptions ?? defaultPlan.openaiOptions;
+
+    logger.debug(`Plan validated: ${JSON.stringify(validated)}`);
+
+    return validated;
   }
 }

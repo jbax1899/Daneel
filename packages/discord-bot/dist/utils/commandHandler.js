@@ -7,7 +7,7 @@ import { REST, Routes, Collection } from 'discord.js';
 import { fileURLToPath } from 'url';
 import path from 'path';
 import { readdir } from 'fs/promises';
-import { logger } from './logger.js';
+import { logger } from './Logger';
 /** Path to the commands directory */
 const commandsPath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../commands');
 /**
@@ -119,4 +119,4 @@ export class CommandHandler {
         }
     }
 }
-//# sourceMappingURL=commandHandler.js.map
+//# sourceMappingURL=CommandHandler.js.map

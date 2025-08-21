@@ -5,7 +5,7 @@
  */
 import path from 'path';
 import { readdir } from 'fs/promises';
-import { logger } from './logger.js';
+import { logger } from './Logger.js';
 /**
  * Manages Discord.js events for the bot.
  * Handles dynamic loading of event handlers and binding them to Discord client events.
@@ -117,4 +117,4 @@ export class EventManager {
         return this.events.length;
     }
 }
-//# sourceMappingURL=eventManager.js.map
+//# sourceMappingURL=EventManager.js.map

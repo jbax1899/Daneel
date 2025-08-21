@@ -1,5 +1,5 @@
 import { APIEmbed, APIEmbedField, ColorResolvable, EmbedBuilder as DiscordEmbedBuilder } from 'discord.js';
-import { logger } from '../logger.js';
+import { logger } from '../Logger.js';
 
 // Discord API limits
 const MAX_TITLE_LENGTH = 256;

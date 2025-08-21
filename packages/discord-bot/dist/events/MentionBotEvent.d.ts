@@ -5,7 +5,7 @@
  */
 import { Message } from 'discord.js';
 import { Event } from './Event.js';
-import { OpenAIService } from '../utils/openaiService.js';
+import { OpenAIService } from '../utils/OpenAIService.js';
 /**
  * Dependencies required for the MentionBotEvent
  * @interface Dependencies

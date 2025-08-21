@@ -12,7 +12,7 @@ trigger: always_on
 - IMPORTANT - Refer to these documentation files frequently, and keep them up to date by proposing edits:
   - /README.md (the pretty version used for the GitHub main page)
   - /cascadeReference.md (referenced frequently by Cascade)
-  - /cascadeReferenceRolybot.md (referenced ocassionally by Cascade when adding features from legacy code)
+  - /cascadeReferenceRolybot.md (referenced occasionally by Cascade when adding features from legacy code)
 
 ### Code Organization
 - **Commands**: One file per command in `commands/`
@@ -45,10 +45,12 @@ discord-bot/
 │   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
 │   │   │
 │   │   ├── prompting/      # Prompt construction and management
+│   │   │   ├── Planner.ts  # Determines response strategy (reply/DM/react)
 │   │   │   └── PromptBuilder.ts # Builds conversation contexts for AI
 │   │   │
 │   │   └── response/       # Response handling
-│   │       └── ResponseHandler.ts # Handles formatting and sending responses
+│   │       ├── ResponseHandler.ts # Handles formatting and sending responses
+│   │       └── EmbedBuilder.ts    # Creates and validates Discord embeds
 │   │
 │   ├── MessageProcessor.ts # Core message processing pipeline
 │   └── index.ts            # Bot entry point
@@ -68,17 +70,19 @@ frontend/
     ├── components/         # Reusable UI components
     │   ├── assistant-ui/   # Assistant UI components
     │   ├── ui/             # Base UI components (shadcn/ui)
-    │   ├── app-sidebar.tsx  # Application sidebar
-    │   └── assistant.tsx    # Assistant component
+    │   ├── app-sidebar.tsx # Application sidebar
+    │   └── assistant.tsx   # Assistant component
     │
-    └── lib/                 # Utility libraries
-        └── utils.ts         # Shared utility functions
+    └── lib/                # Utility libraries
+        └── utils.ts        # Shared utility functions
 ```
 
 #### 3. Shared (`/packages/shared`)
 ```
 shared/
 └── src/
+    ├── types/             # Shared TypeScript types
+    └── constants/         # Shared constants and enums
 ```
 
 ### Naming Conventions
@@ -93,3 +97,5 @@ shared/
 - Use interfaces for object shapes that represent classes or complex types
 - Use type aliases for unions, tuples, or other complex type definitions
 - Avoid using `any` - prefer `unknown` with type guards
+- Document complex types and functions with JSDoc comments
+- Use discriminated unions for better type safety with similar but distinct types

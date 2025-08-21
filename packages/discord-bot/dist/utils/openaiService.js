@@ -1,132 +1,105 @@
-/**
- * @file openaiService.ts
- * @description Service for interacting with the OpenAI API to generate AI responses.
- * Handles message formatting and API communication with OpenAI's Responses API.
- */
 import OpenAI from 'openai';
-import { logger } from './logger.js';
-const DEFAULT_MODEL = 'gpt-5-mini';
-/**
- * Service for interacting with the OpenAI API
- * @class OpenAIService
- */
+import { logger } from './Logger.js';
+// ====================
+// Constants
+// ====================
+const DEFAULT_GPT5_MODEL = 'gpt-5-mini';
+const DEFAULT_MODEL = DEFAULT_GPT5_MODEL;
+const GPT5_PRICING = {
+    // Pricing per 1M tokens
+    // https://platform.openai.com/docs/pricing
+    'gpt-5': { input: 1.25, output: 10 },
+    'gpt-5-mini': { input: 0.25, output: 2.0 },
+    'gpt-5-nano': { input: 0.05, output: 0.4 },
+};
+// ====================
+// OpenAI Service Class
+// ====================
 export class OpenAIService {
-    openai; // OpenAI client instance
-    /**
-     * Creates an instance of OpenAIService
-     * @param {string} apiKey - OpenAI API key for authentication
-     */
+    openai;
+    defaultModel = DEFAULT_MODEL;
     constructor(apiKey) {
         this.openai = new OpenAI({ apiKey });
     }
-    /**
-     * Generates a response from the OpenAI API based on the provided messages
-     * @async
-     * @param {OpenAIMessage[]} messages - Array of message objects for the conversation context
-     * @param {string} [model='gpt-5-mini'] - The OpenAI model to use for generation
-     * @param {OpenAIOptions} [options] - Additional options for the generation
-     * @returns {Promise<OpenAIResponse>} The generated response and token usage data
-     * @throws {Error} If there's an error communicating with the OpenAI API
-     */
-    async generateResponse(messages, model = DEFAULT_MODEL, options = {}) {
+    async generateResponse(model = this.defaultModel, messages, options = {}) {
+        return this.generateGPT5Response(model, messages, options);
+    }
+    async generateGPT5Response(model, messages, options) {
+        const { reasoningEffort = 'low', verbosity = 'low', functions } = options;
         try {
-            logger.debug('Requesting response from OpenAI...');
-            const { reasoningEffort = 'minimal', verbosity = 'low' } = options;
-            const response = await this.openai.responses.create({
+            // Map messages for the OpenAI Responses API
+            const input = messages.map(msg => ({
+                role: msg.role === 'developer' ? 'system' : msg.role,
+                content: [{ type: 'input_text', text: msg.content }]
+            }));
+            const tools = functions?.map(fn => ({
+                type: 'function',
+                name: fn.name,
+                description: fn.description || '',
+                parameters: fn.parameters || {},
+                strict: false
+            }));
+            const requestPayload = {
                 model,
-                input: messages,
+                input,
                 ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
-                ...(verbosity ? {
-                    text: {
-                        ...(verbosity && { verbosity })
-                    }
-                } : {}),
-            });
-            let result = {
-                response: response.output_text || null
+                ...(verbosity && { text: { verbosity } }),
+                ...(tools ? { tools } : {}),
+                tool_choice: 'auto', // Let the model pick a tool if needed
             };
-            // Add token usage if available
-            if (response.usage) {
-                const { input_tokens = 0, output_tokens = 0, total_tokens = 0 } = response.usage;
-                const cost = this.calculateCost(model, input_tokens, output_tokens);
-                result.usage = {
-                    input_tokens,
-                    output_tokens,
-                    total_tokens,
-                    cost
-                };
+            // Generate response
+            const response = await this.openai.responses.create(requestPayload);
+            // Get output items from response
+            const outputItems = response.output;
+            // First try to find a message response
+            let outputText = '';
+            let finishReason = 'stop';
+            for (const item of outputItems ?? []) {
+                if (item.type === 'message' && item.content?.[0]?.text) {
+                    outputText = item.content[0].text;
+                    finishReason = item.finish_reason ?? finishReason;
+                    break;
+                }
             }
-            // Add debug context if in development mode
-            if (process.env.NODE_ENV === 'development') {
-                result.debugContext = this.generateDebugContext(messages, options, {
-                    input_tokens: response.usage?.input_tokens || 0,
-                    output_tokens: response.usage?.output_tokens || 0,
-                    total_tokens: response.usage?.total_tokens || 0,
-                    cost: this.calculateCost(model, response.usage?.input_tokens || 0, response.usage?.output_tokens || 0)
-                });
+            // Fall back to output_text if no message found
+            if (!outputText) {
+                const firstTextItem = outputItems.find(i => i.type === 'output_text' && i.content?.[0]?.text?.trim());
+                outputText = firstTextItem?.content?.[0]?.text ?? '';
+                finishReason = firstTextItem?.finish_reason ?? finishReason;
             }
-            return result;
+            let parsedFunctionCall = null;
+            for (const item of outputItems ?? []) {
+                if (item.type === 'function_call' && item.name) {
+                    parsedFunctionCall = { name: item.name, arguments: item.arguments ?? '{}' };
+                    break;
+                }
+            }
+            return {
+                normalizedText: outputText,
+                message: {
+                    role: 'assistant',
+                    content: outputText,
+                    function_call: parsedFunctionCall
+                },
+                finish_reason: finishReason,
+                usage: {
+                    input_tokens: response.usage?.input_tokens ?? 0,
+                    output_tokens: response.usage?.output_tokens ?? 0,
+                    total_tokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
+                    cost: this.calculateCost(response.usage?.input_tokens ?? 0, response.usage?.output_tokens ?? 0, model)
+                }
+            };
         }
         catch (error) {
-            logger.error('Error in OpenAI service:', error);
+            logger.error('Error in generateGPT5Response:', error);
             throw error;
         }
     }
-    /**
-     * Calculate the estimated cost for a given model and token usage
-     * @private
-     * @param {string} model - The model used
-     * @param {number} promptTokens - Number of tokens in the prompt
-     * @param {number} completionTokens - Number of tokens in the completion
-     * @returns {string} Formatted cost string or 'N/A' if model pricing is unknown
-     */
-    calculateCost(model, promptTokens, completionTokens) {
-        // Token prices per 1M tokens (in USD)
-        // https://platform.openai.com/docs/pricing
-        // Updated 2025-08-18
-        const PRICING = {
-            'gpt-5-mini': { prompt: 0.25, completion: 2.00 },
-            'gpt-5-nano': { prompt: 0.05, completion: 0.40 },
-        };
-        const modelPricing = Object.entries(PRICING).find(([key]) => model.toLowerCase().includes(key))?.[1];
-        if (!modelPricing)
-            return 'N/A';
-        const promptCost = (promptTokens / 1_000_000) * modelPricing.prompt;
-        const completionCost = (completionTokens / 1_000_000) * modelPricing.completion;
-        const totalCost = promptCost + completionCost;
-        return `$${totalCost.toFixed(6)}`;
-    }
-    /**
-     * Generates debug context for development purposes
-     * @private
-     * @param {OpenAIMessage[]} messages - The messages sent to the API
-     * @param {OpenAIOptions} options - The options used for the API call
-     * @param {Object} usage - Token usage information
-     * @param {number} usage.input_tokens - Number of input tokens
-     * @param {number} usage.output_tokens - Number of output tokens
-     * @param {number} usage.total_tokens - Total number of tokens
-     * @param {string} usage.cost - Estimated cost of the API call
-     * @returns {{filename: string, content: string}} Debug context with filename and content
-     */
-    generateDebugContext(messages, options, usage) {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `context-${timestamp}.txt`;
-        const content = [
-            // Options
-            `[OPTS] ${Object.entries(options)
-                .filter(([_, v]) => v !== undefined)
-                .map(([k, v]) => `${k}: ${v}`)
-                .join(' | ')}`,
-            // Token usage information
-            `[USAGE] tokens: ${usage.input_tokens} in | ${usage.output_tokens} out | ${usage.total_tokens} total | Cost: ${usage.cost}`,
-            // Messages
-            ...messages.map(msg => {
-                const rolePrefix = msg.role.toUpperCase().substring(0, 4);
-                const content = msg.content.replace(/\n/g, '\\n');
-                return `[${rolePrefix}] ${content}`;
-            })
-        ].join('\n\n');
-        return { filename, content };
+    calculateCost(inputTokens, outputTokens, model) {
+        const pricing = GPT5_PRICING[model];
+        const inputCost = (inputTokens / 1_000_000) * pricing.input;
+        const outputCost = (outputTokens / 1_000_000) * pricing.output;
+        return `$${(inputCost + outputCost).toFixed(6)}`;
     }
 }
-//# sourceMappingURL=openaiService.js.map
+//# sourceMappingURL=OpenAIService.js.map

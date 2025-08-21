@@ -4,7 +4,7 @@
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 import { EmbedBuilder as DiscordEmbedBuilder } from 'discord.js';
-import { logger } from '../logger.js';
+import { logger } from '../Logger.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 /**
  * Handles various types of message responses for Discord interactions.
@@ -32,45 +32,52 @@ export class ResponseHandler {
      * @param {Array<{filename: string, data: string | Buffer}>} [files=[]] - Optional files to attach
      * @returns {Promise<Message | Message[]>} The sent message(s)
      */
-    async sendMessage(content, files = []) {
+    async sendMessage(content, files, replyToMessage) {
         if (!this.channel.isSendable()) {
             throw new Error('Channel is not sendable');
         }
         try {
-            // If we have no content but have files, just send the files
-            if (!content.trim() && files.length > 0) {
-                const messageOptions = {
-                    files: files.map(f => ({
-                        attachment: Buffer.from(f.data),
-                        name: f.filename
-                    }))
-                };
-                return await this.channel.send(messageOptions);
-            }
             // Split content into chunks using the splitMessage method
             const chunks = this.splitMessage(content);
             const messages = [];
-            // If we have no files, just send all chunks as separate messages
-            if (files.length === 0) {
-                for (const chunk of chunks) {
+            // Build messages
+            for (let i = 0; i < chunks.length; i++) {
+                const chunk = chunks[i];
+                const isFirstChunk = i === 0;
+                const isLastChunk = i === chunks.length - 1;
+                const hasFiles = files && files.length > 0;
+                if (isFirstChunk && replyToMessage) {
+                    // For first chunk with reply, always use reply()
+                    if (isLastChunk && hasFiles) {
+                        // If this is also the last chunk and we have files, include them
+                        messages.push(await replyToMessage.reply({
+                            content: chunk,
+                            files: files.map(f => ({
+                                attachment: Buffer.from(f.data),
+                                name: f.filename
+                            }))
+                        }));
+                    }
+                    else {
+                        // Otherwise just reply with text
+                        messages.push(await replyToMessage.reply({ content: chunk }));
+                    }
+                }
+                else if (isLastChunk && hasFiles) {
+                    // Last chunk with files but not a reply
+                    messages.push(await this.channel.send({
+                        content: chunk,
+                        files: files.map(f => ({
+                            attachment: Buffer.from(f.data),
+                            name: f.filename
+                        }))
+                    }));
+                }
+                else {
+                    // Regular message
                     messages.push(await this.channel.send({ content: chunk }));
                 }
-                return messages.length === 1 ? messages[0] : messages;
             }
-            // If we have files, send all but the last chunk as regular messages
-            for (let i = 0; i < chunks.length - 1; i++) {
-                messages.push(await this.channel.send({ content: chunks[i] }));
-            }
-            // Send the last chunk with files
-            const lastChunk = chunks[chunks.length - 1];
-            const messageOptions = {
-                content: lastChunk,
-                files: files.map(f => ({
-                    attachment: Buffer.from(f.data),
-                    name: f.filename
-                }))
-            };
-            messages.push(await this.channel.send(messageOptions));
             return messages.length === 1 ? messages[0] : messages;
         }
         catch (error) {
@@ -79,29 +86,17 @@ export class ResponseHandler {
         }
     }
     /**
-     * Sends a text response to the channel where the message was received.
-     * @param {string} content - The text content to send
-     * @returns {Promise<Message | null>} The last sent message or null if sending failed
-     */
-    async sendText(content) {
-        if (!this.channel.isSendable()) {
-            throw new Error('Channel is not sendable');
-        }
-        const result = await this.sendMessage(content);
-        return Array.isArray(result) ? result[result.length - 1] : result;
-    }
-    /**
      * Sends a file as an attachment to the channel.
      * @param {string} content - The content to include with the file
      * @param {string} filename - The name of the file
      * @param {string | Buffer} data - The file data as a string or Buffer
      * @returns {Promise<Message | null>} The last sent message or null if sending failed
      */
-    async sendFile(content, filename, data) {
+    async sendFile(content, filename, data, replyToMessage) {
         if (!this.channel.isSendable()) {
             throw new Error('Channel is not sendable');
         }
-        const result = await this.sendMessage(content, [{ filename, data }]);
+        const result = await this.sendMessage(content, [{ filename, data }], replyToMessage);
         return Array.isArray(result) ? result[result.length - 1] : result;
     }
     /**
@@ -146,10 +141,10 @@ export class ResponseHandler {
             logger.error('Failed to send DM:', error);
             // Fall back to public channel if DM fails
             if (typeof content === 'string') {
-                await this.sendText(`Sorry, I couldn't send you a DM.\n> ${content}`);
+                await this.sendMessage(`Sorry, I couldn't send you a DM.\n> ${content}`);
             }
             else {
-                await this.sendText("Sorry, I couldn't send you a DM.");
+                await this.sendMessage("Sorry, I couldn't send you a DM.");
             }
         }
     }
@@ -180,34 +175,33 @@ export class ResponseHandler {
     async addReaction(emoji) {
         if (!emoji?.trim())
             return;
-        // Simple function to check if a string is a single emoji
-        const isSingleEmoji = (str) => {
-            // Unicode emoji regex that matches a single emoji
-            const emojiRegex = /^(\p{Emoji_Presentation}|\p{Extended_Pictographic})$/u;
+        const MAX_REACTIONS = 20; // Discord's limit
+        const isEmoji = (str) => {
+            const emojiRegex = /\p{Emoji_Presentation}|\p{Extended_Pictographic}/u;
             return emojiRegex.test(str);
         };
         try {
-            // First try to react with the entire string as a single emoji
-            if (isSingleEmoji(emoji.trim())) {
-                await this.message.react(emoji.trim());
-                return;
-            }
-            // If not a single emoji, try to split by spaces and react to each
-            const emojis = emoji.split(/\s+/).filter(Boolean);
-            for (const e of emojis) {
-                try {
-                    await this.message.react(e);
-                    // Add a small delay between reactions to respect rate limits
-                    await new Promise(resolve => setTimeout(resolve, 250));
+            let reactionCount = 0;
+            for (const char of emoji) {
+                if (reactionCount >= MAX_REACTIONS) {
+                    logger.debug(`Reached maximum of ${MAX_REACTIONS} reactions`);
+                    break;
                 }
-                catch (error) {
-                    logger.warn(`Failed to react with emoji ${e}:`, error);
-                    continue;
+                if (isEmoji(char)) {
+                    try {
+                        await this.message.react(char);
+                        reactionCount++;
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                    catch (error) {
+                        logger.warn(`Failed to react with emoji ${char}:`, error);
+                    }
                 }
             }
         }
         catch (error) {
-            logger.error('Failed to process reaction:', error);
+            logger.error('Error adding reactions:', error);
+            throw error;
         }
     }
     /**
@@ -232,7 +226,7 @@ export class ResponseHandler {
      * @private
      */
     splitMessage(text) {
-        const maxLength = 2000;
+        const maxLength = 2000; // Discord's limit
         const chunks = [];
         let currentChunk = '';
         // Split by paragraphs first to maintain readability

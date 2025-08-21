@@ -137,8 +137,9 @@ frontend/
 
 #### 1. MessageProcessor
 - Handles incoming messages and orchestrates the response flow
-- Integrates with PromptBuilder and ResponseHandler
+- Integrates with Planner, PromptBuilder, and ResponseHandler
 - Manages conversation state and token usage tracking
+- Implements rate limiting at user, channel, and guild levels
 - Provides detailed debug information in development mode
 
 #### 2. OpenAIService
@@ -146,26 +147,46 @@ frontend/
 - Handles token usage tracking and cost estimation
 - Supports GPT-5 and other OpenAI models
 - Provides detailed logging of API interactions
+- Includes debug context generation for development
 
-#### 3. PromptBuilder
-- Constructs prompts for the AI
-- Manages conversation history
-- Handles context injection
+#### 3. Planner
+- Determines the best response strategy for incoming messages
+- Uses AI to generate response plans (reply, DM, react, or no-op)
+- Supports different response modalities (text, embed)
+- Configures OpenAI options based on the response strategy
+- Falls back to default behavior when needed
 
 #### 4. ResponseHandler
 - Manages all bot responses
 - Handles different response types (text, embeds, DMs, reactions)
-- Provides consistent error handling
+- Provides consistent error handling and fallbacks
+- Supports message editing and reactions
+- Manages typing indicators and message splitting
+
+#### 5. EmbedBuilder
+- Provides a fluent API for creating rich embeds
+- Validates embed content to prevent API errors
+- Supports all Discord embed features
+- Handles URL validation and length limits
+- Converts between custom and Discord.js embed formats
 
 ### Message Flow
 1. `MentionBotEvent` receives and validates the message
-2. `MessageProcessor` handles the message:
+2. `MessageProcessor` processes the message:
+   - Validates input and checks rate limits
+   - Uses `Planner` to determine the best response strategy
    - Builds context using `PromptBuilder`
    - Tracks token usage for each component
    - Generates AI response using `OpenAIService`
    - Logs detailed token usage and cost information
    - Manages response through `ResponseHandler`
-3. `ResponseHandler` sends the response to Discord
+3. `ResponseHandler` sends the appropriate response to Discord:
+   - Text messages with proper formatting
+   - Rich embeds using `EmbedBuilder`
+   - Direct messages when appropriate
+   - Reactions to messages
+   - Error messages when needed
+4. Debug information is collected and logged at each step
 
 ## Future Improvements
 

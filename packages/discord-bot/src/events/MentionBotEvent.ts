@@ -6,8 +6,8 @@
 
 import { Message } from 'discord.js';
 import { Event } from './Event.js';
-import { logger } from '../utils/logger.js';
-import { OpenAIService } from '../utils/openaiService.js';
+import { logger } from '../utils/Logger.js';
+import { OpenAIService } from '../utils/OpenAIService.js';
 import { MessageProcessor } from '../utils/MessageProcessor.js';
 import { Planner } from '../utils/prompting/Planner.js';
 

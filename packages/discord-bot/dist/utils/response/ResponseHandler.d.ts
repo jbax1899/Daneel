@@ -30,13 +30,7 @@ export declare class ResponseHandler {
     sendMessage(content: string, files?: Array<{
         filename: string;
         data: string | Buffer;
-    }>): Promise<Message | Message[]>;
-    /**
-     * Sends a text response to the channel where the message was received.
-     * @param {string} content - The text content to send
-     * @returns {Promise<Message | null>} The last sent message or null if sending failed
-     */
-    sendText(content: string): Promise<Message | null>;
+    }>, replyToMessage?: Message): Promise<Message | Message[]>;
     /**
      * Sends a file as an attachment to the channel.
      * @param {string} content - The content to include with the file
@@ -44,7 +38,7 @@ export declare class ResponseHandler {
      * @param {string | Buffer} data - The file data as a string or Buffer
      * @returns {Promise<Message | null>} The last sent message or null if sending failed
      */
-    sendFile(content: string, filename: string, data: string | Buffer): Promise<Message | null>;
+    sendFile(content: string, filename: string, data: string | Buffer, replyToMessage?: Message): Promise<Message | null>;
     /**
      * Sends an embedded message to the channel where the message was received.
      * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send

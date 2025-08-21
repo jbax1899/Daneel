@@ -1,11 +1,11 @@
 import { Client, GatewayIntentBits, Events } from 'discord.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { CommandHandler } from './utils/commandHandler.js';
-import { EventManager } from './utils/eventManager.js';
-import { logger } from './utils/logger.js';
+import { CommandHandler } from './utils/CommandHandler.js';
+import { EventManager } from './utils/EventManager.js';
+import { logger } from './utils/Logger.js';
 import { config } from './utils/env.js';
-import { OpenAIService } from './utils/openaiService.js';
+import { OpenAIService } from './utils/OpenAIService.js';
 
 // ====================
 // Environment Setup

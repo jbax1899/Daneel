@@ -7,7 +7,7 @@
 import { Client } from 'discord.js';
 import path from 'path';
 import { readdir } from 'fs/promises';
-import { logger } from './logger.js';
+import { logger } from './Logger.js';
 import { Event } from '../events/Event.js';
 
 /**

@@ -4,7 +4,7 @@
  * messages that mention the bot or are replies to the bot.
  */
 import { Event } from './Event.js';
-import { logger } from '../utils/logger.js';
+import { logger } from '../utils/Logger.js';
 import { MessageProcessor } from '../utils/MessageProcessor.js';
 import { Planner } from '../utils/prompting/Planner.js';
 /**
