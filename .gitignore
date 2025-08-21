@@ -1,6 +1,3 @@
-# git
-.gitignore
-
 # Dependencies
 node_modules/
 
