@@ -100,8 +100,11 @@ export class OpenAIService {
     try {
       // Map messages for the OpenAI Responses API
       const input = messages.map(msg => ({
-        role: msg.role === 'developer' ? 'system' : msg.role,
-        content: [{ type: 'input_text', text: msg.content }]
+        role: msg.role,
+        content: [{
+          type: msg.role === 'assistant' ? 'output_text' : 'input_text' as const,
+          text: msg.content
+        }]
       }));
 
       const tools = functions?.map(fn => ({
