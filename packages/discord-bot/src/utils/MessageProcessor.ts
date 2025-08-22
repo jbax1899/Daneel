@@ -186,7 +186,7 @@ export class MessageProcessor {
           .replace(/T/, ' ')
           .replace(/\..+/, '')
           .slice(0, -3); // Trim to minutes
-        let formattedMessage = `[${messageIndex++}] At ${timestamp} ${m.author.username}${displayName !== m.author.username ? `/${displayName}` : ''} said: ${m.content}`;
+        let formattedMessage = `[${messageIndex++}] At ${timestamp} ${m.author.username}${displayName !== m.author.username ? `/${displayName}` : ''} said: "${m.content}"`;
       
         // If this is the replied message, set the replied message index
         if (repliedMessage && m.id === repliedMessage.id) {
@@ -204,7 +204,7 @@ export class MessageProcessor {
     // Add the current message
     history.push({
       role: 'user',
-      content: `${message.member?.displayName || message.author.username} said: ${message.content} ${repliedMessageIndex ? ` (Replying to message ${repliedMessageIndex - 1})` : ''}`
+      content: `${message.member?.displayName || message.author.username} said: "${message.content}" ${repliedMessageIndex ? ` (Replying to message ${repliedMessageIndex - 1})` : ''}`
     });
 
     // Build the final context
