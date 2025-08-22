@@ -82,37 +82,37 @@ export class MessageProcessor {
         await responseHandler.startTyping(); // Start persistent typing indicator
 
         try {
-        // Generate AI response
-        logger.debug(`Generating AI response with options: ${JSON.stringify(plan.openaiOptions)}`);
-        const aiResponse = await this.openaiService.generateResponse(
-          MAIN_MODEL,
-          responseContext,
-          plan.openaiOptions
-        );
-        logger.debug(`Response recieved. Usage: ${JSON.stringify(aiResponse.usage)}`);
+          // Generate AI response
+          logger.debug(`Generating AI response with options: ${JSON.stringify(plan.openaiOptions)}`);
+          const aiResponse = await this.openaiService.generateResponse(
+            MAIN_MODEL,
+            responseContext,
+            plan.openaiOptions
+          );
+          logger.debug(`Response recieved. Usage: ${JSON.stringify(aiResponse.usage)}`);
 
-        // Get the assistant's response
-        const responseText = aiResponse.message.content;
+          // Get the assistant's response
+          const responseText = aiResponse.message.content;
 
-        // If the assistant has a response, send it
-        if (responseText) {
-          // this is a reply, reply to the new message
-          const replyMessageReference = message.reference?.messageId 
-            ? { messageReference: { 
-                messageId: message.id, 
-                channelId: message.channel.id, 
-                guildId: message.guild?.id,
-                type: 0 // 0 = REPLY
-              }}
-            : undefined;
-          
-          await responseHandler.sendMessage(responseText, [], replyMessageReference);
-          logger.debug(`Response sent.`);
+          // If the assistant has a response, send it
+          if (responseText) {
+            // this is a reply, reply to the new message
+            const replyMessageReference = message.reference?.messageId 
+              ? { messageReference: { 
+                  messageId: message.id, 
+                  channelId: message.channel.id, 
+                  guildId: message.guild?.id,
+                  type: 0 // 0 = REPLY
+                }}
+              : undefined;
+            
+            await responseHandler.sendMessage(responseText, [], replyMessageReference);
+            logger.debug(`Response sent.`);
+          }
+        } finally {
+          responseHandler.stopTyping(); // Stop typing indicator
         }
         return;
-      } finally {
-        responseHandler.stopTyping(); // Stop typing indicator
-      }
       case 'react':
         if (plan.reaction) {
           await responseHandler.addReaction(plan.reaction);
