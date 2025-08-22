@@ -4,7 +4,7 @@
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 
-import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReference, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
 import { logger } from '../logger.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 
@@ -33,87 +33,58 @@ export class ResponseHandler {
    * Sends a message to the channel with optional file attachments
    * @param {string} content - The message content to send
    * @param {Array<{filename: string, data: string | Buffer}>} [files=[]] - Optional files to attach
+   * @param {Object} [replyToMessage] - Optional message reference for replies
    * @returns {Promise<Message | Message[]>} The sent message(s)
    */
   public async sendMessage(
     content: string,
-    files?: Array<{filename: string, data: string | Buffer}>,
-    replyToMessage?: Message
+    files: Array<{filename: string, data: string | Buffer}> = [],
+    replyToMessage?: { messageReference: MessageReference & { guildId?: string } }
   ): Promise<Message | Message[]> {
     if (!this.channel.isSendable()) {
       throw new Error('Channel is not sendable');
     }
-
+  
     try {
-      // Split content into chunks using the splitMessage method
       const chunks = this.splitMessage(content);
       const messages: Message[] = [];
-
-      // Build messages
+  
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const isFirstChunk = i === 0;
         const isLastChunk = i === chunks.length - 1;
         const hasFiles = files && files.length > 0;
-
+  
+        // Create base message options
+        const messageOptions: MessageCreateOptions = { content: chunk };
+  
+        // Add message reference for replies
         if (isFirstChunk && replyToMessage) {
-          // For first chunk with reply, always use reply()
-          if (isLastChunk && hasFiles) {
-            // If this is also the last chunk and we have files, include them
-            messages.push(await replyToMessage.reply({ 
-              content: chunk,
-              files: files.map(f => ({
-                attachment: Buffer.from(f.data),
-                name: f.filename
-              }))
-            }));
-          } else {
-            // Otherwise just reply with text
-            messages.push(await replyToMessage.reply({ content: chunk }));
-          }
-        } 
-        else if (isLastChunk && hasFiles) {
-          // Last chunk with files but not a reply
-          messages.push(await this.channel.send({ 
-            content: chunk, 
-            files: files.map(f => ({
-              attachment: Buffer.from(f.data),
-              name: f.filename
-            }))
+          (messageOptions as any).messageReference = {
+            messageId: replyToMessage.messageReference.messageId,
+            channelId: replyToMessage.messageReference.channelId,
+            guildId: replyToMessage.messageReference.guildId,
+            failIfNotExists: false
+          };
+        }
+  
+        // Add files if this is the last chunk and there are files
+        if (isLastChunk && hasFiles) {
+          messageOptions.files = files.map(f => ({
+            attachment: Buffer.from(f.data),
+            name: f.filename
           }));
         }
-        else {
-          // Regular message
-          messages.push(await this.channel.send({ content: chunk }));
-        }
+  
+        // Send the message
+        messages.push(await this.channel.send(messageOptions));
       }
-
+  
       return messages.length === 1 ? messages[0] : messages;
     } catch (error) {
       logger.error('Failed to send message:', error);
       throw error;
     }
-  }
-
-  /**
-   * Sends a file as an attachment to the channel.
-   * @param {string} content - The content to include with the file
-   * @param {string} filename - The name of the file
-   * @param {string | Buffer} data - The file data as a string or Buffer
-   * @returns {Promise<Message | null>} The last sent message or null if sending failed
-   */
-  public async sendFile(
-    content: string,
-    filename: string,
-    data: string | Buffer,
-    replyToMessage?: Message
-  ): Promise<Message | null> {
-    if (!this.channel.isSendable()) {
-      throw new Error('Channel is not sendable');
-    }
-    
-    const result = await this.sendMessage(content, [{ filename, data }], replyToMessage);
-    return Array.isArray(result) ? result[result.length - 1] : result;
   }
 
   /**
