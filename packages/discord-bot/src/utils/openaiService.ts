@@ -1,5 +1,8 @@
+import { fileURLToPath } from 'url';
+import path, { dirname } from 'path';
+import fs from 'fs';
 import OpenAI from 'openai';
-import { logger } from './logger.js';
+import { logger } from './logger.js'
 
 // ====================
 // Type Declarations
@@ -7,6 +10,8 @@ import { logger } from './logger.js';
 
 export type SupportedModel = GPT5ModelType; 
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
+export type TTSModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+export type TTSVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
 
 export interface OpenAIMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
@@ -57,7 +62,7 @@ interface ResponseOutputItemExtended {
 }
 
 // ====================
-// Constants
+// Constants / Variables
 // ====================
 
 const DEFAULT_GPT5_MODEL: SupportedModel = 'gpt-5-mini';
@@ -69,6 +74,12 @@ const GPT5_PRICING: Record<GPT5ModelType, { input: number; output: number }> = {
   'gpt-5-mini': { input: 0.25, output: 2.0 },
   'gpt-5-nano': { input: 0.05, output: 0.4 },
 };
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
+const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
+
+let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 
 // ====================
 // OpenAI Service Class
@@ -80,6 +91,7 @@ export class OpenAIService {
 
   constructor(apiKey: string) {
     this.openai = new OpenAI({ apiKey });
+    ensureDirectories();
   }
 
   public async generateResponse(
@@ -183,10 +195,65 @@ export class OpenAIService {
     }
   }
 
+  public async generateSpeech(
+    model: TTSModel,
+    voice: TTSVoice,
+    input: string, 
+    instructions: string, 
+    filename: string, 
+    format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm') {
+    //https://platform.openai.com/docs/guides/text-to-speech
+    if (!filename || !/^[\w\-]+$/.test(filename)) {
+      throw new Error('Invalid filename. Only alphanumeric characters, hyphens, and underscores are allowed.');
+    }
+    
+    const outputPath = path.join(TTS_OUTPUT_PATH, `${filename}.${format}`);
+
+    logger.debug(`Generating speech file: ${outputPath}...`);
+
+    try {
+      const mp3 = await this.openai.audio.speech.create({
+        model: model,
+        voice: voice,
+        input: input,
+        instructions: instructions,
+        response_format: format,
+      });
+
+      const buffer = Buffer.from(await mp3.arrayBuffer());
+      await fs.promises.writeFile(outputPath, buffer);
+      logger.debug(`Generated speech file: ${outputPath}`);
+      return outputPath;
+    } catch (error) {
+      // Clean up partially written file if it exists
+      try {
+        if (fs.existsSync(outputPath)) {
+          await fs.promises.unlink(outputPath);
+        }
+      } catch (cleanupError) {
+        logger.error('Failed to clean up file after error:', cleanupError);
+      }
+      throw error;
+    }
+  }
+
   private calculateCost(inputTokens: number, outputTokens: number, model: SupportedModel): string {
     const pricing = GPT5_PRICING[model];
     const inputCost = (inputTokens / 1_000_000) * pricing.input;
     const outputCost = (outputTokens / 1_000_000) * pricing.output;
     return `$${(inputCost + outputCost).toFixed(6)}`;
+  }
+}
+
+async function ensureDirectories(): Promise<void> {
+  if (isDirectoryInitialized) return;
+  
+  try {
+    await fs.promises.mkdir(OUTPUT_PATH, { recursive: true });
+    await fs.promises.mkdir(TTS_OUTPUT_PATH, { recursive: true });
+    isDirectoryInitialized = true;
+  } catch (error) {
+    logger.error('Failed to create output directories:', error);
+    throw new Error('Failed to initialize output directories');
   }
 }

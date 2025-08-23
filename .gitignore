@@ -9,6 +9,9 @@ node_modules/
 # Discord bot logs
 packages/discord-bot/logs/
 
+# Discord bot generated output
+packages/discord-bot/src/output/
+
 # Reference code
 reference
 
