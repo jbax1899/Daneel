@@ -137,6 +137,8 @@ export class MessageProcessor {
                 }], 
                 replyMessageReference
               );
+              // delete the tts file
+              fs.unlinkSync(ttsPath);
             } else {
                 await responseHandler.sendMessage(responseText, [], replyMessageReference);
             }
