@@ -122,11 +122,11 @@ export class MessageProcessor {
             // this is a reply, reply to the new message
             const replyMessageReference = message.reference?.messageId 
               ? { messageReference: { 
-                  messageId: message.id, 
+                  messageId: message.reference.messageId,
                   channelId: message.channel.id, 
                   guildId: message.guild?.id,
                   type: 0 // 0 = REPLY
-                }}
+                }} 
               : undefined;
             
             if (ttsPath) {
