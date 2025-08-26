@@ -1,5 +1,5 @@
 /**
- * @file MentionBotEvent.ts
+ * @file MessageCreate.ts
  * @description Handles the 'messageCreate' event from Discord.js, specifically for processing
  * messages that mention the bot or are replies to the bot.
  */
@@ -31,15 +31,13 @@ interface Dependencies {
  * @class MentionBotEvent
  * @extends {Event}
  */
-export class MentionBotEvent extends Event {
-  /** The Discord.js event name this handler is registered for */
-  public readonly name = 'messageCreate' as const;
-  
-  /** Whether the event should only be handled once (false for message events) */
-  public readonly once = false;
-  
-  /** The message processor that handles the actual message processing logic */
-  private readonly messageProcessor: MessageProcessor;
+export class MessageCreate extends Event {
+  public readonly name = 'messageCreate' as const;          // The Discord.js event name this handler is registered for
+  public readonly once = false;                             // Whether the event should only be handled once (false for message events)
+  private readonly messageProcessor: MessageProcessor;      // The message processor that handles the actual message processing logic
+  private readonly CATCHUP_AFTER_MESSAGES = 10;             // After X messages, do a catchup
+  private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = 5; // After X messages, if mentioned, do a catchup
+  private lastMessageCount = 0;                             // Tracks the number of messages since the last catchup
 
   /**
    * Creates an instance of MentionBotEvent
@@ -60,9 +58,33 @@ export class MentionBotEvent extends Event {
    * @returns {Promise<void>}
    */
   public async execute(message: Message): Promise<void> {
-    if (this.shouldIgnoreMessage(message)) return;
+    // If we just posted a message, reset the counter, and ignore self
+    if (message.author.id === message.client.user!.id) {
+      this.lastMessageCount = 0;
+      //logger.debug(`Reset message count: ${this.lastMessageCount}`);
+      return;
+    }
+
+    // New message: Increment the counter
+    this.lastMessageCount++;
+    //logger.debug(`Last message count: ${this.lastMessageCount}`);
 
     try {
+      // If we are within the catchup threshold, catch up
+      if (
+        (this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
+        || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.includes(message.client.user!.username)) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
+      ) {
+        logger.debug(`Catching up to message ID: ${message.id}`);
+        this.lastMessageCount = 0;
+        await this.messageProcessor.processMessage(message);
+      }
+      
+      // Not performing checkup - See if we should ignore the message
+      if (this.shouldIgnoreMessage(message)) return;
+
+      // Not ignoring the message - Process it
+      logger.debug(`Responding to mention in message ID: ${message.id}`);
       await this.messageProcessor.processMessage(message);
     } catch (error) {
       await this.handleError(error, message);

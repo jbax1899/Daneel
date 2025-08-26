@@ -20,9 +20,13 @@ const planFunction = {
             action: {
                 type: "string",
                 enum: ["message", "react", "ignore"],
-                description: "The action to take. 'message' sends a text response, 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (use when its best to ignore the message)"
+                description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (use when its best to ignore the message)"
             },
-            modality: { type: "string", enum: ["text"] },
+            modality: {
+                type: "string",
+                enum: ["text", "tts"],
+                description: "The modality to use. 'text' sends a text response, 'tts' sends a speech response in addition to the text response. Use 'tts' for casual conversation where 'reasoningEffort' and 'verbosity' are 'minimal' or 'low', or when asked to (but then set 'reasoningEffort' and 'verbosity' to 'low')."
+            },
             reaction: {
                 type: "string",
                 description: "A string containing only emoji characters (no text). Required when action is 'react'. Example: 🤖👍",
@@ -89,7 +93,7 @@ export class Planner {
     validatePlan(plan) {
         const validated = { ...defaultPlan, ...plan };
         validated.action = ['message', 'react', 'ignore'].includes(validated.action) ? validated.action : defaultPlan.action;
-        validated.modality = validated.modality === 'text' ? 'text' : defaultPlan.modality;
+        validated.modality = validated.modality ?? defaultPlan.modality;
         validated.reaction = validated.reaction ?? defaultPlan.reaction;
         validated.openaiOptions = validated.openaiOptions ?? defaultPlan.openaiOptions;
         logger.debug(`Plan validated: ${JSON.stringify(validated)}`);

@@ -1,5 +1,7 @@
 export type SupportedModel = GPT5ModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
+export type TTSModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+export type TTSVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
     content: string;
@@ -46,5 +48,6 @@ export declare class OpenAIService {
     constructor(apiKey: string);
     generateResponse(model: SupportedModel | undefined, messages: OpenAIMessage[], options?: OpenAIOptions): Promise<OpenAIResponse>;
     private generateGPT5Response;
+    generateSpeech(model: TTSModel, voice: TTSVoice, input: string, instructions: string, filename: string, format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'): Promise<string>;
     private calculateCost;
 }

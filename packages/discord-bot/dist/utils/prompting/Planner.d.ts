@@ -1,7 +1,7 @@
 import { OpenAIService, OpenAIMessage, OpenAIOptions } from '../openaiService.js';
 export interface Plan {
     action: 'message' | 'react' | 'ignore';
-    modality: 'text';
+    modality: 'text' | 'tts';
     reaction?: string;
     openaiOptions: OpenAIOptions;
 }

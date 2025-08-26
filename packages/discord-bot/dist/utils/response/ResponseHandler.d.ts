@@ -3,7 +3,7 @@
  * @description Manages how the bot responds to messages in Discord.
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
-import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReference, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 /**
  * Handles various types of message responses for Discord interactions.
@@ -27,20 +27,17 @@ export declare class ResponseHandler {
      * Sends a message to the channel with optional file attachments
      * @param {string} content - The message content to send
      * @param {Array<{filename: string, data: string | Buffer}>} [files=[]] - Optional files to attach
+     * @param {Object} [replyToMessage] - Optional message reference for replies
      * @returns {Promise<Message | Message[]>} The sent message(s)
      */
     sendMessage(content: string, files?: Array<{
         filename: string;
         data: string | Buffer;
-    }>, replyToMessage?: Message): Promise<Message | Message[]>;
-    /**
-     * Sends a file as an attachment to the channel.
-     * @param {string} content - The content to include with the file
-     * @param {string} filename - The name of the file
-     * @param {string | Buffer} data - The file data as a string or Buffer
-     * @returns {Promise<Message | null>} The last sent message or null if sending failed
-     */
-    sendFile(content: string, filename: string, data: string | Buffer, replyToMessage?: Message): Promise<Message | null>;
+    }>, replyToMessage?: {
+        messageReference: MessageReference & {
+            guildId?: string;
+        };
+    }): Promise<Message | Message[]>;
     /**
      * Sends an embedded message to the channel where the message was received.
      * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send
