@@ -79,13 +79,11 @@ export class MessageCreate extends Event {
         this.lastMessageCount = 0;
         await this.messageProcessor.processMessage(message);
       }
-      
-      // Not performing checkup - See if we should ignore the message
-      if (this.shouldIgnoreMessage(message)) return;
-
-      // Not ignoring the message - Process it
-      logger.debug(`Responding to mention in message ID: ${message.id}`);
-      await this.messageProcessor.processMessage(message);
+      else if (!this.shouldIgnoreMessage(message)) {
+        // Not ignoring the message - Process it
+        logger.debug(`Responding to mention in message ID: ${message.id}`);
+        await this.messageProcessor.processMessage(message);
+      }
     } catch (error) {
       await this.handleError(error, message);
     }
