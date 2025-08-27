@@ -83,14 +83,14 @@ export class Planner {
       //logger.debug(`Raw OpenAI response: ${JSON.stringify(openaiResponse)}`);
 
       const response: OpenAIResponse = {
-        normalizedText: openaiResponse.message.content,
+        normalizedText: openaiResponse.message?.content || "Error: No plan generated",
         message: openaiResponse.message,
         finish_reason: openaiResponse.finish_reason,
         usage: openaiResponse.usage
       }
       logger.debug(`Plan generated. Usage: ${JSON.stringify(response.usage)}`);
 
-      const funcCall = response.message.function_call;
+      const funcCall = response.message?.function_call;
       if (funcCall?.arguments) {
         try {
           const parsed = JSON.parse(funcCall.arguments) as Partial<Plan>;

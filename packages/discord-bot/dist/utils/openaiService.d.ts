@@ -25,8 +25,8 @@ export interface OpenAIOptions {
     } | 'none' | 'auto' | null;
 }
 export interface OpenAIResponse {
-    normalizedText: string | null;
-    message: {
+    normalizedText?: string | null;
+    message?: {
         role: 'user' | 'assistant' | 'system' | 'developer';
         content: string;
         function_call?: {
@@ -34,7 +34,7 @@ export interface OpenAIResponse {
             arguments?: string;
         } | null;
     };
-    finish_reason: string;
+    finish_reason?: string;
     usage?: {
         input_tokens: number;
         output_tokens: number;
@@ -49,5 +49,7 @@ export declare class OpenAIService {
     generateResponse(model: SupportedModel | undefined, messages: OpenAIMessage[], options?: OpenAIOptions): Promise<OpenAIResponse>;
     private generateGPT5Response;
     generateSpeech(model: TTSModel, voice: TTSVoice, input: string, instructions: string, filename: string, format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'): Promise<string>;
+    generateImageDescription(imageUrl: string, // URL from Discord attachment
+    context?: string): Promise<OpenAIResponse>;
     private calculateCost;
 }

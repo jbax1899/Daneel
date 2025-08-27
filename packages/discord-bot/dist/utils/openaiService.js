@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 import fs from 'fs';
 import OpenAI from 'openai';
+import fetch from 'node-fetch';
 import { logger } from './logger.js';
 // ====================
 // Constants / Variables
@@ -19,6 +20,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
+const IMAGE_DESCRIPTION_MODEL = 'gpt-5-mini';
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 // ====================
 // OpenAI Service Class
@@ -139,6 +141,62 @@ export class OpenAIService {
                 logger.error('Failed to clean up file after error:', cleanupError);
             }
             throw error;
+        }
+    }
+    async generateImageDescription(imageUrl, // URL from Discord attachment
+    context) {
+        try {
+            // Download the image from the URL
+            const response = await fetch(imageUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to download image: ${response.statusText}`);
+            }
+            // Get the image data as a buffer
+            const imageBuffer = await response.arrayBuffer();
+            // Convert the image to base64
+            const base64Image = Buffer.from(imageBuffer).toString('base64');
+            // Get the content type from the response headers or default to jpeg
+            const contentType = response.headers.get('content-type') || 'image/jpeg';
+            const chatResponse = await this.openai.chat.completions.create({
+                model: IMAGE_DESCRIPTION_MODEL,
+                messages: [{
+                        role: 'user',
+                        content: [
+                            {
+                                type: 'text',
+                                text: `What's in this image?${context ? ` (Additional context: ${context})` : ''}`
+                            },
+                            {
+                                type: 'image_url',
+                                image_url: {
+                                    url: `data:${contentType};base64,${base64Image}`,
+                                    detail: 'high'
+                                }
+                            }
+                        ]
+                    }]
+            });
+            const choice = chatResponse.choices[0];
+            const imageDescriptionResponse = {
+                normalizedText: choice.message.content || null,
+                message: {
+                    role: 'assistant',
+                    content: choice.message.content || '',
+                },
+                finish_reason: choice.finish_reason || 'stop',
+                usage: chatResponse.usage ? {
+                    input_tokens: chatResponse.usage.prompt_tokens,
+                    output_tokens: chatResponse.usage.completion_tokens,
+                    total_tokens: chatResponse.usage.total_tokens,
+                    cost: this.calculateCost(chatResponse.usage.prompt_tokens || 0, chatResponse.usage.completion_tokens || 0, IMAGE_DESCRIPTION_MODEL)
+                } : undefined
+            };
+            logger.debug(`Image description generated: ${imageDescriptionResponse.message?.content}${imageDescriptionResponse.usage ? ` (Cost: ${imageDescriptionResponse.usage.cost})` : ''}`);
+            return imageDescriptionResponse;
+        }
+        catch (error) {
+            logger.error('Error generating image description:', error);
+            throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
         }
     }
     calculateCost(inputTokens, outputTokens, model) {
