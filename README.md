@@ -2,6 +2,9 @@
 
 Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comprehensive AI assistant system featuring both a web interface and a Discord bot, built with modern TypeScript.
 
+<img width="802" height="172" alt="image" src="https://github.com/user-attachments/assets/a842ed94-6902-4493-a1a1-efc6415c1765" />
+
+
 ## Project Status
 
 ### Current Phase: Core Functionality (Q3 2025)
@@ -35,12 +38,18 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Robust error handling and logging
 - Configurable rate limiting to prevent abuse
 
+<img width="823" height="326" alt="image" src="https://github.com/user-attachments/assets/6b119f11-ecc5-46de-b18b-d7920a23a36c" />
+
+
 ### 🌐 Web Client
 - Next.js 15 with React 19
 - Modern UI with Tailwind CSS and shadcn/ui
 - Real-time chat interface with AI SDK
 - Secure authentication with Clerk
 - Responsive design for all devices
+
+<img width="710" height="703" alt="image" src="https://github.com/user-attachments/assets/a388fbc0-9a64-4ebc-8499-65c354e6dcbc" />
+
 
 ### 🧩 Shared Core
 - TypeScript-based shared utilities and types
