@@ -41,10 +41,10 @@ Some rules to follow (for Cascade):
 - [x] Add detailed token usage tracking and cost estimation
 - [X] Custom embed builder
 - [X] LLM pre-pass system
-- [ ] Allow the bot to respond to other bots
-- [ ] Allow the bot to respond to plaintext name (with direction from prepass)
+- [X] Allow the bot to respond to other bots
+- [X] Allow the bot to respond to plaintext name
+- [X] Audio generation (TTS)
 - [ ] Image processing
-- [ ] Audio generation
 - [ ] Live voice chat via Discord call
 
 ## Technical Stack
