@@ -79,30 +79,14 @@ export class MessageCreate extends Event {
         this.lastMessageCount = 0;
         await this.messageProcessor.processMessage(message);
       }
-      else if (!this.shouldIgnoreMessage(message)) {
-        // Not ignoring the message - Process it
+      else if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
+        // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
         logger.debug(`Responding to mention in message ID: ${message.id}`);
         await this.messageProcessor.processMessage(message);
       }
     } catch (error) {
       await this.handleError(error, message);
     }
-  }
-
-  /**
-   * Determines if a message should be ignored based on certain criteria.
-   * @private
-   * @param {Message} message - The message to check
-   * @returns {boolean} True if the message should be ignored, false otherwise
-   */
-  private shouldIgnoreMessage(message: Message): boolean {
-    // Ignore messages from self
-    if (message.author.id === message.client.user!.id) return true;
-    // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
-    if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
-      return false;
-    }
-    return true;
   }
 
   /**
