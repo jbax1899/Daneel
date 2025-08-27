@@ -22,6 +22,7 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - [X] Allow the bot to respond to other bots
 - [X] Allow the bot to respond to plaintext name
 - [X] Audio generation (TTS)
+- [ ] Planning stage can trigger a web search for additional information
 - [ ] Image processing
 - [ ] Live voice chat via Discord call
 

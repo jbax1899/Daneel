@@ -78,12 +78,28 @@ export class MessageProcessor {
       return;
     }
 
-    // Generate plan
+    // Build context for plan
     const { context: planContext } = await this.buildMessageContext(message);
+
+    // If there are image attachments, process them
+    if (message.attachments.some(a => a.contentType?.startsWith('image/'))) {
+      logger.debug(`Processing image attachment from ${message.author.id}/${message.author.tag}`);
+      // For each image, generate a description
+      const imageDescriptions = await Promise.all(
+        message.attachments
+          .filter(a => a.contentType?.startsWith('image/'))
+          .map(a => this.openaiService.generateImageDescription(a.url))
+      );
+      // Add the image descriptions to the plan context
+      planContext.push({ role: 'system', content: `User also uploaded images with these automatically generated descriptions: ${imageDescriptions.map(i => i.message?.content).join(' | ')}` });
+      logger.debug(`Image descriptions added to plan context: ${imageDescriptions.map(i => i.message?.content).join(' | ')}`);
+    }
+
+    // Generate plan
     const plan: Plan = await this.planner.generatePlan(planContext);
 
     // Get trimmed context from Plan for response
-    const responseContext = planContext; // todo: alter Plan tool call to return trimmed context
+    const trimmedContext = planContext; // TODO: alter Plan tool call to return trimmed context
 
     // Handle response based on plan
     switch (plan.action) {
@@ -96,13 +112,13 @@ export class MessageProcessor {
           logger.debug(`Generating AI response with options: ${JSON.stringify(plan.openaiOptions)}`);
           const aiResponse = await this.openaiService.generateResponse(
             MAIN_MODEL,
-            responseContext,
+            trimmedContext,
             plan.openaiOptions
           );
           logger.debug(`Response recieved. Usage: ${JSON.stringify(aiResponse.usage)}`);
 
           // Get the assistant's response
-          const responseText = aiResponse.message.content;
+          const responseText = aiResponse.message?.content || 'No response generated.';
 
           // If the response is to be read out loud, generate speech
           let ttsPath: string | null = null;
