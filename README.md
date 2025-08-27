@@ -2,29 +2,7 @@
 
 Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comprehensive AI assistant system featuring both a web interface and a Discord bot, built with modern TypeScript.
 
-## Project Status
-
-### Current Phase: Core Functionality (Q3 2025)
-- [x] Set up monorepo structure
-- [x] Implement basic Discord bot with slash commands
-- [x] Create Next.js frontend with basic chat interface
-- [x] Set up CI/CD pipeline with GitHub Actions
-- [x] Create a basic Discord bot with slash commands
-- [x] Create a basic frontend with chat interface
-- [x] Implement MessageProcessor for handling message flow
-- [x] Add PromptBuilder for AI context management
-- [x] Implement ResponseHandler for centralized response management
-- [x] Implement rate limiting system with user, channel, and guild limits
-- [x] Upgrade to GPT-5 for improved responses
-- [x] Add detailed token usage tracking and cost estimation
-- [X] Custom embed builder
-- [X] LLM pre-pass system
-- [X] Allow the bot to respond to other bots
-- [X] Allow the bot to respond to plaintext name
-- [X] Audio generation (TTS)
-- [ ] Planning stage can trigger a web search for additional information
-- [ ] Image processing
-- [ ] Live voice chat via Discord call
+<img width="802" height="172" alt="image" src="https://github.com/user-attachments/assets/a842ed94-6902-4493-a1a1-efc6415c1765" />
 
 ## Features
 
@@ -36,12 +14,18 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Robust error handling and logging
 - Configurable rate limiting to prevent abuse
 
+<img width="823" height="326" alt="image" src="https://github.com/user-attachments/assets/6b119f11-ecc5-46de-b18b-d7920a23a36c" />
+
+
 ### 🌐 Web Client
 - Next.js 15 with React 19
 - Modern UI with Tailwind CSS and shadcn/ui
 - Real-time chat interface with AI SDK
 - Secure authentication with Clerk
 - Responsive design for all devices
+
+<img width="710" height="703" alt="image" src="https://github.com/user-attachments/assets/a388fbc0-9a64-4ebc-8499-65c354e6dcbc" />
+
 
 ### 🧩 Shared Core
 - TypeScript-based shared utilities and types
@@ -75,6 +59,29 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Linting: ESLint + Prettier
 - CI/CD: GitHub Actions
 - Deployment: Fly.io
+
+## Project Status
+
+### Current Phase: Core Functionality (Q3 2025)
+- [x] Set up monorepo structure
+- [x] Implement basic Discord bot with slash commands
+- [x] Create Next.js frontend with basic chat interface
+- [x] Set up CI/CD pipeline with GitHub Actions
+- [x] Create a basic Discord bot with slash commands
+- [x] Create a basic frontend with chat interface
+- [x] Implement MessageProcessor for handling message flow
+- [x] Add PromptBuilder for AI context management
+- [x] Implement ResponseHandler for centralized response management
+- [x] Implement rate limiting system with user, channel, and guild limits
+- [x] Upgrade to GPT-5 for improved responses
+- [x] Add detailed token usage tracking and cost estimation
+- [X] Custom embed builder
+- [X] LLM pre-pass system
+- [X] Allow the bot to respond to other bots
+- [X] Allow the bot to respond to plaintext name
+- [X] Audio generation (TTS)
+- [ ] Image processing
+- [ ] Live voice chat via Discord call
 
 ## 📁 Project Structure
 
