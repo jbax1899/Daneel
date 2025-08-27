@@ -61,28 +61,29 @@ export class MessageCreate extends Event {
     // If we just posted a message, reset the counter, and ignore self
     if (message.author.id === message.client.user!.id) {
       this.lastMessageCount = 0;
-      //logger.debug(`Reset message count: ${this.lastMessageCount}`);
+      logger.debug(`Reset message count: ${this.lastMessageCount}`);
       return;
     }
 
     // New message: Increment the counter
     this.lastMessageCount++;
-    //logger.debug(`Last message count: ${this.lastMessageCount}`);
+    logger.debug(`Last message count: ${this.lastMessageCount}`);
 
     try {
+      // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
+      if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
+        
+        logger.debug(`Responding to mention in message ID: ${message.id}`);
+        await this.messageProcessor.processMessage(message, true);
+      }
       // If we are within the catchup threshold, catch up
-      if (
+      else if (
         (this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
         || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
       ) {
         logger.debug(`Catching up to message ID: ${message.id}`);
         this.lastMessageCount = 0;
-        await this.messageProcessor.processMessage(message);
-      }
-      else if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
-        // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
-        logger.debug(`Responding to mention in message ID: ${message.id}`);
-        await this.messageProcessor.processMessage(message);
+        await this.messageProcessor.processMessage(message, false);
       }
     } catch (error) {
       await this.handleError(error, message);

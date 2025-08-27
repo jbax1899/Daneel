@@ -35,7 +35,7 @@ export class ResponseHandler {
      * @param {Object} [replyToMessage] - Optional message reference for replies
      * @returns {Promise<Message | Message[]>} The sent message(s)
      */
-    async sendMessage(content, files = [], replyToMessage) {
+    async sendMessage(content, files = [], directReply = false) {
         if (!this.channel.isSendable()) {
             throw new Error('Channel is not sendable');
         }
@@ -50,11 +50,9 @@ export class ResponseHandler {
                 // Create base message options
                 const messageOptions = { content: chunk };
                 // Add message reference for replies
-                if (isFirstChunk && replyToMessage) {
-                    messageOptions.messageReference = {
-                        messageId: replyToMessage.messageReference.messageId,
-                        channelId: replyToMessage.messageReference.channelId,
-                        guildId: replyToMessage.messageReference.guildId,
+                if (isFirstChunk && directReply) {
+                    messageOptions.reply = {
+                        messageReference: this.message.id,
                         failIfNotExists: false
                     };
                 }
@@ -65,6 +63,7 @@ export class ResponseHandler {
                         name: f.filename
                     }));
                 }
+                logger.debug(`Message options: ${JSON.stringify(messageOptions)}`);
                 // Send the message
                 messages.push(await this.channel.send(messageOptions));
             }

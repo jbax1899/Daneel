@@ -1,5 +1,5 @@
 /**
- * @file MentionBotEvent.ts
+ * @file MessageCreate.ts
  * @description Handles the 'messageCreate' event from Discord.js, specifically for processing
  * messages that mention the bot or are replies to the bot.
  */
@@ -25,7 +25,7 @@ interface Dependencies {
  * @class MentionBotEvent
  * @extends {Event}
  */
-export declare class MentionBotEvent extends Event {
+export declare class MessageCreate extends Event {
     readonly name: "messageCreate";
     readonly once = false;
     private readonly messageProcessor;
@@ -44,13 +44,6 @@ export declare class MentionBotEvent extends Event {
      * @returns {Promise<void>}
      */
     execute(message: Message): Promise<void>;
-    /**
-     * Determines if a message should be ignored based on certain criteria.
-     * @private
-     * @param {Message} message - The message to check
-     * @returns {boolean} True if the message should be ignored, false otherwise
-     */
-    private shouldIgnoreMessage;
     /**
      * Checks if the bot is mentioned in the message.
      * @private

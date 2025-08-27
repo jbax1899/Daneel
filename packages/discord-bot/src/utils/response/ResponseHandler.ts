@@ -4,7 +4,7 @@
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 
-import { Message, MessageCreateOptions, MessageReference, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
 import { logger } from '../logger.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 
@@ -39,7 +39,7 @@ export class ResponseHandler {
   public async sendMessage(
     content: string,
     files: Array<{filename: string, data: string | Buffer}> = [],
-    replyToMessage?: { messageReference: MessageReference & { guildId?: string } }
+    directReply: boolean = false
   ): Promise<Message | Message[]> {
     if (!this.channel.isSendable()) {
       throw new Error('Channel is not sendable');
@@ -59,11 +59,9 @@ export class ResponseHandler {
         const messageOptions: MessageCreateOptions = { content: chunk };
   
         // Add message reference for replies
-        if (isFirstChunk && replyToMessage) {
-          (messageOptions as any).messageReference = {
-            messageId: replyToMessage.messageReference.messageId,
-            channelId: replyToMessage.messageReference.channelId,
-            guildId: replyToMessage.messageReference.guildId,
+        if (isFirstChunk && directReply) {
+          messageOptions.reply = {
+            messageReference: this.message.id,
             failIfNotExists: false
           };
         }
@@ -75,6 +73,8 @@ export class ResponseHandler {
             name: f.filename
           }));
         }
+
+        logger.debug(`Message options: ${JSON.stringify(messageOptions)}`);
   
         // Send the message
         messages.push(await this.channel.send(messageOptions));

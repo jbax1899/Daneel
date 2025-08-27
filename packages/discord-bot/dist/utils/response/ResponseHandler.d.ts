@@ -3,7 +3,7 @@
  * @description Manages how the bot responds to messages in Discord.
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
-import { Message, MessageCreateOptions, MessageReference, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 /**
  * Handles various types of message responses for Discord interactions.
@@ -33,11 +33,7 @@ export declare class ResponseHandler {
     sendMessage(content: string, files?: Array<{
         filename: string;
         data: string | Buffer;
-    }>, replyToMessage?: {
-        messageReference: MessageReference & {
-            guildId?: string;
-        };
-    }): Promise<Message | Message[]>;
+    }>, directReply?: boolean): Promise<Message | Message[]>;
     /**
      * Sends an embedded message to the channel where the message was received.
      * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send

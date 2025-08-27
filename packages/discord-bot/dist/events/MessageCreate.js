@@ -1,5 +1,5 @@
 /**
- * @file MentionBotEvent.ts
+ * @file MessageCreate.ts
  * @description Handles the 'messageCreate' event from Discord.js, specifically for processing
  * messages that mention the bot or are replies to the bot.
  */
@@ -13,7 +13,7 @@ import { Planner } from '../utils/prompting/Planner.js';
  * @class MentionBotEvent
  * @extends {Event}
  */
-export class MentionBotEvent extends Event {
+export class MessageCreate extends Event {
     name = 'messageCreate'; // The Discord.js event name this handler is registered for
     once = false; // Whether the event should only be handled once (false for message events)
     messageProcessor; // The message processor that handles the actual message processing logic
@@ -48,39 +48,23 @@ export class MentionBotEvent extends Event {
         this.lastMessageCount++;
         logger.debug(`Last message count: ${this.lastMessageCount}`);
         try {
+            // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
+            if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
+                logger.debug(`Responding to mention in message ID: ${message.id}`);
+                await this.messageProcessor.processMessage(message, true);
+            }
             // If we are within the catchup threshold, catch up
-            if ((this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
-                || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.includes(message.client.user.username)) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
+            else if ((this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
+                || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
             ) {
                 logger.debug(`Catching up to message ID: ${message.id}`);
                 this.lastMessageCount = 0;
-                await this.messageProcessor.processMessage(message);
+                await this.messageProcessor.processMessage(message, false);
             }
-            // Not performing checkup - See if we should ignore the message
-            if (this.shouldIgnoreMessage(message))
-                return;
-            // Not ignoring the message - Process it
-            await this.messageProcessor.processMessage(message);
         }
         catch (error) {
             await this.handleError(error, message);
         }
-    }
-    /**
-     * Determines if a message should be ignored based on certain criteria.
-     * @private
-     * @param {Message} message - The message to check
-     * @returns {boolean} True if the message should be ignored, false otherwise
-     */
-    shouldIgnoreMessage(message) {
-        // Ignore messages from self
-        if (message.author.id === message.client.user.id)
-            return true;
-        // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
-        if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
-            return false;
-        }
-        return true;
     }
     /**
      * Checks if the bot is mentioned in the message.
