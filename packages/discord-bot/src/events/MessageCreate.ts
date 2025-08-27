@@ -73,7 +73,7 @@ export class MessageCreate extends Event {
       // If we are within the catchup threshold, catch up
       if (
         (this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
-        || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.includes(message.client.user!.username)) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
+        || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
       ) {
         logger.debug(`Catching up to message ID: ${message.id}`);
         this.lastMessageCount = 0;
