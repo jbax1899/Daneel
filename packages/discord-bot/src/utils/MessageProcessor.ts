@@ -88,11 +88,10 @@ export class MessageProcessor {
       const imageDescriptions = await Promise.all(
         message.attachments
           .filter(a => a.contentType?.startsWith('image/'))
-          .map(a => this.openaiService.generateImageDescription(a.url))
+          .map(a => this.openaiService.generateImageDescription(a.url, message.content))
       );
       // Add the image descriptions to the plan context
       planContext.push({ role: 'system', content: `User also uploaded images with these automatically generated descriptions: ${imageDescriptions.map(i => i.message?.content).join(' | ')}` });
-      logger.debug(`Image descriptions added to plan context: ${imageDescriptions.map(i => i.message?.content).join(' | ')}`);
     }
 
     // Generate plan

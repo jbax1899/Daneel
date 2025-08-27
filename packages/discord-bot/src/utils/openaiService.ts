@@ -241,7 +241,7 @@ export class OpenAIService {
 
   public async generateImageDescription(
     imageUrl: string, // URL from Discord attachment
-    model: SupportedModel = IMAGE_DESCRIPTION_MODEL,
+    context?: string
   ): Promise<OpenAIResponse> {
     try {
       // Download the image from the URL
@@ -260,13 +260,13 @@ export class OpenAIService {
       const contentType = response.headers.get('content-type') || 'image/jpeg';
       
       const chatResponse = await this.openai.chat.completions.create({
-        model,
+        model: IMAGE_DESCRIPTION_MODEL,
         messages: [{
           role: 'user',
           content: [
             {
               type: 'text',
-              text: "What's in this image?"
+              text: `What's in this image?${context ? ` (Additional context: ${context})` : ''}`
             },
             {
               type: 'image_url',
@@ -280,7 +280,7 @@ export class OpenAIService {
       });
 
       const choice = chatResponse.choices[0];
-      return {
+      const imageDescriptionResponse: OpenAIResponse = {
         normalizedText: choice.message.content || null,
         message: {
           role: 'assistant',
@@ -294,10 +294,12 @@ export class OpenAIService {
           cost: this.calculateCost(
             chatResponse.usage.prompt_tokens || 0,
             chatResponse.usage.completion_tokens || 0,
-            model
+            IMAGE_DESCRIPTION_MODEL
           )
         } : undefined
       };
+      logger.debug(`Image description generated: ${imageDescriptionResponse.message?.content}${imageDescriptionResponse.usage ? ` (Cost: ${imageDescriptionResponse.usage.cost})` : ''}`);
+      return imageDescriptionResponse;
     } catch (error) {
       logger.error('Error generating image description:', error);
       throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
