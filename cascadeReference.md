@@ -44,8 +44,10 @@ Some rules to follow (for Cascade):
 - [X] Allow the bot to respond to other bots
 - [X] Allow the bot to respond to plaintext name
 - [X] Audio generation (TTS)
-- [ ] Planning stage can trigger a web search for additional information
-- [ ] Image processing
+- [X] Image context processing
+- [ ] Plan refines context
+- [ ] Cache chain of thought
+- [ ] DM-based, opt-in memory
 - [ ] Live voice chat via Discord call
 
 ## Technical Stack
