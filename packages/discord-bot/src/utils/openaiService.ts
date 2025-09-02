@@ -22,6 +22,18 @@ export interface OpenAIMessage {
 export interface OpenAIOptions {
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   verbosity?: 'low' | 'medium' | 'high';
+  webSearch?: {
+    query?: string;
+    allowedDomains?: string[]; // Up to 20 domains
+    searchContextSize?: 'low' | 'medium' | 'high';
+    userLocation?: {
+      type?: 'approximate' | 'exact';
+      country?: string; // ISO country code (e.g., 'US', 'GB')
+      city?: string;
+      region?: string;
+      timezone?: string; // IANA timezone (e.g., 'America/Chicago')
+    };
+  };
   functions?: Array<{
     name: string;
     description?: string;
@@ -29,7 +41,7 @@ export interface OpenAIOptions {
   }>;
   function_call?: { name: string } | 'auto' | 'none' | 'required' | null;
   tool_choice?: {
-    type: 'function';
+    type: 'function' | 'web_search';
     function: { name: string };
   } | 'none' | 'auto' | null;
 }
@@ -40,6 +52,11 @@ export interface OpenAIResponse {
     role: 'user' | 'assistant' | 'system' | 'developer';
     content: string;
     function_call?: { name: string; arguments?: string } | null;
+    citations?: Array<{
+      url: string;
+      title: string;
+      text: string;
+    }>;
   };
   finish_reason?: string;
   usage?: {
@@ -52,13 +69,24 @@ export interface OpenAIResponse {
 
 // Extended interface for OpenAI Responses output items
 interface ResponseOutputItemExtended {
-  type?: string; // "reasoning", "function_call", etc.
+  type?: string; // "reasoning", "function_call", "message", etc.
+  role?: 'user' | 'assistant' | 'system' | 'developer';
   name?: string; // present on type "function_call"
   arguments?: string; // present on type "function_call"
   tool_calls?: Array<{ function: { name: string; arguments?: string } }>;
   function_call?: { name: string; arguments?: string };
   tool?: { name: string; arguments?: string };
-  content?: Array<{ type: string; text: string }>;
+  content?: Array<{ 
+    type: string; 
+    text?: string;
+    annotations?: Array<{
+      type: string;
+      url?: string;
+      title?: string;
+      start_index: number;
+      end_index: number;
+    }>;
+  }>;
   finish_reason?: string;
 }
 
@@ -106,14 +134,14 @@ export class OpenAIService {
 
   private async generateGPT5Response(
     model: SupportedModel,
-    messages: OpenAIMessage[],
+    messagesInput: OpenAIMessage[],
     options: OpenAIOptions
   ): Promise<OpenAIResponse> {
-    const { reasoningEffort = 'low', verbosity = 'low', functions } = options;
+    const { reasoningEffort = 'low', verbosity = 'low' } = options;
 
     try {
       // Map messages for the OpenAI Responses API
-      const input = messages.map(msg => ({
+      const messages = messagesInput.map(msg => ({
         role: msg.role,
         content: [{
           type: msg.role === 'assistant' ? 'output_text' : 'input_text' as const,
@@ -121,39 +149,98 @@ export class OpenAIService {
         }]
       }));
 
-      const tools = functions?.map(fn => ({
-        type: 'function' as const,
-        name: fn.name,
-        description: fn.description || '',
-        parameters: fn.parameters || {},
-        strict: false
-      }));
+      const tools: any[] = []; // Initialize tools array
+      const doingWebSearch = typeof options.tool_choice === 'object' && 
+                              options.tool_choice !== null && 
+                              options.tool_choice.type === 'web_search';
+      
+      // Add web search tool if enabled
+      if (doingWebSearch) {
+        // Create web search tool
+        const webSearchTool: any = {
+          type: 'web_search',
+        };
 
+        // Add optional web search parameters
+        if (options.webSearch?.allowedDomains?.length) {
+          webSearchTool.filters = {
+            allowed_domains: options.webSearch.allowedDomains
+          };
+        }
+
+        if (options.webSearch?.searchContextSize) {
+          webSearchTool.search_context_size = options.webSearch.searchContextSize;
+        }
+
+        if (options.webSearch?.userLocation) {
+          webSearchTool.user_location = {
+            ...options.webSearch.userLocation
+          };
+        }
+
+        tools.push(webSearchTool);
+      }
+
+      // Add function tools if any (separate from web search tool)
+      if (options.functions?.length) {
+        tools.push(...options.functions.map(fn => ({
+          type: 'function' as const,
+          name: fn.name,
+          description: fn.description || '',
+          parameters: fn.parameters || {},
+          strict: false
+        })));
+      }
+
+      // Create request payload to pass to OpenAI
       const requestPayload: any = {
         model,
-        input,
+        input: [
+          ...messages,
+          ...(doingWebSearch ? [{
+            role: 'system' as const,
+            content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
+          }] : [])
+        ],
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
         ...(verbosity && { text: { verbosity } }),
-        ...(tools ? { tools } : {}),
-        tool_choice: 'auto',  // Let the model pick a tool if needed
+        ...(tools.length > 0 && { tools })
       };
+
+      logger.debug(`Generating AI response with payload: ${JSON.stringify(requestPayload)}`); // TODO: Remove
 
       // Generate response
       const response = await this.openai.responses.create(requestPayload);
 
-      //logger.debug(`Raw OpenAI response: ${JSON.stringify(response)}`);
-
       // Get output items from response
       const outputItems = response.output as ResponseOutputItemExtended[];
 
-      // First try to find a message response
+      // Find the assistant's message and web search results
       let outputText = '';
       let finishReason = 'stop';
+      const citations: Array<{url: string; title: string; text: string}> = [];
 
       for (const item of outputItems ?? []) {
-        if (item.type === 'message' && item.content?.[0]?.text) {
-          outputText = item.content[0].text;
-          finishReason = item.finish_reason ?? finishReason;
+        // Handle message with citations
+        if (item.type === 'message' && item.role === 'assistant' && item.content) {
+          const textContent = item.content.find(c => c.type === 'output_text');
+          if (textContent?.text) {
+            outputText = textContent.text;
+            
+            // Extract citations if any
+            if (textContent.annotations?.length) {
+              for (const annotation of textContent.annotations) {
+                if (annotation.type === 'url_citation' && annotation.url) {
+                  citations.push({
+                    url: annotation.url,
+                    title: annotation.title || 'Source',
+                    text: outputText.slice(annotation.start_index, annotation.end_index)
+                  });
+                }
+              }
+            }
+          }
+          finishReason = item.finish_reason || finishReason;
           break;
         }
       }
@@ -167,10 +254,14 @@ export class OpenAIService {
         finishReason = firstTextItem?.finish_reason ?? finishReason;
       }
 
+      // Handle function calls if any
       let parsedFunctionCall: { name: string; arguments: string } | null = null;
       for (const item of outputItems ?? []) {
-        if (item.type === 'function_call' && item.name) {
-          parsedFunctionCall = { name: item.name, arguments: item.arguments ?? '{}' };
+        if ((item.type === 'function_call' || item.type === 'tool_calls') && item.name) {
+          parsedFunctionCall = { 
+            name: item.name, 
+            arguments: item.arguments || '{}' 
+          };
           break;
         }
       }
@@ -180,14 +271,19 @@ export class OpenAIService {
         message: {
           role: 'assistant',
           content: outputText,
-          function_call: parsedFunctionCall
+          ...(parsedFunctionCall && { function_call: parsedFunctionCall }),
+          ...(citations.length > 0 && { citations })
         },
         finish_reason: finishReason,
         usage: {
           input_tokens: response.usage?.input_tokens ?? 0,
           output_tokens: response.usage?.output_tokens ?? 0,
           total_tokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
-          cost: this.calculateCost(response.usage?.input_tokens ?? 0, response.usage?.output_tokens ?? 0, model)
+          cost: this.calculateCost(
+            response.usage?.input_tokens ?? 0,
+            response.usage?.output_tokens ?? 0,
+            model
+          )
         }
       };
 

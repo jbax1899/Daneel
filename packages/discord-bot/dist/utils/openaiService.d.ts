@@ -9,6 +9,18 @@ export interface OpenAIMessage {
 export interface OpenAIOptions {
     reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
     verbosity?: 'low' | 'medium' | 'high';
+    webSearch?: {
+        query?: string;
+        allowedDomains?: string[];
+        searchContextSize?: 'low' | 'medium' | 'high';
+        userLocation?: {
+            type?: 'approximate' | 'exact';
+            country?: string;
+            city?: string;
+            region?: string;
+            timezone?: string;
+        };
+    };
     functions?: Array<{
         name: string;
         description?: string;
@@ -18,7 +30,7 @@ export interface OpenAIOptions {
         name: string;
     } | 'auto' | 'none' | 'required' | null;
     tool_choice?: {
-        type: 'function';
+        type: 'function' | 'web_search';
         function: {
             name: string;
         };
@@ -33,6 +45,11 @@ export interface OpenAIResponse {
             name: string;
             arguments?: string;
         } | null;
+        citations?: Array<{
+            url: string;
+            title: string;
+            text: string;
+        }>;
     };
     finish_reason?: string;
     usage?: {

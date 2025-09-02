@@ -19,7 +19,14 @@ const defaultPlan: Plan = {
   reaction: '',
   openaiOptions: {
     reasoningEffort: 'low',
-    verbosity: 'low'
+    verbosity: 'low',
+    tool_choice: 'auto',
+    webSearch: {
+      query: '',
+      allowedDomains: [],
+      searchContextSize: 'low',
+      userLocation: { type: 'approximate' }
+    }
   }
 };
 
@@ -48,16 +55,49 @@ const planFunction = {
         properties: {
           reasoningEffort: { 
             type: "string", 
-            enum: ["minimal", "low", "medium", "high"],
-            description: "The level of reasoning to use. Prefer 'low', then 'medium', then 'high'. Only use 'minimal' if asked to think fast etc."
+            enum: [/*"minimal", */"low", "medium"/*, "high"*/],
+            description: "The level of reasoning to use, with 'low' being the default."
           },
           verbosity: { 
             type: "string", 
             enum: ["low","medium","high"],
-            description: "The level of verbosity to use. Prefer 'low', then 'medium'. Only use 'high' when asked to be verbose etc."
+            description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses. Only use 'high' when asked to be verbose/detailed."
+          },
+          tool_choice: {
+            type: "object",
+            properties: {
+              type: { 
+                type: "string", 
+                enum: ["none","web_search"],
+                description: "'none' performs no tool calls. 'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message. In particular, gather real-time information. Always pair this with reasoningEffort >= low."
+              }
+            },
+            required: ["type"]
+          },
+          webSearch: {
+            type: "object",
+            properties: {
+              query: { type: "string", description: "If performing a web_search, the query to perform a web search for." },
+              //allowedDomains: { type: "array", items: { type: "string" }, description: "An array of allowed domains to search within." },
+              searchContextSize: { type: "string", enum: ["low", "medium"/*, "high"*/], description: "The size of the search context, 'medium' being the default." },
+              /*
+              userLocation: {
+                type: "object",
+                properties: {
+                  type: { type: "string", enum: ["approximate", "exact"], description: "The type of user location." },
+                  country: { type: "string", description: "The ISO country code." },
+                  city: { type: "string", description: "The city." },
+                  region: { type: "string", description: "The region." },
+                  timezone: { type: "string", description: "The IANA timezone." }
+                },
+                required: ["type"]
+              }
+              */
+            },
+            required: ["query", "searchContextSize"]
           }
         },
-        required: ["reasoningEffort","verbosity"]
+        required: ["reasoningEffort","verbosity","tool_choice"]
       }
     },
     required: ["action","modality","openaiOptions"]
@@ -79,11 +119,10 @@ export class Planner {
           functions: [planFunction], 
           function_call: { name: 'generate-plan' }
         }
-      );
-      //logger.debug(`Raw OpenAI response: ${JSON.stringify(openaiResponse)}`);
+      )
 
       const response: OpenAIResponse = {
-        normalizedText: openaiResponse.message?.content || "Error: No plan generated",
+        normalizedText: openaiResponse.message?.content,
         message: openaiResponse.message,
         finish_reason: openaiResponse.finish_reason,
         usage: openaiResponse.usage
