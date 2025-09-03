@@ -96,6 +96,23 @@ export class MessageProcessor {
     // Generate plan
     const plan: Plan = await this.planner.generatePlan(planContext);
 
+    logger.debug(`Raw plan: ${JSON.stringify(plan)}`);
+
+    // If the plan updated the bot's presence, update it
+    if (plan.presence) {
+      logger.debug(`Updating presence: ${JSON.stringify(plan.presence)}`);
+
+      // Verify options
+      let verifiedOptions = {
+        status: plan.presence.status,
+        activities: plan.presence.activities,
+        shardId: plan.presence.shardId,
+        afk: plan.presence.afk
+      }
+
+      responseHandler.setPresence(verifiedOptions);
+    }
+
     // Get trimmed context from Plan for response
     const trimmedContext = planContext; // TODO: alter Plan tool call to return trimmed context
 

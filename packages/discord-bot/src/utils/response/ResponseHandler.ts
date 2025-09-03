@@ -4,7 +4,7 @@
  * Handles different response types including text replies, embeds, DMs, and reactions.
  */
 
-import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions } from 'discord.js';
+import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions, ActivityOptions } from 'discord.js';
 import { logger } from '../logger.js';
 import { EmbedBuilder as CustomEmbedBuilder } from './EmbedBuilder.js';
 
@@ -258,6 +258,64 @@ export class ResponseHandler {
     if (this.typingInterval) {
       clearInterval(this.typingInterval);
       this.typingInterval = null;
+    }
+  }
+
+  /**
+   * Sets the bot's presence with customizable options.
+   *
+   * @param {Object} options - Presence configuration options
+   * @param {'online'|'idle'|'dnd'|'invisible'} [options.status='online']
+   *        The overall status of the bot.
+   * @param {Array<ActivityOptions>} [options.activities=[]]
+   *        Array of activity objects to display (e.g. "Playing X").
+   * @param {number|null} [options.shardId=null]
+   *        The shard ID to apply the presence to. Optional, and usually not needed
+   *        unless the bot is running with multiple shards. If omitted or null,
+   *        the presence applies globally.
+   * @param {boolean} [options.afk=false]
+   *        Whether the bot should be flagged as AFK.
+   * @returns {void}
+   *
+   * @example
+   * // Basic example: playing a game
+   * setPresence({
+   *   status: 'online',
+   *   activities: [{ name: 'with TypeScript', type: ActivityType.Playing }],
+   *   afk: false
+   * });
+   *
+   * @example
+   * // Advanced: streaming
+   * setPresence({
+   *   status: 'dnd',
+   *   activities: [{ name: 'my coding stream', type: ActivityType.Streaming, url: 'https://twitch.tv/mychannel' }]
+   * });
+   */
+  public setPresence({
+    status = 'online',
+    activities = [],
+    shardId = null,
+    afk = false,
+  }: {
+    status?: 'online' | 'idle' | 'dnd' | 'invisible';
+    activities?: ActivityOptions[];
+    shardId?: number | null;
+    afk?: boolean;
+  } = {}): void {
+    try {
+      const client = this.message.client;
+
+      client.user?.setPresence({
+        status,
+        activities,
+        shardId: shardId ?? undefined,
+        afk,
+      });
+
+      logger.info(`Presence updated: ${status} with ${activities.length} activities`);
+    } catch (error) {
+      logger.warn('Failed to set presence:', error); // Not a critical error
     }
   }
 

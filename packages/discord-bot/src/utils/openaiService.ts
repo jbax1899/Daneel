@@ -4,6 +4,7 @@ import fs from 'fs';
 import OpenAI from 'openai';
 import fetch from 'node-fetch';
 import { logger } from './logger.js'
+import { ActivityOptions } from 'discord.js';
 
 // ====================
 // Type Declarations
@@ -65,6 +66,7 @@ export interface OpenAIResponse {
     total_tokens: number;
     cost?: string;
   };
+  newPresence?: ActivityOptions;
 }
 
 // Extended interface for OpenAI Responses output items
