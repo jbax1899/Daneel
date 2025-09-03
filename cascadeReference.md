@@ -45,10 +45,12 @@ Some rules to follow (for Cascade):
 - [X] Allow the bot to respond to plaintext name
 - [X] Audio generation (TTS)
 - [X] Image context processing
+- [X] Web search
 - [ ] Plan refines context
 - [ ] Cache chain of thought
 - [ ] DM-based, opt-in memory
 - [ ] Live voice chat via Discord call
+
 
 ## Technical Stack
 
