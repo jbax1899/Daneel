@@ -39,7 +39,8 @@ export class ResponseHandler {
   public async sendMessage(
     content: string,
     files: Array<{filename: string, data: string | Buffer}> = [],
-    directReply: boolean = false
+    directReply: boolean = false,
+    suppressEmbeds: boolean = true
   ): Promise<Message | Message[]> {
     if (!this.channel.isSendable()) {
       throw new Error('Channel is not sendable');
@@ -56,7 +57,10 @@ export class ResponseHandler {
         const hasFiles = files && files.length > 0;
   
         // Create base message options
-        const messageOptions: MessageCreateOptions = { content: chunk };
+        const messageOptions: MessageCreateOptions = { 
+          content: chunk,
+          flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined
+        };
   
         // Add message reference for replies
         if (isFirstChunk && directReply) {

@@ -56,8 +56,8 @@ const planFunction = {
                         properties: {
                             type: {
                                 type: "string",
-                                enum: ["web_search"],
-                                description: "'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message. In particular, gather real-time information. Always pair this with reasoningEffort >= low."
+                                enum: ["none", "web_search"],
+                                description: "'none' performs no tool calls. 'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message. In particular, gather real-time information. Always pair this with reasoningEffort >= low."
                             }
                         },
                         required: ["type"]

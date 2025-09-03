@@ -33,7 +33,7 @@ export declare class ResponseHandler {
     sendMessage(content: string, files?: Array<{
         filename: string;
         data: string | Buffer;
-    }>, directReply?: boolean): Promise<Message | Message[]>;
+    }>, directReply?: boolean, suppressEmbeds?: boolean): Promise<Message | Message[]>;
     /**
      * Sends an embedded message to the channel where the message was received.
      * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send

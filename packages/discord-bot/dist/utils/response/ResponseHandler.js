@@ -35,7 +35,7 @@ export class ResponseHandler {
      * @param {Object} [replyToMessage] - Optional message reference for replies
      * @returns {Promise<Message | Message[]>} The sent message(s)
      */
-    async sendMessage(content, files = [], directReply = false) {
+    async sendMessage(content, files = [], directReply = false, suppressEmbeds = true) {
         if (!this.channel.isSendable()) {
             throw new Error('Channel is not sendable');
         }
@@ -48,7 +48,10 @@ export class ResponseHandler {
                 const isLastChunk = i === chunks.length - 1;
                 const hasFiles = files && files.length > 0;
                 // Create base message options
-                const messageOptions = { content: chunk };
+                const messageOptions = {
+                    content: chunk,
+                    flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined
+                };
                 // Add message reference for replies
                 if (isFirstChunk && directReply) {
                     messageOptions.reply = {
