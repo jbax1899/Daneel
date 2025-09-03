@@ -83,7 +83,7 @@ export class MessageCreate extends Event {
       ) {
         logger.debug(`Catching up to message ID: ${message.id}`);
         this.lastMessageCount = 0;
-        await this.messageProcessor.processMessage(message, false);
+        await this.messageProcessor.processMessage(message, false); // Do not direct-reply to anyone when catching up
       }
     } catch (error) {
       await this.handleError(error, message);

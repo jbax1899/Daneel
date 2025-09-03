@@ -39,7 +39,7 @@ const planFunction = {
       action: { 
         type: "string", 
         enum: ["message", "react", "ignore"],
-      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (use when its best to ignore the message)"
+      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (though typically you should prefer 'react' over 'ignore')."
       },
       modality: { 
         type: "string",
