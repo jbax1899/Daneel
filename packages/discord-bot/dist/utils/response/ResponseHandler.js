@@ -239,80 +239,144 @@ export class ResponseHandler {
         }
     }
     /**
+     * Sets the bot's presence with customizable options.
+     *
+     * @param {Object} options - Presence configuration options
+     * @param {'online'|'idle'|'dnd'|'invisible'} [options.status='online']
+     *        The overall status of the bot.
+     * @param {Array<ActivityOptions>} [options.activities=[]]
+     *        Array of activity objects to display (e.g. "Playing X").
+     * @param {number|null} [options.shardId=null]
+     *        The shard ID to apply the presence to. Optional, and usually not needed
+     *        unless the bot is running with multiple shards. If omitted or null,
+     *        the presence applies globally.
+     * @param {boolean} [options.afk=false]
+     *        Whether the bot should be flagged as AFK.
+     * @returns {void}
+     *
+     * @example
+     * // Basic example: playing a game
+     * setPresence({
+     *   status: 'online',
+     *   activities: [{ name: 'with TypeScript', type: ActivityType.Playing }],
+     *   afk: false
+     * });
+     *
+     * @example
+     * // Advanced: streaming
+     * setPresence({
+     *   status: 'dnd',
+     *   activities: [{ name: 'my coding stream', type: ActivityType.Streaming, url: 'https://twitch.tv/mychannel' }]
+     * });
+     */
+    setPresence({ status = 'online', activities = [], shardId = null, afk = false, } = {}) {
+        try {
+            const client = this.message.client;
+            client.user?.setPresence({
+                status,
+                activities,
+                shardId: shardId ?? undefined,
+                afk,
+            });
+            logger.info(`Presence updated: ${status} with ${activities.length} activities`);
+        }
+        catch (error) {
+            logger.warn('Failed to set presence:', error); // Not a critical error
+        }
+    }
+    /**
      * Splits a message into chunks that fit within Discord's message limits
      * @private
      */
     splitMessage(text) {
-        const maxLength = 2000; // Discord's limit
+        const maxLength = 2000;
         const chunks = [];
         let currentChunk = '';
-        // Split by paragraphs first to maintain readability
-        const paragraphs = text.split(/\n\s*\n/);
-        for (const paragraph of paragraphs) {
-            // If adding this paragraph would exceed the limit, push current chunk and start a new one
-            if (currentChunk.length + paragraph.length + 2 > maxLength) {
-                if (currentChunk) {
-                    chunks.push(currentChunk.trim());
-                    currentChunk = '';
-                }
-                // If a single paragraph is too long, split it by sentences
-                if (paragraph.length > maxLength) {
-                    const sentences = paragraph.split(/(?<=[.!?])\s+/);
-                    let sentenceChunk = '';
-                    for (const sentence of sentences) {
-                        if (sentenceChunk.length + sentence.length + 1 > maxLength) {
-                            if (sentenceChunk) {
-                                chunks.push(sentenceChunk.trim());
-                                sentenceChunk = '';
-                            }
-                            // If a single sentence is still too long, split by words
-                            if (sentence.length > maxLength) {
-                                const words = sentence.split(/\s+/);
-                                let wordChunk = '';
-                                for (const word of words) {
-                                    if (wordChunk.length + word.length + 1 > maxLength) {
-                                        if (wordChunk) {
-                                            chunks.push(wordChunk.trim());
-                                            wordChunk = '';
-                                        }
-                                        // If a single word is too long, split it
-                                        if (word.length > maxLength) {
-                                            for (let i = 0; i < word.length; i += maxLength) {
-                                                chunks.push(word.substring(i, i + maxLength));
-                                            }
-                                        }
-                                        else {
-                                            wordChunk = word;
-                                        }
-                                    }
-                                    else {
-                                        wordChunk += (wordChunk ? ' ' : '') + word;
-                                    }
-                                }
-                                if (wordChunk) {
-                                    chunks.push(wordChunk.trim());
-                                }
-                            }
-                            else {
-                                sentenceChunk = sentence;
-                            }
+        // First, handle code blocks specially
+        const codeBlockRegex = /(```[a-z]*\n[\s\S]*?\n```)/g;
+        const parts = text.split(codeBlockRegex);
+        for (let i = 0; i < parts.length; i++) {
+            const part = parts[i];
+            if (!part.trim())
+                continue;
+            // Check if this part is a complete code block
+            const isCodeBlock = part.startsWith('```') && part.endsWith('```') && part.split('\n').length > 2;
+            if (isCodeBlock) {
+                // If code block is too large, split it specially
+                if (part.length > maxLength) {
+                    // Push current chunk if not empty
+                    if (currentChunk) {
+                        chunks.push(currentChunk.trim());
+                        currentChunk = '';
+                    }
+                    // Split the code block into multiple chunks
+                    const codeContent = part.slice(3, -3); // Remove the ``` markers
+                    const language = part.split('\n')[0].slice(3).trim() || '';
+                    const codeLines = codeContent.split('\n');
+                    let codeChunk = `\`\`\`${language}\n`;
+                    for (const line of codeLines) {
+                        // If adding this line would exceed max length, start a new chunk
+                        if (codeChunk.length + line.length + 1 > maxLength - 3) { // -3 for the ```
+                            // Close current code block
+                            codeChunk += '\n```';
+                            chunks.push(codeChunk);
+                            // Start new code block
+                            codeChunk = `\`\`\`${language}\n${line}\n`;
                         }
                         else {
-                            sentenceChunk += (sentenceChunk ? ' ' : '') + sentence;
+                            codeChunk += `${line}\n`;
                         }
                     }
-                    if (sentenceChunk) {
-                        chunks.push(sentenceChunk.trim());
+                    // Add the last code block if there's any content left
+                    if (codeChunk.length > language.length + 5) { // 5 = ``` + \n + \n
+                        if (!codeChunk.endsWith('\n```')) {
+                            codeChunk += '```';
+                        }
+                        currentChunk = codeChunk;
                     }
                 }
+                // If code block fits in current chunk, add it
+                else if (currentChunk.length + part.length + 2 <= maxLength) {
+                    currentChunk += (currentChunk ? '\n\n' : '') + part;
+                }
+                // Otherwise, start a new chunk
                 else {
-                    currentChunk = paragraph;
+                    if (currentChunk) {
+                        chunks.push(currentChunk.trim());
+                    }
+                    currentChunk = part;
                 }
             }
+            // Handle non-code block text
             else {
-                currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+                const paragraphs = part.split(/\n\s*\n/);
+                for (const paragraph of paragraphs) {
+                    // If adding this paragraph would exceed the limit, push current chunk
+                    if (currentChunk && currentChunk.length + paragraph.length + 2 > maxLength) {
+                        chunks.push(currentChunk.trim());
+                        currentChunk = '';
+                    }
+                    // If a single paragraph is too long, split it by words
+                    if (paragraph.length > maxLength) {
+                        const words = paragraph.split(/\s+/);
+                        for (const word of words) {
+                            if (currentChunk.length + word.length + 1 > maxLength) {
+                                chunks.push(currentChunk.trim());
+                                currentChunk = word;
+                            }
+                            else {
+                                currentChunk += (currentChunk ? ' ' : '') + word;
+                            }
+                        }
+                    }
+                    // Otherwise add the paragraph
+                    else {
+                        currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+                    }
+                }
             }
         }
+        // Add the last chunk if it's not empty
         if (currentChunk) {
             chunks.push(currentChunk.trim());
         }

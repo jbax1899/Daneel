@@ -97,20 +97,28 @@ export class CommandHandler {
     async deployCommands(token, clientId, guildId) {
         try {
             if (this.commands.size === 0) {
+                logger.debug('No commands found in cache, loading commands...');
                 await this.loadCommands();
             }
             const rest = new REST({ version: '10' }).setToken(token);
-            const commands = Array.from(this.commands.values()).map(cmd => cmd.data.toJSON());
-            logger.debug('Started refreshing application (/) commands.');
+            const commands = Array.from(this.commands.values()).map(cmd => {
+                const commandData = cmd.data.toJSON();
+                logger.debug(`Registering command: ${commandData.name}`);
+                return commandData;
+            });
+            logger.debug(`Starting to refresh ${guildId ? 'guild' : 'application'} commands...`);
+            logger.debug(`Number of commands to register: ${commands.length}`);
             if (guildId) {
                 // Guild-specific commands
-                await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
-                logger.info(`Successfully reloaded ${commands.length} guild commands.`);
+                logger.debug(`Registering commands for guild: ${guildId}`);
+                const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commands });
+                logger.info(`Successfully reloaded ${data.length} guild commands.`);
             }
             else {
                 // Global commands
-                await rest.put(Routes.applicationCommands(clientId), { body: commands });
-                logger.info(`Successfully reloaded ${commands.length} global commands.`);
+                logger.debug('Registering global commands');
+                const data = await rest.put(Routes.applicationCommands(clientId), { body: commands });
+                logger.info(`Successfully reloaded ${data.length} global commands.`);
             }
         }
         catch (error) {

@@ -1,3 +1,4 @@
+import { ActivityOptions } from 'discord.js';
 export type SupportedModel = GPT5ModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
 export type TTSModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
@@ -58,6 +59,7 @@ export interface OpenAIResponse {
         total_tokens: number;
         cost?: string;
     };
+    newPresence?: ActivityOptions;
 }
 export declare class OpenAIService {
     private openai;

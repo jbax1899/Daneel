@@ -22,7 +22,6 @@ Some rules to follow (for Cascade):
 2. [Technical Stack](#technical-stack)
 3. [Packages](#packages)
 4. [Architecture](#architecture)
-5. [Future Improvements](#future-improvements)
 
 ## Project Status
 
@@ -194,40 +193,3 @@ frontend/
    - Reactions to messages
    - Error messages when needed
 4. Debug information is collected and logged at each step
-
-## Future Improvements
-
-### Core Features
-- [ ] Moderation commands
-- [ ] User feedback system
-- [ ] Database integration
-- [ ] Caching layer
-
-### Developer Experience
-- [ ] Enhanced testing framework
-- [ ] Better error tracking
-- [ ] Performance monitoring
-- [ ] Documentation improvements
-
-### Infrastructure
-- [ ] Database migrations
-- [ ] Backup system
-- [ ] Advanced logging
-- [ ] Metrics collection
-
-### Security
-- [ ] Input validation
-- [ ] Audit logging
-- [ ] Security headers
-
-### Documentation
-- [ ] API documentation
-- [ ] Architecture decision records (ADRs)
-- [ ] User guides
-- [ ] Development setup guide
-
-### Performance
-- [ ] Query optimization
-- [ ] Caching strategy
-- [ ] Load testing
-- [ ] Bundle size optimization

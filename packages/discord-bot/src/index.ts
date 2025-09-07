@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Initialize OpenAI service
-const openaiService = new OpenAIService(config.openaiApiKey);
+export const openaiService = new OpenAIService(config.openaiApiKey); // Exported for use in other files, like /news command
 
 // ====================
 // Client Configuration
@@ -41,36 +41,43 @@ const eventManager = new EventManager(client, {
 // ====================
 // Load and Register Commands
 // ====================
-try {
-  const commands = await commandHandler.loadCommands();
-  
-  // Deploy commands to Discord
-  await commandHandler.deployCommands(
-    config.token,
-    config.clientId,
-    config.guildId
-  );
-  
-  // Store commands in memory for execution
-  commands.forEach((cmd, name) => {
-    (client as any).commands = (client as any).commands || new Map();
-    (client as any).commands.set(name, cmd);
-  });
-} catch (error) {
-  logger.error('Failed to load/deploy commands:', error);
-  process.exit(1);
-}
 
-// ====================
-// Load Events
-// ====================
-await eventManager.loadEvents(__dirname + '/events');
-eventManager.registerAll();
+// Use an async IIFE to handle top-level await
+(async () => {
+  try {
+    // Load commands first
+    const commands = await commandHandler.loadCommands();
+    
+    // Deploy commands to Discord
+    logger.debug('Deploying commands to Discord...');
+    await commandHandler.deployCommands(
+      config.token,
+      config.clientId,
+      config.guildId
+    );
+    
+    // Store commands in memory for execution
+    commands.forEach((cmd, name) => {
+      (client as any).commands = (client as any).commands || new Map();
+      (client as any).commands.set(name, cmd);
+      logger.debug(`Command stored in memory: ${name}`);
+    });
 
-// ====================
-// Start the Bot
-// ====================
-client.login(config.token);
+    // Load events after commands are registered
+    logger.debug('Loading events...');
+    await eventManager.loadEvents(__dirname + '/events');
+    eventManager.registerAll();
+    logger.debug('Events loaded and registered.');
+
+    // Login to Discord after everything is set up
+    logger.debug('Logging in to Discord...');
+    await client.login(config.token);
+    logger.info('Bot is now connected to Discord and ready!');
+  } catch (error) {
+    logger.error('Failed to initialize bot:', error);
+    process.exit(1);
+  }
+})();
 
 // ====================
 // Process Handlers
@@ -84,31 +91,38 @@ client.once(Events.ClientReady, () => {
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  try {
-    const command = (interaction.client as any).commands?.get(interaction.commandName);
+  const command = (interaction.client as any).commands?.get(interaction.commandName);
 
-    if (!command) {
-      logger.warn(`No command matching ${interaction.commandName} was found.`);
+  if (!command) {
+    logger.warn(`No command matching ${interaction.commandName} was found.`);
+    // Only try to reply if not already handled
+    if (!interaction.replied && !interaction.deferred) {
       return interaction.reply({
         content: 'This command is not available.',
-        ephemeral: true
-      });
+        flags: [1 << 6] // EPHEMERAL
+      }).catch(console.error);
     }
+    return;
+  }
 
-    logger.info(`Executing command: ${interaction.commandName}`);
-    return command.execute(interaction);
+  logger.info(`Executing command: ${interaction.commandName}`);
+  
+  try {
+    // Let the command handle its own defer/reply logic
+    await command.execute(interaction);
   } catch (error) {
-    logger.error(`Error executing ${interaction.commandName}`, error);
+    logger.error(`Error executing command ${interaction.commandName}:`, error);
     
-    const reply = { 
-      content: 'There was an error while executing this command!', 
-      ephemeral: true
-    };
-
-    if (interaction.replied || interaction.deferred) {
-      return interaction.followUp(reply);
-    } else {
-      return interaction.reply(reply);
+    // Only try to send an error message if we haven't already replied
+    if (!interaction.replied && !interaction.deferred) {
+      await interaction.reply({
+        content: 'There was an error executing this command!',
+        flags: [1 << 6] // EPHEMERAL
+      }).catch(console.error);
+    } else if (interaction.deferred && !interaction.replied) {
+      await interaction.editReply({
+        content: 'There was an error executing this command!'
+      }).catch(console.error);
     }
   }
 });
