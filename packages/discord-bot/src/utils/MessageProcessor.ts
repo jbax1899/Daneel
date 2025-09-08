@@ -252,6 +252,21 @@ export class MessageProcessor {
         if (repliedMessage && m.id === repliedMessage.id) {
           repliedMessageIndex = messageIndex;
         }
+
+        // Include embeds with full context (as in EmbedBuilder.ts)
+        if (m.embeds.length > 0) {
+          formattedMessage += '\nEmbeds: ';
+          m.embeds.forEach(embed => {
+            if (embed.title) formattedMessage += `\nTitle: ${embed.title}`;
+            if (embed.description) formattedMessage += `\nDescription: ${embed.description}`;
+            if (embed.footer) formattedMessage += `\nFooter: ${embed.footer.text}`;
+            if (embed.image) formattedMessage += `\nImage: ${embed.image.url}`;
+            if (embed.thumbnail) formattedMessage += `\nThumbnail: ${embed.thumbnail.url}`;
+            if (embed.author) formattedMessage += `\nAuthor: ${embed.author.name}`;
+            if (embed.provider) formattedMessage += `\nProvider: ${embed.provider.name}`;
+            if (embed.url) formattedMessage += `\nURL: ${embed.url}`;
+          });
+        }
         
         logger.debug(formattedMessage); // todo: remove
       

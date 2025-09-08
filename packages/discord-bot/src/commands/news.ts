@@ -6,9 +6,11 @@ import { OpenAIOptions } from '../utils/openaiService.js';
 import { EmbedBuilder } from '../utils/response/EmbedBuilder.js';
 import { logger } from '../utils/logger.js';
 
+const DEFAULT_MAX_RESULTS = 3;
+const MAX_RESULTS = 5;
 const newsFunction = {
   name: "generate_news_response",
-  description: "Generates a structured news response with multiple news items",
+  description: "Generates a structured news response with multiple news items and a summary",
   parameters: {
     type: "object",
     properties: {
@@ -25,11 +27,14 @@ const newsFunction = {
             thumbnail: { type: "string", description: "URL to article thumbnail image", nullable: true }
           },
           required: ["title", "summary", "url", "source", "timestamp"]
-        },
-        description: "Array of news items"
+        }
+      },
+      summary: {
+        type: "string",
+        description: "A brief summary of the news findings"
       }
     },
-    required: ["news"]
+    required: ["news", "summary"]
   }
 };
 
@@ -48,6 +53,14 @@ const command: Command = {
         .setName('category')
         .setDescription('News category (e.g., tech, sports, politics)')
         .setRequired(false)
+    )
+    .addIntegerOption(option =>
+      option
+        .setName('max_results')
+        .setDescription('Maximum number of news items to return')
+        .setRequired(false)
+        .setMinValue(1)
+        .setMaxValue(MAX_RESULTS)
     )
     .addStringOption(option =>
       option
@@ -94,26 +107,41 @@ const command: Command = {
         : undefined;
       const reasoningEffort = interaction.options.getString('reasoning_effort') ?? 'medium';
       const verbosity = interaction.options.getString('verbosity') ?? 'medium';
+      const maxResults = interaction.options.getInteger('max_results') ?? DEFAULT_MAX_RESULTS;
 
       const openAIOptions: OpenAIOptions = { 
         reasoningEffort: reasoningEffort as 'minimal' | 'low' | 'medium' | 'high', 
         verbosity: verbosity as 'low' | 'medium' | 'high',
-        function_call: { name: "generate_news_response" },
-        webSearch: { 
+        tool_choice: {
+          type: 'web_search',
+          function: { name: 'generate_news_response' }
+        },
+        webSearch: {
           query: query || category || 'latest news',
           allowedDomains,
-          searchContextSize: 'high'
-        } 
+          searchContextSize: 'high',
+          userLocation: { type: 'approximate' }
+        }
       };
+
+      const systemPrompt = `You are a news assistant that fetches and summarizes current news using web search.
+      INSTRUCTIONS:
+      1. ALWAYS use the generate_news_response function to return results
+      2. Use web search to find the most recent and relevant news
+      3. Include a concise 1-2 sentence summary of the overall findings
+      4. Return ${maxResults} news items by default unless specified otherwise
+      5. Format each news item with: title, summary, url, source, and timestamp
+      Search parameters:
+      - Query: ${query || 'Not specified'}
+      - Category: ${category || 'Not specified'}
+      - Max results: ${maxResults}
+      - Allowed domains: ${allowedDomains?.join(', ') || 'Any'}`;
 
       const response = await openaiService.generateResponse(
         undefined,
         [
-          { role: 'system' as const, content: `You are a helpful news assistant that fetches news from the web. 
-            Users can supply these optional arguments: query, category, allowed_domains, reasoning_effort, verbosity.
-            If the user does not provide any arguments, you should fetch the latest global news stories.
-            Only return a function call to "generate_news_response".` },
-          { role: 'user' as const, content: `User provided arguments: ${JSON.stringify({ query, category, allowedDomains, reasoningEffort, verbosity })}`}
+          { role: 'system' as const, content: systemPrompt },
+          { role: 'user' as const, content: `User provided arguments: ${JSON.stringify({ query, category, maxResults, allowedDomains, reasoningEffort, verbosity })}`}
         ],
         {
           ...openAIOptions,
@@ -135,7 +163,7 @@ const command: Command = {
       }
 
       // Create embeds for each news item
-      const embeds = newsResponse.news.slice(0, 5).map((item: any) => {
+      const embeds = newsResponse.news.slice(0, maxResults).map((item: any) => {
         const embed = new EmbedBuilder()
           .setTitle(item.title)
           .setDescription(item.summary)
@@ -149,7 +177,19 @@ const command: Command = {
         return embed.build();
       });
 
-      await interaction.editReply({ embeds });
+      // Create a header message
+      const searchParams = [];
+      if (query) searchParams.push(`query: "${query}"`);
+      if (category) searchParams.push(`category: "${category}"`);
+      if (allowedDomains?.length) searchParams.push(`sources: ${allowedDomains.join(', ')}`);
+      
+      const headerMessage = `**News** ${searchParams.length ? `for ${searchParams.join(', ')}` : 'from around the world'}`;
+      const resultMessage = newsResponse.summary || `Found ${newsResponse.news.length} news items.`;
+      
+      await interaction.editReply({ 
+        content: `${headerMessage}\n${resultMessage}`,
+        embeds: embeds.slice(0, maxResults)
+      });
 
     } catch (error) {
       logger.error(`Error in news command: ${error}`);
