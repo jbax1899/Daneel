@@ -4,19 +4,21 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 
 <img width="802" height="172" alt="image" src="https://github.com/user-attachments/assets/a842ed94-6902-4493-a1a1-efc6415c1765" />
 
-TTS greeting: <audio controls><source src="https://github.com/user-attachments/files/22224548/IamDaneel.mp3" type="audio/mpeg">Your browser does not support the audio element.</audio>
+https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 
 ## Features
 
 ### 🤖 Discord Bot
 - Powered by Discord.js 14 with TypeScript
-- Custom command and event system
-- Advanced message processing pipeline
-- AI-powered responses with conversation context
-- Robust error handling and logging
-- Configurable rate limiting to prevent abuse
+- Custom command handling, event management, and message processing pipelines
+- Robust error handling, logging, and rate limiting options
+- Text-to-speech (TTS) generation
+- Detailed image analysis
+- /news command: Fetches recent articles from across the web with optional parameters query, category, max_results, allowed_domains, reasoning_effort, verbosity
 
-<img width="897" height="349" alt="image" src="https://github.com/user-attachments/assets/b467db66-1b37-47ce-996b-f6dc61a3a961" />
+<img width="900" height="362" alt="image" src="https://github.com/user-attachments/assets/b0ce1cc3-e388-408d-9574-4fdc40d540fc" />
+<img width="909" height="953" alt="image" src="https://github.com/user-attachments/assets/49cd2df9-ec29-4eee-85bb-2a77f6ba8537" />
+<img width="892" height="766" alt="image" src="https://github.com/user-attachments/assets/ccd154a8-bb8a-453e-b15c-07f994f741f6" />
 
 ### 🌐 Web Client
 - Next.js 15 with React 19
@@ -82,9 +84,10 @@ TTS greeting: <audio controls><source src="https://github.com/user-attachments/f
 - [X] Audio generation (TTS)
 - [X] Image context processing
 - [X] Web search
+- [X] /news command
 - [ ] Plan refines context
 - [ ] Cache chain of thought
-- [ ] DM-based, opt-in memory
+- [ ] Opt-in, user-deletable memory
 - [ ] Live voice chat via Discord call
 
 ## Configuration
