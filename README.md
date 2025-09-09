@@ -4,6 +4,8 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 
 <img width="802" height="172" alt="image" src="https://github.com/user-attachments/assets/a842ed94-6902-4493-a1a1-efc6415c1765" />
 
+TTS greeting: <audio controls><source src="https://github.com/user-attachments/files/22224548/IamDaneel.mp3" type="audio/mpeg">Your browser does not support the audio element.</audio>
+
 ## Features
 
 ### 🤖 Discord Bot
@@ -14,8 +16,7 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Robust error handling and logging
 - Configurable rate limiting to prevent abuse
 
-<img width="823" height="326" alt="image" src="https://github.com/user-attachments/assets/6b119f11-ecc5-46de-b18b-d7920a23a36c" />
-
+<img width="897" height="349" alt="image" src="https://github.com/user-attachments/assets/b467db66-1b37-47ce-996b-f6dc61a3a961" />
 
 ### 🌐 Web Client
 - Next.js 15 with React 19
@@ -25,7 +26,6 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - Responsive design for all devices
 
 <img width="710" height="703" alt="image" src="https://github.com/user-attachments/assets/a388fbc0-9a64-4ebc-8499-65c354e6dcbc" />
-
 
 ### 🧩 Shared Core
 - TypeScript-based shared utilities and types
@@ -87,33 +87,6 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 - [ ] DM-based, opt-in memory
 - [ ] Live voice chat via Discord call
 
-## 📁 Project Structure
-
-```
-daneel/
-├── packages/
-│   ├── discord-bot/          # Discord bot implementation
-│   │   ├── src/
-│   │   │   ├── commands/     # Bot command handlers
-│   │   │   ├── events/       # Discord event handlers
-│   │   │   ├── types/        # TypeScript type definitions
-│   │   │   ├── utils/        # Utility functions
-│   │   │   └── index.ts      # Bot entry point
-│   │
-│   ├── frontend/             # Web client application
-│   │   └── web/              # Next.js application
-│   │       ├── app/          # App router
-│   │       ├── components/   # UI components
-│   │       └── lib/          # Utility libraries
-│   │
-│   └── shared/               # Shared code between packages
-│       └── src/              # Shared types and utilities
-├── .github/                  # GitHub workflows
-├── .gitignore
-├── package.json              # Root package.json with workspace config
-└── README.md
-```
-
 ## Configuration
 
 ### Required Environment Variables
@@ -151,6 +124,33 @@ CHANNEL_RATE_WINDOW_MS=60000  # Time window in milliseconds (60 seconds)
 RATE_LIMIT_GUILD=true         # Enable/disable guild rate limiting
 GUILD_RATE_LIMIT=20           # Max requests per guild per time window
 GUILD_RATE_WINDOW_MS=60000    # Time window in milliseconds (60 seconds)
+```
+
+## 📁 Project Structure
+
+```
+daneel/
+├── packages/
+│   ├── discord-bot/          # Discord bot implementation
+│   │   ├── src/
+│   │   │   ├── commands/     # Bot command handlers
+│   │   │   ├── events/       # Discord event handlers
+│   │   │   ├── types/        # TypeScript type definitions
+│   │   │   ├── utils/        # Utility functions
+│   │   │   └── index.ts      # Bot entry point
+│   │
+│   ├── frontend/             # Web client application
+│   │   └── web/              # Next.js application
+│   │       ├── app/          # App router
+│   │       ├── components/   # UI components
+│   │       └── lib/          # Utility libraries
+│   │
+│   └── shared/               # Shared code between packages
+│       └── src/              # Shared types and utilities
+├── .github/                  # GitHub workflows
+├── .gitignore
+├── package.json              # Root package.json with workspace config
+└── README.md
 ```
 
 ## 📝 License
