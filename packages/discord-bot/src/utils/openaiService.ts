@@ -12,12 +12,20 @@ import { ActivityOptions } from 'discord.js';
 
 export type SupportedModel = GPT5ModelType; 
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
-export type TTSModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
-export type TTSVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
 
 export interface OpenAIMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
   content: string;
+}
+
+export type TTSOptions = {
+  model: 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+  voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
+  speed?: 'slow' | 'normal' | 'fast';
+  pitch?: 'low' | 'normal' | 'high';
+  emphasis?: 'none' | 'moderate' | 'strong';
+  style?: 'casual' | 'narrative' | 'cheerful' | 'sad' | 'angry' | string;
+  styleDegree?: 'low' | 'normal' | 'high';
 }
 
 export interface OpenAIOptions {
@@ -35,6 +43,7 @@ export interface OpenAIOptions {
       timezone?: string; // IANA timezone (e.g., 'America/Chicago')
     };
   };
+  ttsOptions?: TTSOptions;
   functions?: Array<{
     name: string;
     description?: string;
@@ -112,6 +121,16 @@ const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
 const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
 
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
+
+export const TTS_DEFAULT_OPTIONS: TTSOptions = {
+  model: 'gpt-4o-mini-tts',
+  voice: 'echo',
+  speed: 'normal',
+  pitch: 'normal',
+  emphasis: 'moderate',
+  style: 'conversational',
+  styleDegree: 'normal'
+}
 
 // ====================
 // OpenAI Service Class
@@ -296,10 +315,8 @@ export class OpenAIService {
   }
 
   public async generateSpeech(
-    model: TTSModel,
-    voice: TTSVoice,
     input: string, 
-    instructions: string, 
+    instructions: TTSOptions,
     filename: string, 
     format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm') {
     //https://platform.openai.com/docs/guides/text-to-speech
@@ -310,13 +327,14 @@ export class OpenAIService {
     const outputPath = path.join(TTS_OUTPUT_PATH, `${filename}.${format}`);
 
     logger.debug(`Generating speech file: ${outputPath}...`);
+    logger.debug(`Using TTS options: ${JSON.stringify(instructions)}`);
 
     try {
       const mp3 = await this.openai.audio.speech.create({
-        model: model,
-        voice: voice,
+        model: instructions.model,
+        voice: instructions.voice,
         input: input,
-        instructions: instructions,
+        instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}`,
         response_format: format,
       });
 
