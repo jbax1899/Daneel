@@ -26,6 +26,7 @@ export type TTSOptions = {
   emphasis?: 'none' | 'moderate' | 'strong';
   style?: 'casual' | 'narrative' | 'cheerful' | 'sad' | 'angry' | string;
   styleDegree?: 'low' | 'normal' | 'high';
+  styleNote?: string;
 }
 
 export interface OpenAIOptions {
@@ -221,7 +222,8 @@ export class OpenAIService {
           ...(doingWebSearch ? [{
             role: 'system' as const,
             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
-          }] : [])
+          }] : []),
+          ...(options.ttsOptions ? [{ role: 'system' as const, content: `This message will be read as TTS. If appropriate, add a little emphasis with italics (wrap with *), bold (wrap with **), and/or UPPERCASE (shouting).` }] : [])
         ],
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
         ...(verbosity && { text: { verbosity } }),
@@ -334,7 +336,7 @@ export class OpenAIService {
         model: instructions.model,
         voice: instructions.voice,
         input: input,
-        instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}`,
+        instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}, Other style notes: ${instructions.styleNote}`,
         response_format: format,
       });
 

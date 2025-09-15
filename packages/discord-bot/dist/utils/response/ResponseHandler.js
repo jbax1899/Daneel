@@ -66,7 +66,7 @@ export class ResponseHandler {
                         name: f.filename
                     }));
                 }
-                logger.debug(`Message options: ${JSON.stringify(messageOptions)}`);
+                //logger.debug(`Message options: ${JSON.stringify(messageOptions)}`);
                 // Send the message
                 messages.push(await this.channel.send(messageOptions));
             }

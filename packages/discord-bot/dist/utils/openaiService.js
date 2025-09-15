@@ -22,6 +22,15 @@ const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
 const IMAGE_DESCRIPTION_MODEL = 'gpt-5-mini';
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
+export const TTS_DEFAULT_OPTIONS = {
+    model: 'gpt-4o-mini-tts',
+    voice: 'echo',
+    speed: 'normal',
+    pitch: 'normal',
+    emphasis: 'moderate',
+    style: 'conversational',
+    styleDegree: 'normal'
+};
 // ====================
 // OpenAI Service Class
 // ====================
@@ -90,7 +99,8 @@ export class OpenAIService {
                     ...(doingWebSearch ? [{
                             role: 'system',
                             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
-                        }] : [])
+                        }] : []),
+                    ...(options.ttsOptions ? [{ role: 'system', content: `This message will be read as TTS, so use appropriate emphasis with italics (mild, wrap with *), bold (strong, wrap with **), and UPPERCASE (shouting).` }] : [])
                 ],
                 ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
                 ...(verbosity && { text: { verbosity } }),
@@ -167,19 +177,20 @@ export class OpenAIService {
             throw error;
         }
     }
-    async generateSpeech(model, voice, input, instructions, filename, format) {
+    async generateSpeech(input, instructions, filename, format) {
         //https://platform.openai.com/docs/guides/text-to-speech
         if (!filename || !/^[\w\-]+$/.test(filename)) {
             throw new Error('Invalid filename. Only alphanumeric characters, hyphens, and underscores are allowed.');
         }
         const outputPath = path.join(TTS_OUTPUT_PATH, `${filename}.${format}`);
         logger.debug(`Generating speech file: ${outputPath}...`);
+        logger.debug(`Using TTS options: ${JSON.stringify(instructions)}`);
         try {
             const mp3 = await this.openai.audio.speech.create({
-                model: model,
-                voice: voice,
+                model: instructions.model,
+                voice: instructions.voice,
                 input: input,
-                instructions: instructions,
+                instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}`,
                 response_format: format,
             });
             const buffer = Buffer.from(await mp3.arrayBuffer());

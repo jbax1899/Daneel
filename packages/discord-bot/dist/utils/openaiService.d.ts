@@ -1,12 +1,19 @@
 import { ActivityOptions } from 'discord.js';
 export type SupportedModel = GPT5ModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
-export type TTSModel = 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
-export type TTSVoice = 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
     content: string;
 }
+export type TTSOptions = {
+    model: 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
+    voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
+    speed?: 'slow' | 'normal' | 'fast';
+    pitch?: 'low' | 'normal' | 'high';
+    emphasis?: 'none' | 'moderate' | 'strong';
+    style?: 'casual' | 'narrative' | 'cheerful' | 'sad' | 'angry' | string;
+    styleDegree?: 'low' | 'normal' | 'high';
+};
 export interface OpenAIOptions {
     reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
     verbosity?: 'low' | 'medium' | 'high';
@@ -22,6 +29,7 @@ export interface OpenAIOptions {
             timezone?: string;
         };
     };
+    ttsOptions?: TTSOptions;
     functions?: Array<{
         name: string;
         description?: string;
@@ -61,13 +69,14 @@ export interface OpenAIResponse {
     };
     newPresence?: ActivityOptions;
 }
+export declare const TTS_DEFAULT_OPTIONS: TTSOptions;
 export declare class OpenAIService {
     private openai;
     defaultModel: SupportedModel;
     constructor(apiKey: string);
     generateResponse(model: SupportedModel | undefined, messages: OpenAIMessage[], options?: OpenAIOptions): Promise<OpenAIResponse>;
     private generateGPT5Response;
-    generateSpeech(model: TTSModel, voice: TTSVoice, input: string, instructions: string, filename: string, format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'): Promise<string>;
+    generateSpeech(input: string, instructions: TTSOptions, filename: string, format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'): Promise<string>;
     generateImageDescription(imageUrl: string, // URL from Discord attachment
     context?: string): Promise<OpenAIResponse>;
     private calculateCost;

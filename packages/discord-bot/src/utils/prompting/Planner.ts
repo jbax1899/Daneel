@@ -45,12 +45,12 @@ const planFunction = {
       action: { 
         type: "string", 
         enum: ["message", "react", "ignore"],
-      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (prefer 'react' over 'ignore')."
+      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as emoji. If replying to the same Discord bot for the second time, 'react' instead), 'ignore' does nothing (prefer 'react' over 'ignore')."
       },
       modality: { 
         type: "string",
         enum: ["text", "tts"],
-        description: "The modality to use. 'text' sends just a text response, 'tts' sends that text response with a TTS speech response. Prefer 'tts' for short/quick/causual responses or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low')."
+        description: "The modality to use. 'text' sends just a text response, 'tts' sends that text response along with a TTS speech response. Prefer 'tts' for short/causual responses or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low')."
       },
       reaction: { 
         type: "string",
@@ -110,7 +110,8 @@ const planFunction = {
               pitch:        { type: "string", enum: ["low", "normal", "high"], description: "Pitch of speech." },
               emphasis:     { type: "string", enum: ["low", "normal", "high"], description: "Level of emphasis." },
               style:        { type: "string", enum: ["casual", "narrative", "cheerful", "sad", "angry"], description: "Speaking style." },
-              styleDegree:  { type: "string", enum: ["low", "normal", "high"], description: "Weight of speaking style." }
+              styleDegree:  { type: "string", enum: ["low", "normal", "high"], description: "Weight of speaking style." },
+              styleNote:    { type: "string", description: "Additional notes about the speaking style." }
             },
             required: ["speed", "pitch", "emphasis", "style", "styleDegree"]
           }
@@ -145,7 +146,7 @@ const planFunction = {
             }
           },
           afk: { type: "boolean", description: "Whether the bot is AFK" },
-          shardId: { type: "number", description: "Shard ID to apply this presence to" }
+          //shardId: { type: "number", description: "Shard ID to apply this presence to" }
         },
         required: ["status"]
       }

@@ -1,4 +1,5 @@
 import { logger } from '../logger.js';
+import { TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 const PLANNING_MODEL = 'gpt-5-mini';
 const PLANNING_OPTIONS = { reasoningEffort: 'medium', verbosity: 'low' };
 const PLAN_SYSTEM_PROMPT = `Only return a function call to "generate-plan"`;
@@ -14,24 +15,25 @@ const defaultPlan = {
             allowedDomains: [],
             searchContextSize: 'low',
             userLocation: { type: 'approximate' }
-        }
+        },
+        ttsOptions: TTS_DEFAULT_OPTIONS
     }
 };
 const planFunction = {
     name: "generate-plan",
-    description: "Generates a structured plan for responding to a message",
+    description: "Generates a structured plan for responding to a message.",
     parameters: {
         type: "object",
         properties: {
             action: {
                 type: "string",
                 enum: ["message", "react", "ignore"],
-                description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (though typically you should prefer 'react' over 'ignore')."
+                description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as a string of emoji), 'ignore' does nothing (prefer 'react' over 'ignore')."
             },
             modality: {
                 type: "string",
                 enum: ["text", "tts"],
-                description: "The modality to use. 'text' sends a text response, 'tts' sends a speech response in addition to the text response. Use 'tts' for casual conversation where 'reasoningEffort' and 'verbosity' are 'minimal' or 'low', or when asked to (but then set 'reasoningEffort' and 'verbosity' to 'low')."
+                description: "The modality to use. 'text' sends just a text response, 'tts' sends that text response with a TTS speech response. Prefer 'tts' for short/quick/causual responses or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low')."
             },
             reaction: {
                 type: "string",
@@ -80,6 +82,20 @@ const planFunction = {
                             }*/
                         },
                         required: ["query", "searchContextSize"]
+                    },
+                    ttsOptions: {
+                        type: "object",
+                        description: "Controls how the TTS response should be generated. Required if 'modality' is 'tts'.",
+                        properties: {
+                            //model:      { type: "string", description: "The model to use for TTS." }, // hardcoded to "gpt-4o-mini-tts" for now
+                            //voice:      { type: "string", description: "The voice to use for TTS." }, // hardcoded to "echo" for now
+                            speed: { type: "string", enum: ["slow", "normal", "fast"], description: "Speed of speech." },
+                            pitch: { type: "string", enum: ["low", "normal", "high"], description: "Pitch of speech." },
+                            emphasis: { type: "string", enum: ["low", "normal", "high"], description: "Level of emphasis." },
+                            style: { type: "string", enum: ["casual", "narrative", "cheerful", "sad", "angry"], description: "Speaking style." },
+                            styleDegree: { type: "string", enum: ["low", "normal", "high"], description: "Weight of speaking style." }
+                        },
+                        required: ["speed", "pitch", "emphasis", "style", "styleDegree"]
                     }
                 },
                 required: ["reasoningEffort", "verbosity", "tool_choice"]
@@ -145,7 +161,9 @@ export class Planner {
             if (funcCall?.arguments) {
                 try {
                     const parsed = JSON.parse(funcCall.arguments);
-                    return this.validatePlan(parsed);
+                    const validatedPlan = this.validatePlan(parsed);
+                    logger.debug(`Validated plan: ${JSON.stringify(validatedPlan)}`);
+                    return validatedPlan;
                 }
                 catch {
                     logger.warn('Failed to parse plan arguments, using default');
@@ -160,16 +178,29 @@ export class Planner {
         }
     }
     validatePlan(plan) {
-        const validatedPlan = { ...defaultPlan, ...plan };
-        // Check that input matches what is expected (and if not, use default)
-        // TODO: Validate better
-        validatedPlan.action = plan.action ? plan.action : defaultPlan.action;
-        validatedPlan.modality = plan.modality ? plan.modality : defaultPlan.modality;
-        validatedPlan.reaction = plan.reaction ? plan.reaction : defaultPlan.reaction;
-        validatedPlan.openaiOptions = plan.openaiOptions ? plan.openaiOptions : defaultPlan.openaiOptions;
-        validatedPlan.presence = plan.presence ? plan.presence : defaultPlan.presence;
-        logger.debug(`Plan validated: ${JSON.stringify(validatedPlan)}`);
-        return validatedPlan;
+        // Create a deep copy of defaultPlan to avoid mutating it
+        const validatedPlan = JSON.parse(JSON.stringify(defaultPlan));
+        // Merge the plan properties, ensuring nested objects are properly merged
+        if (plan.openaiOptions) {
+            validatedPlan.openaiOptions = {
+                ...validatedPlan.openaiOptions,
+                ...plan.openaiOptions,
+                // Ensure ttsOptions is properly merged if it exists
+                ...(plan.openaiOptions.ttsOptions ? {
+                    ttsOptions: {
+                        ...validatedPlan.openaiOptions.ttsOptions,
+                        ...plan.openaiOptions.ttsOptions
+                    }
+                } : {})
+            };
+        }
+        // Merge other top-level properties
+        return {
+            ...validatedPlan,
+            ...plan,
+            // Ensure we keep the merged openaiOptions
+            openaiOptions: validatedPlan.openaiOptions
+        };
     }
 }
 //# sourceMappingURL=Planner.js.map
