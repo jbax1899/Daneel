@@ -38,6 +38,7 @@ export class MessageCreate extends Event {
   private readonly CATCHUP_AFTER_MESSAGES = 10;             // After X messages, do a catchup
   private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = 5; // After X messages, if mentioned, do a catchup
   private lastMessageCount = 0;                             // Tracks the number of messages since the last catchup
+  private readonly ALLOWED_THREAD_IDS = ['1407811416244617388']; //TODO: hoist this to config
 
   /**
    * Creates an instance of MentionBotEvent
@@ -58,6 +59,11 @@ export class MessageCreate extends Event {
    * @returns {Promise<void>}
    */
   public async execute(message: Message): Promise<void> {
+    // Check if the message is in a thread, and if so, if it's in an allowed thread
+    if (this.disallowedThread(message)) {
+      return;
+    }
+
     // If we just posted a message, reset the counter, and ignore self
     if (message.author.id === message.client.user!.id) {
       this.lastMessageCount = 0;
@@ -114,6 +120,16 @@ export class MessageCreate extends Event {
     const isReplyingToBot = message.mentions.repliedUser?.id === message.client.user!.id;
     
     return isSameChannel && isReplyingToBot;
+  }
+
+  /**
+   * Checks if A. the message is in a thread, and B. the thread is in a disallowed thread.
+   * @private
+   * @param {Message} message - The message to check
+   * @returns {boolean} True if the message is in a disallowed thread, false otherwise
+   */
+  private disallowedThread(message: Message): boolean {
+    return message.channel.isThread() && !this.ALLOWED_THREAD_IDS.includes(message.channel.id);
   }
 
   /**

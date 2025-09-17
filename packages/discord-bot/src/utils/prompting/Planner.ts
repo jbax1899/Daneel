@@ -45,7 +45,7 @@ const planFunction = {
       action: { 
         type: "string", 
         enum: ["message", "react", "ignore"],
-      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as emoji, or if replying to a Discord bot for the second time), 'ignore' does nothing (prefer 'react' over 'ignore')."
+      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as emoji, and always if replying to another Discord bot), 'ignore' does nothing (prefer 'react' over 'ignore')."
       },
       modality: { 
         type: "string",

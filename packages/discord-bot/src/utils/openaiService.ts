@@ -10,8 +10,11 @@ import { ActivityOptions } from 'discord.js';
 // Type Declarations
 // ====================
 
-export type SupportedModel = GPT5ModelType; 
+export type SupportedModel = GPT5ModelType | ImageGenerationModelType; 
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
+export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
+export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
 
 export interface OpenAIMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
@@ -119,7 +122,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
-const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
+export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
+
+export const DEFAULT_IMAGE_GENERATION_MODEL: SupportedModel = 'gpt-image-1';
+export const DEFAULT_IMAGE_GENERATION_RESOLUTION: ImageGenerationResolutionType = '1024x1024';
+export const DEFAULT_IMAGE_GENERATION_QUALITY: ImageGenerationQualityType = 'low';
 
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 
@@ -151,11 +158,11 @@ export class OpenAIService {
     messages: OpenAIMessage[],
     options: OpenAIOptions = {}
   ): Promise<OpenAIResponse> {
-    return this.generateGPT5Response(model, messages, options);
+    return this.generateGPT5Response(model as GPT5ModelType, messages, options);
   }
 
   private async generateGPT5Response(
-    model: SupportedModel,
+    model: GPT5ModelType,
     messagesInput: OpenAIMessage[],
     options: OpenAIOptions
   ): Promise<OpenAIResponse> {
@@ -412,7 +419,7 @@ export class OpenAIService {
           cost: this.calculateCost(
             chatResponse.usage.prompt_tokens || 0,
             chatResponse.usage.completion_tokens || 0,
-            IMAGE_DESCRIPTION_MODEL
+            IMAGE_DESCRIPTION_MODEL as GPT5ModelType
           )
         } : undefined
       };
@@ -424,12 +431,18 @@ export class OpenAIService {
     }
   }
 
-  private calculateCost(inputTokens: number, outputTokens: number, model: SupportedModel): string {
+  private calculateCost(inputTokens: number, outputTokens: number, model: GPT5ModelType): string {
     const pricing = GPT5_PRICING[model];
     const inputCost = (inputTokens / 1_000_000) * pricing.input;
     const outputCost = (outputTokens / 1_000_000) * pricing.output;
     return `$${(inputCost + outputCost).toFixed(6)}`;
   }
+
+  /*
+  public async generateImage(prompt: string, model?: ImageGenerationModelType): Promise<Buffer> {
+    //TODO
+  }
+  */
 }
 
 async function ensureDirectories(): Promise<void> {

@@ -256,7 +256,7 @@ export class MessageProcessor {
           .replace(/T/, ' ')
           .replace(/\..+/, '')
           .slice(0, -3); // Trim to minutes
-        let formattedMessage = `[${messageIndex++}] At ${timestamp} ${m.author.username}${displayName !== m.author.username ? `/${displayName}` : ''} said: "${m.content}"`;
+        let formattedMessage = `[${messageIndex++}] At ${timestamp} ${m.author.username}${displayName !== m.author.username ? `/${displayName}` : ''}${isBot ? ' (bot)' : ''} said: "${m.content}"`;
       
         // If this is the replied message, set the replied message index
         if (repliedMessage && m.id === repliedMessage.id) {
