@@ -9,16 +9,19 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 ## Features
 
 ### 🤖 Discord Bot
-- Powered by Discord.js 14 with TypeScript
-- Custom command handling, event management, and message processing pipelines
-- Robust error handling, logging, and rate limiting options
+- Rich bot features with a user-friendly interface (Discord API / Discord.js)
+- Command handling, event management, and message processing pipelines
+- OpenAI message processing
+- Image analysis
 - Text-to-speech (TTS) generation
-- Detailed image analysis
-- /news command: Fetches recent articles from across the web with optional parameters query, category, max_results, allowed_domains, reasoning_effort, verbosity
+- /news command: Fetches recent articles from across the web; Optional arguments for refining search
+- /image command: Generates an image given a prompt; Optional argument for dimensions (square, portrait, landscape)
 
 <img width="900" height="362" alt="image" src="https://github.com/user-attachments/assets/b0ce1cc3-e388-408d-9574-4fdc40d540fc" />
 <img width="909" height="953" alt="image" src="https://github.com/user-attachments/assets/49cd2df9-ec29-4eee-85bb-2a77f6ba8537" />
 <img width="892" height="766" alt="image" src="https://github.com/user-attachments/assets/ccd154a8-bb8a-453e-b15c-07f994f741f6" />
+<img width="567" height="540" alt="image" src="https://github.com/user-attachments/assets/c33798c7-091f-4fba-b483-6231beb0ed8d" />
+
 
 ### 🌐 Web Client
 - Next.js 15 with React 19
