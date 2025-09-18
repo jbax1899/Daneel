@@ -1,6 +1,10 @@
 import { ActivityOptions } from 'discord.js';
-export type SupportedModel = GPT5ModelType;
+export type SupportedModel = GPT5ModelType | ImageGenerationModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
+export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
+export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
+export type EmbeddingModelType = 'text-embedding-ada-002';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
     content: string;
@@ -13,6 +17,7 @@ export type TTSOptions = {
     emphasis?: 'none' | 'moderate' | 'strong';
     style?: 'casual' | 'narrative' | 'cheerful' | 'sad' | 'angry' | string;
     styleDegree?: 'low' | 'normal' | 'high';
+    styleNote?: string;
 };
 export interface OpenAIOptions {
     reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
@@ -69,6 +74,11 @@ export interface OpenAIResponse {
     };
     newPresence?: ActivityOptions;
 }
+export declare const IMAGE_DESCRIPTION_MODEL: SupportedModel;
+export declare const DEFAULT_IMAGE_GENERATION_MODEL: SupportedModel;
+export declare const DEFAULT_IMAGE_GENERATION_RESOLUTION: ImageGenerationResolutionType;
+export declare const DEFAULT_IMAGE_GENERATION_QUALITY: ImageGenerationQualityType;
+export declare const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType;
 export declare const TTS_DEFAULT_OPTIONS: TTSOptions;
 export declare class OpenAIService {
     private openai;
@@ -80,4 +90,10 @@ export declare class OpenAIService {
     generateImageDescription(imageUrl: string, // URL from Discord attachment
     context?: string): Promise<OpenAIResponse>;
     private calculateCost;
+    /**
+     * Embeds text using the default embedding model.
+     * @param text The text to embed.
+     * @returns A Promise that resolves to an array of numbers representing the embedding.
+     */
+    embedText(text: string): Promise<number[]>;
 }

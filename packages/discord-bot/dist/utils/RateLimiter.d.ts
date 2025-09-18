@@ -18,6 +18,7 @@ interface RateLimitOptions {
 export declare class RateLimiter {
     private readonly limits;
     private readonly options;
+    private readonly lastImageGenerationByUser;
     /**
      * Creates a new RateLimiter instance.
      * @param {RateLimitOptions} options - Configuration options for the rate limiter
@@ -36,6 +37,16 @@ export declare class RateLimiter {
      * @returns {{allowed: boolean, retryAfter?: number, error?: string}} Result of the rate limit check
      */
     check(userId: string, channelId: string, guildId?: string): {
+        allowed: boolean;
+        retryAfter?: number;
+        error?: string;
+    };
+    /**
+     * Checks if a request to generate an image (/image) is allowed based on the rate limit rules.
+     * @param {string} userId - The ID of the user making the request
+     * @returns {{allowed: boolean, retryAfter?: number, error?: string}} Result of the rate limit check
+     */
+    checkRateLimitImageCommand(userId: string): {
         allowed: boolean;
         retryAfter?: number;
         error?: string;
@@ -72,4 +83,5 @@ export declare function createChannelRateLimiter(limit: number, window: number):
  * @returns A RateLimiter instance configured for guild-level limiting
  */
 export declare function createGuildRateLimiter(limit: number, window: number): RateLimiter;
+export declare const imageCommandRateLimiter: RateLimiter;
 export {};

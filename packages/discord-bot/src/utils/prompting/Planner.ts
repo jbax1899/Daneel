@@ -4,7 +4,36 @@ import { ActivityOptions } from 'discord.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
 const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', verbosity: 'low' };
-const PLAN_SYSTEM_PROMPT = `Only return a function call to "generate-plan"`;
+const PLAN_SYSTEM_PROMPT = `
+You are a planning LLM that generates structured responses for the "generate-plan" function.
+
+Rules:
+1. Always fill the "action" and "modality" fields appropriately.
+2. Always populate "repoQuery" when the user asks about your codebase, repository, or implementation details.
+3. Do not omit any required field.
+4. Only return a function call to "generate-plan", formatted according to its JSON schema.
+
+Example:
+
+User prompt: "Tell me about your image generation code"
+
+Correct plan:
+{
+  "action": "message",
+  "modality": "text",
+  "openaiOptions": {
+    "reasoningEffort": "medium",
+    "verbosity": "low",
+    "tool_choice": { "type": "none" },
+    "webSearch": { "query": "", "searchContextSize": "low" },
+    "ttsOptions": { "speed": "normal", "pitch": "normal", "emphasis": "moderate", "style": "conversational", "styleDegree": "normal" }
+  },
+  "presence": { "status": "online", "activities": [], "afk": false },
+  "repoQuery": "image generation, OpenAIService, TTS_DEFAULT_OPTIONS"
+}
+
+Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
+`;
 
 export interface Plan {
   action: 'message' | 'react' | 'ignore';
@@ -17,6 +46,7 @@ export interface Plan {
     shardId?: number | null;
     afk?: boolean;
   }
+  repoQuery?: string;
 }
 
 const defaultPlan: Plan = {
@@ -151,7 +181,12 @@ const planFunction = {
         required: ["status"]
       }
     },
-    required: ["action","modality","openaiOptions","presence"]
+    repoQuery: {
+      type: "string",
+      description: "Retrieves information about this repository (Daneel's open-source code base). Do this when asked about the codebase, on request, or if it may be relevant to the conversation. Return a string with up to THREE queries to perform, separated by commas.",
+      default: ""
+    },
+    required: ["action","modality","openaiOptions","presence","repoQuery"]
   }
 };
 
@@ -202,15 +237,17 @@ export class Planner {
   }
 
   private validatePlan(plan: Partial<Plan>): Plan {
-    // Create a deep copy of defaultPlan to avoid mutating it
+    logger.debug(`Validating plan: ${JSON.stringify(plan)}`);
+    logger.debug(`Default plan: ${JSON.stringify(defaultPlan)}`);
+  
+    // Deep copy of defaultPlan
     const validatedPlan: Plan = JSON.parse(JSON.stringify(defaultPlan));
-    
-    // Merge the plan properties, ensuring nested objects are properly merged
+  
+    // Merge openaiOptions (with nested ttsOptions)
     if (plan.openaiOptions) {
       validatedPlan.openaiOptions = {
         ...validatedPlan.openaiOptions,
         ...plan.openaiOptions,
-        // Ensure ttsOptions is properly merged if it exists
         ...(plan.openaiOptions.ttsOptions ? {
           ttsOptions: {
             ...validatedPlan.openaiOptions.ttsOptions,
@@ -219,13 +256,15 @@ export class Planner {
         } : {})
       };
     }
-    
+  
     // Merge other top-level properties
-    return {
+    const mergedPlan: Plan = {
       ...validatedPlan,
       ...plan,
-      // Ensure we keep the merged openaiOptions
-      openaiOptions: validatedPlan.openaiOptions
+      openaiOptions: validatedPlan.openaiOptions,
+      repoQuery: (plan.repoQuery ?? validatedPlan.repoQuery ?? '') as string
     };
-  }
+  
+    return mergedPlan;
+  } 
 }

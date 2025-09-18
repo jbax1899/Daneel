@@ -11,6 +11,8 @@ export declare class MessageProcessor {
     private readonly openaiService;
     private readonly planner;
     private readonly rateLimiters;
+    private readonly pineconeClient;
+    private readonly repoIndex;
     constructor(options: MessageProcessorOptions);
     /**
      *

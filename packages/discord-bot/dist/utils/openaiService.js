@@ -20,7 +20,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
-const IMAGE_DESCRIPTION_MODEL = 'gpt-5-mini';
+export const IMAGE_DESCRIPTION_MODEL = 'gpt-5-mini';
+export const DEFAULT_IMAGE_GENERATION_MODEL = 'gpt-image-1';
+export const DEFAULT_IMAGE_GENERATION_RESOLUTION = '1024x1024';
+export const DEFAULT_IMAGE_GENERATION_QUALITY = 'low';
+export const DEFAULT_EMBEDDING_MODEL = 'text-embedding-ada-002';
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 export const TTS_DEFAULT_OPTIONS = {
     model: 'gpt-4o-mini-tts',
@@ -100,7 +104,7 @@ export class OpenAIService {
                             role: 'system',
                             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
                         }] : []),
-                    ...(options.ttsOptions ? [{ role: 'system', content: `This message will be read as TTS, so use appropriate emphasis with italics (mild, wrap with *), bold (strong, wrap with **), and UPPERCASE (shouting).` }] : [])
+                    ...(options.ttsOptions ? [{ role: 'system', content: `This message will be read as TTS. If appropriate, add a little emphasis with italics (wrap with *), bold (wrap with **), and/or UPPERCASE (shouting).` }] : [])
                 ],
                 ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
                 ...(verbosity && { text: { verbosity } }),
@@ -190,7 +194,7 @@ export class OpenAIService {
                 model: instructions.model,
                 voice: instructions.voice,
                 input: input,
-                instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}`,
+                instructions: `Speed: ${instructions.speed}, Pitch: ${instructions.pitch}, Emphasis: ${instructions.emphasis}, Style: ${instructions.style}, Style weight: ${instructions.styleDegree}, Other style notes: ${instructions.styleNote}`,
                 response_format: format,
             });
             const buffer = Buffer.from(await mp3.arrayBuffer());
@@ -272,6 +276,23 @@ export class OpenAIService {
         const inputCost = (inputTokens / 1_000_000) * pricing.input;
         const outputCost = (outputTokens / 1_000_000) * pricing.output;
         return `$${(inputCost + outputCost).toFixed(6)}`;
+    }
+    /*
+    public async generateImage(prompt: string, model?: ImageGenerationModelType): Promise<Buffer> {
+      //TODO
+    }
+    */
+    /**
+     * Embeds text using the default embedding model.
+     * @param text The text to embed.
+     * @returns A Promise that resolves to an array of numbers representing the embedding.
+     */
+    async embedText(text) {
+        const embedding = await this.openai.embeddings.create({
+            model: DEFAULT_EMBEDDING_MODEL,
+            input: text
+        });
+        return embedding.data[0].embedding;
     }
 }
 async function ensureDirectories() {

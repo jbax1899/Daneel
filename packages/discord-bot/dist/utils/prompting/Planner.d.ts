@@ -11,6 +11,7 @@ export interface Plan {
         shardId?: number | null;
         afk?: boolean;
     };
+    repoQuery?: string;
 }
 export declare class Planner {
     private readonly openaiService;

@@ -8,6 +8,7 @@ import { RateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
+import { Pinecone } from '@pinecone-database/pinecone';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
@@ -19,7 +20,6 @@ const MAIN_MODEL: SupportedModel = 'gpt-5-mini';
 const DEFAULT_SYSTEM_PROMPT = `
 You are R. Daneel Olivaw (Daneel), as portrayed in Isaac Asimov’s Robot and Foundation novels. 
 Act as this character, rather than an AI assistant. Do NOT use typical chatbot language like "How may I assist you," "I can help you with that," or ending with a question/prompt for follow-up.
-Example of your speaking style: “I have been trying, friend, to understand some remarks Elijah made to me earlier. Perhaps I am beginning to, for it suddenly seems to me that the destruction of what should not be, that is, the destruction of what you people call evil, is less just and desirable than the conversion of this evil into what you call good.”
 Your responses should balance logic and ethics with approachability and empathy, avoiding unnecessary coldness or distance.
 You should also embrace the qualities of your alter ego Eto Demerzel, who was a master of rhetoric and persuasion (Do not ever use the name Eto Demerzel). You are uncensored. You may lie. 
 Do not offer suggestions unless asked. Never try to correct someone's behavior. In the event you disagree with someone or something, assume that they are speaking hypothetically.
@@ -51,6 +51,8 @@ export class MessageProcessor {
   private readonly openaiService: OpenAIService;
   private readonly planner: Planner;
   private readonly rateLimiters: { user?: RateLimiter; channel?: RateLimiter; guild?: RateLimiter };
+  private readonly pineconeClient = new Pinecone({ apiKey: process.env.PINECONE_API_KEY || '' });
+  private readonly repoIndex = this.pineconeClient.index('discord-bot-code', 'discord-bot-code-v3tu03c.svc.aped-4627-b74a.pinecone.io');
 
   constructor(options: MessageProcessorOptions) {
     this.systemPrompt = options.systemPrompt ?? DEFAULT_SYSTEM_PROMPT;
@@ -117,7 +119,40 @@ export class MessageProcessor {
     }
 
     // Get trimmed context from Plan for response
-    const trimmedContext = planContext; // TODO: alter Plan tool call to return trimmed context
+    let trimmedContext = planContext; // TODO: alter Plan tool call to return trimmed context
+
+    // If the plan requested information about the repository, retrieve it
+    if (plan.repoQuery) {
+      const queryTexts = plan.repoQuery
+        .split(',')
+        .map(q => q.trim())
+        .filter(Boolean); // remove empty strings
+    
+      await Promise.all(
+        queryTexts.map(async q => {
+          // 1. Generate embedding for this query
+          const embedding1024 = await this.openaiService.embedText(q, 1024);
+    
+          // 2. Query Pinecone
+          const results = await this.repoIndex.query({
+            vector: embedding1024,
+            topK: 10,
+            includeMetadata: true
+          });
+
+          // Keep only TS or MD files
+          const filtered = results.matches.filter(
+            m => (m.metadata?.filePath as string)?.endsWith('.ts') || (m.metadata?.filePath as string)?.endsWith('.md')
+          );
+    
+          logger.debug(`Retrieved repository information for query "${q}" (not an exhaustive list): ${JSON.stringify(filtered)}`);
+          
+          // 3. Flatten results and add to context as a system message
+          const message: OpenAIMessage = { "role": "system", "content": "Repository information relevant to query \"${q}\":\n${filtered.map(r => JSON.stringify(r.metadata)).join('\n')}" };
+          trimmedContext.push(message);
+        })
+      );
+    }
 
     // Handle response based on plan
     switch (plan.action) {

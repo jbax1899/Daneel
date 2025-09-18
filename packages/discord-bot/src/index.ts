@@ -6,6 +6,8 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
+//import express from 'express'; // For webhook
+//import bodyParser from "body-parser"; // For webhook
 
 // ====================
 // Environment Setup
@@ -82,6 +84,7 @@ const eventManager = new EventManager(client, {
 // ====================
 // Process Handlers
 // ====================
+
 // Client ready handler
 client.once(Events.ClientReady, () => {
   logger.info(`Logged in as ${client.user?.tag}`);
@@ -127,7 +130,9 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 });
 
-// Handle uncaught exceptions
+// ====================
+// Handle Uncaught Exceptions
+// ====================
 process.on('unhandledRejection', (error: Error) => {
   logger.error('Unhandled promise rejection:', error);
 });
@@ -136,3 +141,36 @@ process.on('uncaughtException', (error: Error) => {
   logger.error('Uncaught exception:', error);
   process.exit(1);
 });
+
+// ====================
+// GitHub Webhook Server
+// ====================
+//TODO: Need to implement system of actually updating the vector database with the changes. Currently the system is just to delete/replace the entire database.
+/*
+const appServer = express();
+appServer.use(bodyParser.json());
+
+appServer.post("/github-webhook", async (req, res) => {
+  try {
+    const { ref, commits } = req.body;
+    console.log(`Push detected on ${ref}`);
+
+    const changedFiles = commits.flatMap((c: any) => [...c.added, ...c.modified]);
+    console.log(`Changed files: ${changedFiles.join(', ')}`);
+
+    // Trigger reindexing asynchronously
+    // TODO
+
+    res.sendStatus(200);
+  } catch (err) {
+    console.error("Webhook processing error:", err);
+    res.sendStatus(500);
+  }
+});
+
+// Start Express server
+const WEBHOOK_PORT = process.env.WEBHOOK_PORT || 3000;
+appServer.listen(WEBHOOK_PORT, () => {
+  console.log(`GitHub webhook server listening on port ${WEBHOOK_PORT}`);
+});
+*/

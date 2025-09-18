@@ -32,6 +32,7 @@ export declare class MessageCreate extends Event {
     private readonly CATCHUP_AFTER_MESSAGES;
     private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES;
     private lastMessageCount;
+    private readonly ALLOWED_THREAD_IDS;
     /**
      * Creates an instance of MentionBotEvent
      * @param {Dependencies} dependencies - Required dependencies including OpenAI configuration
@@ -58,6 +59,13 @@ export declare class MessageCreate extends Event {
      * @returns {boolean} True if the message is a reply to the bot, false otherwise
      */
     private isReplyToBot;
+    /**
+     * Checks if A. the message is in a thread, and B. the thread is in a disallowed thread.
+     * @private
+     * @param {Message} message - The message to check
+     * @returns {boolean} True if the message is in a disallowed thread, false otherwise
+     */
+    private disallowedThread;
     /**
      * Handles errors that occur during message processing.
      * Logs the error and attempts to notify the user.

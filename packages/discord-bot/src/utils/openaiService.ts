@@ -15,6 +15,7 @@ export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
 export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
 export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
+export type EmbeddingModelType = 'text-embedding-3-small'; // Dimensions: 1546
 
 export interface OpenAIMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
@@ -127,6 +128,8 @@ export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
 export const DEFAULT_IMAGE_GENERATION_MODEL: SupportedModel = 'gpt-image-1';
 export const DEFAULT_IMAGE_GENERATION_RESOLUTION: ImageGenerationResolutionType = '1024x1024';
 export const DEFAULT_IMAGE_GENERATION_QUALITY: ImageGenerationQualityType = 'low';
+
+export const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType = 'text-embedding-3-small';
 
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 
@@ -443,6 +446,20 @@ export class OpenAIService {
     //TODO
   }
   */
+
+  /**
+   * Embeds text using the default embedding model.
+   * @param text The text to embed.
+   * @returns A Promise that resolves to an array of numbers representing the embedding.
+   */
+  public async embedText(text: string, dimensions: number = 1024): Promise<number[]> {
+    const embedding = await this.openai.embeddings.create({
+      model: DEFAULT_EMBEDDING_MODEL,
+      input: text,
+      dimensions
+    });
+    return embedding.data[0].embedding;
+  }
 }
 
 async function ensureDirectories(): Promise<void> {

@@ -20,6 +20,7 @@ export class MessageCreate extends Event {
     CATCHUP_AFTER_MESSAGES = 10; // After X messages, do a catchup
     CATCHUP_IF_MENTIONED_AFTER_MESSAGES = 5; // After X messages, if mentioned, do a catchup
     lastMessageCount = 0; // Tracks the number of messages since the last catchup
+    ALLOWED_THREAD_IDS = ['1407811416244617388']; //TODO: hoist this to config
     /**
      * Creates an instance of MentionBotEvent
      * @param {Dependencies} dependencies - Required dependencies including OpenAI configuration
@@ -38,6 +39,10 @@ export class MessageCreate extends Event {
      * @returns {Promise<void>}
      */
     async execute(message) {
+        // Check if the message is in a thread, and if so, if it's in an allowed thread
+        if (this.disallowedThread(message)) {
+            return;
+        }
         // If we just posted a message, reset the counter, and ignore self
         if (message.author.id === message.client.user.id) {
             this.lastMessageCount = 0;
@@ -88,6 +93,15 @@ export class MessageCreate extends Event {
             message.reference.channelId === message.channelId;
         const isReplyingToBot = message.mentions.repliedUser?.id === message.client.user.id;
         return isSameChannel && isReplyingToBot;
+    }
+    /**
+     * Checks if A. the message is in a thread, and B. the thread is in a disallowed thread.
+     * @private
+     * @param {Message} message - The message to check
+     * @returns {boolean} True if the message is in a disallowed thread, false otherwise
+     */
+    disallowedThread(message) {
+        return message.channel.isThread() && !this.ALLOWED_THREAD_IDS.includes(message.channel.id);
     }
     /**
      * Handles errors that occur during message processing.
