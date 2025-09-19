@@ -233,7 +233,8 @@ export class OpenAIService {
             role: 'system' as const,
             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
           }] : []),
-          ...(options.ttsOptions ? [{ role: 'system' as const, content: `This message will be read as TTS. If appropriate, add a little emphasis with italics (wrap with *), bold (wrap with **), and/or UPPERCASE (shouting).` }] : [])
+          //...(options.ttsOptions ? [{ role: 'system' as const, content: `This message will be read as TTS. If appropriate, add a little emphasis with italics (wrap with *), bold (wrap with **), and/or UPPERCASE (shouting).` }] : []) 
+          //TODO: Always apppended, even if not tts
         ],
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
         ...(verbosity && { text: { verbosity } }),
