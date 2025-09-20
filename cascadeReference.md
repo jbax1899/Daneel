@@ -23,34 +23,6 @@ Some rules to follow (for Cascade):
 3. [Packages](#packages)
 4. [Architecture](#architecture)
 
-## Project Status
-
-### Current Phase: Core Functionality (Q3 2025)
-- [x] Set up monorepo structure
-- [x] Implement basic Discord bot with slash commands
-- [x] Create Next.js frontend with basic chat interface
-- [x] Set up CI/CD pipeline with GitHub Actions
-- [x] Create a basic Discord bot with slash commands
-- [x] Create a basic frontend with chat interface
-- [x] Implement MessageProcessor for handling message flow
-- [x] Add PromptBuilder for AI context management
-- [x] Implement ResponseHandler for centralized response management
-- [x] Implement rate limiting system with user, channel, and guild limits
-- [x] Upgrade to GPT-5 for improved responses
-- [x] Add detailed token usage tracking and cost estimation
-- [X] Custom embed builder
-- [X] LLM pre-pass system
-- [X] Allow the bot to respond to other bots
-- [X] Allow the bot to respond to plaintext name
-- [X] Audio generation (TTS)
-- [X] Image context processing
-- [X] Web search
-- [ ] Plan refines context
-- [ ] Cache chain of thought
-- [ ] DM-based, opt-in memory
-- [ ] Live voice chat via Discord call
-
-
 ## Technical Stack
 
 ### Core

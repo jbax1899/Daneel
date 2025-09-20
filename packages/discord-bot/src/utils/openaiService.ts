@@ -181,6 +181,15 @@ export class OpenAIService {
         }]
       }));
 
+      // Validate messages before sending to OpenAI
+      const validMessages = messages.filter(msg => {
+        if (!msg.content || typeof msg.content[0].text !== 'string' || msg.content[0].text.trim() === '') {
+          logger.warn(`Filtering out invalid message: ${JSON.stringify(msg)}`);
+          return false;
+        }
+        return true;
+      });
+
       const tools: any[] = []; // Initialize tools array
       const doingWebSearch = typeof options.tool_choice === 'object' && 
                               options.tool_choice !== null && 
@@ -188,7 +197,6 @@ export class OpenAIService {
       
       // Add web search tool if enabled
       if (doingWebSearch) {
-        // Create web search tool
         const webSearchTool: any = {
           type: 'web_search',
         };
@@ -228,7 +236,7 @@ export class OpenAIService {
       const requestPayload: any = {
         model,
         input: [
-          ...messages,
+          ...validMessages,
           ...(doingWebSearch ? [{
             role: 'system' as const,
             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
@@ -442,12 +450,6 @@ export class OpenAIService {
     return `$${(inputCost + outputCost).toFixed(6)}`;
   }
 
-  /*
-  public async generateImage(prompt: string, model?: ImageGenerationModelType): Promise<Buffer> {
-    //TODO
-  }
-  */
-
   /**
    * Embeds text using the default embedding model.
    * @param text The text to embed.
@@ -460,6 +462,100 @@ export class OpenAIService {
       dimensions
     });
     return embedding.data[0].embedding;
+  }
+
+  /**
+   * Reduces the provided array of OpenAI messages to minimal summaries.
+   * If the input string is sufficiently short, it is returned as-is.
+   * Otherwise, it is summarized.
+   * @param context The context to reduce.
+   * @returns The reduced context.
+   */
+  public async reduceContext(context: OpenAIMessage[]): Promise<OpenAIMessage[]> {
+    /*
+    * How it works: 
+    * 1. Iterate over the input context. For each string:
+    *    a. If the string is less than REDUCE_OVER_N_CHARCTERS, pass it through unchanged
+    *    b. Otherwise the string is big and needs summarizing: Store the index of the message to summarize later
+    * 2. If there are any messages that need summarizing, summarize them all at once with an LLM call
+    * 3. Return the reduced context
+    */
+   // TODO: Output is inconsistent - We usually get the warning "number of summaries does not match number of messages to summarize". Consider implementing a tool call to get consistent output.
+
+    const REDUCE_OVER_N_CHARCTERS = 256;
+    const REDUCTION_MODEL: GPT5ModelType = 'gpt-5-nano';
+    const SYSTEM_PROMPT = `You are a helpful assistant that summarizes text to reduce token usage.
+    You will recieve a list of messages, and you must summarize each.
+    You will return a single string with each summary prefixed like [reduced-0], [reduced-1], etc.
+    Pass through the original timestamp and username/nickname of the user who said the message.
+    Do not include any additional text or formatting in your response.
+    The summarized strings must be returned in the order given.`;
+
+    let reducedContext = context; // Set the initial value of reducedContext to the input context; we'll modify it in place
+    let messageIndexesToReduce: number[] = []; // We'll store the index of large messages that need summarizing, so we can summarize all at once
+
+    // Iterate over the input context. For each string:
+    for (let i = 0; i < context.length; i++) {
+      // If the string is less than REDUCE_OVER_N_CHARCTERS, pass it through unchanged
+      if (context[i].content.length < REDUCE_OVER_N_CHARCTERS) { continue; }
+      else {
+        // Otherwise the string is big and needs summarizing: Store the index of the message to summarize later
+        messageIndexesToReduce.push(i);
+      }
+    }
+
+    // If there are any messages that need summarizing, summarize them all at once
+    if (messageIndexesToReduce.length > 0) {
+      logger.debug(`Reducing context for ${messageIndexesToReduce.length} messages`);
+
+      // Give the LLM a list of strings delimited by newlines, and ask it to summarize each and return it in the same order/format
+      const messagesToSummarize = messageIndexesToReduce.map(i => context[i]);
+      try {
+        const response = await this.openai.chat.completions.create({
+          model: REDUCTION_MODEL,
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT },
+            { role: "user", content: messagesToSummarize.map(m => m.content).join('\n\n') }
+          ]
+        });
+
+        // Summaries recieved - replace the original messages with the summaries
+        if (response.choices[0].message.content) {
+          logger.debug(`Original context: ${JSON.stringify(context)}`);
+          logger.debug(`Summaries: ${JSON.stringify(response.choices[0].message.content)}`);
+
+          // Split the response into an array of strings delimited by [reduced-#]
+          const summaries = response.choices[0].message.content.split('[reduced-');
+
+          // Ensure that the number of summaries matches the number of messages to summarize
+          if (summaries.length !== messageIndexesToReduce.length) {
+            logger.warn(`Number of summaries (${summaries.length}) does not match number of messages to summarize (${messageIndexesToReduce.length})`);
+          }
+          
+          // Replace the original messages with the summaries, preserving the original role, and noting that it was summarized
+          for (let i = 0; i < messageIndexesToReduce.length; i++) {
+            reducedContext[messageIndexesToReduce[i]] = { 
+              role: context[messageIndexesToReduce[i]].role, 
+              content: `<summarized> ${summaries[i]}`
+            };
+          }
+
+          logger.debug(`Reduced context: ${JSON.stringify(reducedContext)}`);
+
+          // Log the estimated cost of the reduction
+          const inputTokens = response.usage?.prompt_tokens || 0;
+          const outputTokens = response.usage?.completion_tokens || 0;
+          const estimatedCost = this.calculateCost(inputTokens, outputTokens, REDUCTION_MODEL as GPT5ModelType);
+          logger.debug(`Estimated cost of reduction: ${estimatedCost}`);
+        }
+      } catch (error) {
+        logger.error('Error reducing context:', error);
+      }
+    } else {
+      logger.debug('No messages to summarize');
+    }
+    
+    return reducedContext;
   }
 }
 

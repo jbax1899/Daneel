@@ -77,10 +77,13 @@ export class MessageCreate extends Event {
 
     try {
       // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
-      if (this.isBotMentioned(message) || this.isReplyToBot(message)) {
-        
+      if (this.isBotMentioned(message)) {
         logger.debug(`Responding to mention in message ID: ${message.id}`);
-        await this.messageProcessor.processMessage(message, true);
+        await this.messageProcessor.processMessage(message, true, `Daneel was mentioned with a direct ping`);
+      }
+      else if (this.isReplyToBot(message)) {
+        logger.debug(`Responding to reply in message ID: ${message.id}`);
+        await this.messageProcessor.processMessage(message, true, `Daneel was replied to with a direct reply`);
       }
       // If we are within the catchup threshold, catch up
       else if (
@@ -89,7 +92,7 @@ export class MessageCreate extends Event {
       ) {
         logger.debug(`Catching up to message ID: ${message.id}`);
         this.lastMessageCount = 0;
-        await this.messageProcessor.processMessage(message, false); // Do not direct-reply to anyone when catching up
+        await this.messageProcessor.processMessage(message, false, 'enough messages have passed since Daneel last replied'); // Do not direct-reply to anyone when catching up
       }
     } catch (error) {
       await this.handleError(error, message);

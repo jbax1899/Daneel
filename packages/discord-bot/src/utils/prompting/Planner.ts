@@ -3,37 +3,12 @@ import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedM
 import { ActivityOptions } from 'discord.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
-const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', verbosity: 'low' };
-const PLAN_SYSTEM_PROMPT = `
-You are a planning LLM that generates structured responses for the "generate-plan" function.
-
-Rules:
-1. Always fill the "action" and "modality" fields appropriately.
-2. Always populate "repoQuery" when the user asks about your codebase, repository, or implementation details.
-3. Do not omit any required field.
-4. Only return a function call to "generate-plan", formatted according to its JSON schema.
-
-Example:
-
-User prompt: "Tell me about your image generation code"
-
-Correct plan:
-{
-  "action": "message",
-  "modality": "text",
-  "openaiOptions": {
-    "reasoningEffort": "medium",
-    "verbosity": "low",
-    "tool_choice": { "type": "none" },
-    "webSearch": { "query": "", "searchContextSize": "low" },
-    "ttsOptions": { "speed": "normal", "pitch": "normal", "emphasis": "moderate", "style": "conversational", "styleDegree": "normal" }
-  },
-  "presence": { "status": "online", "activities": [], "afk": false },
-  "repoQuery": "image generation, OpenAIService, TTS_DEFAULT_OPTIONS"
-}
-
+const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // TODO: trying out high reasoning effort, and letting it handle verbosity
+const PLAN_SYSTEM_PROMPT = `You are a planning LLM that generates structured responses for the "generate-plan" function.
+Do not omit any required field.
+Only return a function call to "generate-plan", formatted according to its JSON schema.
 Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
-`;
+If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.`;
 
 export interface Plan {
   action: 'message' | 'react' | 'ignore';
@@ -46,7 +21,7 @@ export interface Plan {
     shardId?: number | null;
     afk?: boolean;
   }
-  repoQuery?: string;
+  //repoQuery?: string;
 }
 
 const defaultPlan: Plan = {
@@ -75,12 +50,12 @@ const planFunction = {
       action: { 
         type: "string", 
         enum: ["message", "react", "ignore"],
-      description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as emoji, and always if replying to another Discord bot), 'ignore' does nothing (prefer 'react' over 'ignore')."
+      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, and 'ignore' does nothing. Based on the last message, you should decide which of these actions to take: 'message' for questions or requests for information, 'react' for simple responses, and 'ignore' if a response is not appropriate (for example, if the last was not directed at you)."
       },
       modality: { 
         type: "string",
         enum: ["text", "tts"],
-        description: "The modality to use. 'text' sends just a text response, 'tts' sends that text response along with a TTS speech response. Prefer 'tts' for short/causual responses or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer or more complex responses."
+        description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causual responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
       },
       reaction: { 
         type: "string",
@@ -181,25 +156,32 @@ const planFunction = {
         required: ["status"]
       }
     },
+    // Disabled for now - It keeps adding WAY too much context, but is rarely needed/useful
+    /*
     repoQuery: {
       type: "string",
       description: "Retrieves information about this repository (Daneel's open-source code base). Do this when asked about the codebase, on request, or if it may be relevant to the conversation. Return a string with up to THREE queries to perform, separated by commas.",
       default: ""
     },
-    required: ["action","modality","openaiOptions","presence","repoQuery"]
+    */
+    required: ["action","modality","openaiOptions","presence"]
   }
 };
 
 export class Planner {
   constructor(private readonly openaiService: OpenAIService) {}
 
-  public async generatePlan(context: OpenAIMessage[] = []): Promise<Plan> {
+  public async generatePlan(context: OpenAIMessage[] = [], trigger: string = ''): Promise<Plan> {
     try {
       const messages: OpenAIMessage[] = [...context];
 
       const openaiResponse = await this.openaiService.generateResponse(
         PLANNING_MODEL,
-        [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages],
+        [
+          { role: 'system', content: PLAN_SYSTEM_PROMPT },
+          { role: 'system', content: `This planner was triggered because ${trigger}.` }, // The planner should know how it was triggered: Either a Discord direct reply/ping, or it decided to reply itself (e.g. a catchup event)
+          ...messages
+        ],
         { 
           ...PLANNING_OPTIONS, 
           functions: [planFunction], 
@@ -262,7 +244,7 @@ export class Planner {
       ...validatedPlan,
       ...plan,
       openaiOptions: validatedPlan.openaiOptions,
-      repoQuery: (plan.repoQuery ?? validatedPlan.repoQuery ?? '') as string
+      //repoQuery: (plan.repoQuery ?? validatedPlan.repoQuery ?? '') as string
     };
   
     return mergedPlan;
