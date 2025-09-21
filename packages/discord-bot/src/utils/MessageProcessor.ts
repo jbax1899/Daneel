@@ -61,17 +61,37 @@ export class MessageProcessor {
 
     // Build context for plan
     const { context: planContext } = await this.contextBuilder.buildMessageContext(message, PLAN_CONTEXT_SIZE);
+
     // If there are images attached to the trigger message, process them
-    if (message.attachments.some(a => a.contentType?.startsWith('image/'))) {
+    let imageDescriptions: string[] = [];
+    let flatImageDescriptions: string = '';
+    const imageAttachments = message.attachments.filter(a => a.contentType?.startsWith('image/'));
+
+    if (imageAttachments.size > 0) {
       logger.debug(`Processing image attachment from ${message.author.id}/${message.author.tag}`);
-      // For each image, generate a description
-      const imageDescriptions = await Promise.all(
-        message.attachments
-          .filter(a => a.contentType?.startsWith('image/'))
-          .map(a => this.openaiService.generateImageDescription(a.url, message.content))
-      );
+
+      // Generate descriptions for all images
+      imageDescriptions.push(...await Promise.all(
+        imageAttachments.map(async (a) => {
+          try {
+            const resp = await this.openaiService.generateImageDescription(a.url, message.content);
+            return resp.message?.content ?? `Error generating image description for ${message.author.id}/${message.author.tag} with image ${a.url}`;
+          } catch (error) {
+            logger.error(`Error generating image description for ${message.author.id}/${message.author.tag} with image ${a.url}: ${error}`);
+            return `Error generating image description for ${message.author.id}/${message.author.tag} with image ${a.url}`;
+          }
+        })
+      ));
+
       // Add the image descriptions to the plan context
-      planContext.push({ role: 'system', content: `User also uploaded images with these automatically generated descriptions: ${imageDescriptions.map(i => i.message?.content).join(' | ')}` });
+      flatImageDescriptions = imageDescriptions
+        .map((desc, index) => `[Image ${index + 1}]: ${desc}`)
+        .join('\n');
+
+      planContext.push({
+        role: 'system',
+        content: `User also uploaded images with these automatically generated descriptions: ${flatImageDescriptions}`
+      });
     }
 
     // Generate plan
@@ -92,51 +112,73 @@ export class MessageProcessor {
       responseHandler.setPresence(verifiedPresenceOptions);
     }
 
-    // Get trimmed context from Plan for response
-    // TODO: Instead of a fixed context size, use the plan's tool call to suggest which messages to include
-    let { context: responseContext } = await this.contextBuilder.buildMessageContext(message, RESPONSE_CONTEXT_SIZE);
-
-    // If the plan requested information about the repository, retrieve it
-    // Disabled for now
-    /*
-    if (plan.repoQuery) {
-      const queryTexts = plan.repoQuery
-        .split(',')
-        .map(q => q.trim())
-        .filter(Boolean); // remove empty strings
-    
-      await Promise.all(
-        queryTexts.map(async q => {
-          // 1. Generate embedding for this query
-          const embedding1024 = await this.openaiService.embedText(q, 1024);
-    
-          // 2. Query Pinecone
-          const results = await this.repoIndex.query({
-            vector: embedding1024,
-            topK: 10,
-            includeMetadata: true
-          });
-
-          // Keep only TS or MD files
-          const filtered = results.matches.filter(
-            m => (m.metadata?.filePath as string)?.endsWith('.ts') || (m.metadata?.filePath as string)?.endsWith('.md')
-          );
-    
-          logger.debug(`Retrieved repository information for query "${q}" (not an exhaustive list): ${JSON.stringify(filtered)}`);
-          
-          // 3. Flatten results and add to context as a system message
-          const message: OpenAIMessage = { "role": "system", "content": "Repository information relevant to query \"${q}\":\n${filtered.map(r => JSON.stringify(r.metadata)).join('\n')}" };
-          trimmedContext.push(message);
-        })
-      );
-    }
-    */
-
+    //
     // Handle response based on plan
+    //
     switch (plan.action) {
-      case 'ignore': return;
+      //
+      // Ignore
+      //
+      case 'ignore':
+        logger.debug(`Ignoring message: ${message.content.slice(0, 100)}...`);
+        return;
+      //
+      // Regular message response
+      //
       case 'message':
+        logger.debug(`Generating response for message: ${message.content.slice(0, 100)}...`);
+
         await responseHandler.startTyping(); // Start persistent typing indicator
+
+        // TODO: Get trimmed context from Plan for response
+        // TODO: Instead of a fixed context size, use the plan's tool call to suggest which messages to include
+        let { context: responseContext } = await this.contextBuilder.buildMessageContext(message, RESPONSE_CONTEXT_SIZE);
+
+        // Add image descriptions to context, if any
+        if (flatImageDescriptions) {
+          responseContext.push({
+            role: 'system',
+            content: `User also uploaded images with these automatically generated descriptions: 
+            ${flatImageDescriptions}
+            Pass through these descriptions exactly as recieved and place them within a code block (\`\`\`descriptions here\`\`\`) at the end of your response.`
+          });
+        }
+
+        // If the plan requested information about the repository, retrieve it
+        // Disabled for now
+        /*
+        if (plan.repoQuery) {
+          const queryTexts = plan.repoQuery
+            .split(',')
+            .map(q => q.trim())
+            .filter(Boolean); // remove empty strings
+        
+          await Promise.all(
+            queryTexts.map(async q => {
+              // 1. Generate embedding for this query
+              const embedding1024 = await this.openaiService.embedText(q, 1024);
+        
+              // 2. Query Pinecone
+              const results = await this.repoIndex.query({
+                vector: embedding1024,
+                topK: 10,
+                includeMetadata: true
+              });
+
+              // Keep only TS or MD files
+              const filtered = results.matches.filter(
+                m => (m.metadata?.filePath as string)?.endsWith('.ts') || (m.metadata?.filePath as string)?.endsWith('.md')
+              );
+        
+              logger.debug(`Retrieved repository information for query "${q}" (not an exhaustive list): ${JSON.stringify(filtered)}`);
+              
+              // 3. Flatten results and add to context as a system message
+              const message: OpenAIMessage = { "role": "system", "content": "Repository information relevant to query \"${q}\":\n${filtered.map(r => JSON.stringify(r.metadata)).join('\n')}" };
+              trimmedContext.push(message);
+            })
+          );
+        }
+        */
 
         try {
           // Generate AI response
@@ -150,7 +192,7 @@ export class MessageProcessor {
 
           // Get the assistant's response
           const responseText = aiResponse.message?.content || 'No response generated.';
-          
+
           // If the response is to be read out loud, generate speech (TTS)
           let ttsPath: string | null = null;
           if (plan.modality === 'tts') {
@@ -179,31 +221,42 @@ export class MessageProcessor {
               // Send the response
               await responseHandler.sendMessage(
                 `\`\`\`${cleanResponseText}\`\`\``, // markdown code block for transcript
-                [{ 
-                  filename: path.basename(ttsPath), 
-                  data: fileBuffer 
-                }], 
+                [{
+                  filename: path.basename(ttsPath),
+                  data: fileBuffer
+                }],
                 true // Make it a reply
               );
               // delete the tts file
               fs.unlinkSync(ttsPath);
             } else {
-                // Not tts, send regular response
-                await responseHandler.sendMessage(responseText, [], directReply);
+              // Not tts, send regular response
+              await responseHandler.sendMessage(responseText, [], directReply);
             }
-            logger.debug(`Response sent.`);
+            logger.debug(`Response sent (${responseText}) for message: ${message.content.slice(0, 100)}...`);
           }
         } finally {
           responseHandler.stopTyping(); // Stop typing indicator
         }
         return;
+      //
+      // React with emoji (one or more) using Discord's built-in reaction feature
+      //
       case 'react':
         if (plan.reaction) {
           await responseHandler.addReaction(plan.reaction);
-          logger.debug(`Reaction(s) sent.`);
+          logger.debug(`Reaction(s) sent (${plan.reaction}) for message: ${message.content.slice(0, 100)}...`);
+        } else {
+          logger.debug(`No reaction specified. Ignoring message: ${message.content.slice(0, 100)}...`);
         }
         return;
-    } 
+      //
+      // Unspecified action: Ignore
+      //
+      default:
+        logger.debug(`No action specified. Ignoring message: ${message.content.slice(0, 100)}...`);
+        return;
+    }
   }
 
   private async checkRateLimits(message: Message): Promise<{ allowed: boolean; error?: string }> {

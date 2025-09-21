@@ -50,12 +50,12 @@ const planFunction = {
       action: { 
         type: "string", 
         enum: ["message", "react", "ignore"],
-      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, and 'ignore' does nothing. Based on the last message, you should decide which of these actions to take: 'message' for questions or requests for information, 'react' for simple responses, and 'ignore' if a response is not appropriate (for example, if the last was not directed at you)."
+      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, and 'ignore' does nothing. Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
       },
       modality: { 
         type: "string",
         enum: ["text", "tts"],
-        description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causual responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
+        description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
       },
       reaction: { 
         type: "string",
@@ -71,8 +71,8 @@ const planFunction = {
           },
           verbosity: { 
             type: "string", 
-            enum: ["low","medium","high"],
-            description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses. Only use 'high' when asked to be verbose/detailed."
+            enum: ["low","medium"/*,"high"*/],
+            description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses."// Only use 'high' when asked to be verbose/detailed."
           },
           tool_choice: {
             type: "object",
@@ -219,8 +219,8 @@ export class Planner {
   }
 
   private validatePlan(plan: Partial<Plan>): Plan {
-    logger.debug(`Validating plan: ${JSON.stringify(plan)}`);
-    logger.debug(`Default plan: ${JSON.stringify(defaultPlan)}`);
+    //logger.debug(`Validating plan: ${JSON.stringify(plan)}`);
+    //logger.debug(`Default plan: ${JSON.stringify(defaultPlan)}`);
   
     // Deep copy of defaultPlan
     const validatedPlan: Plan = JSON.parse(JSON.stringify(defaultPlan));
