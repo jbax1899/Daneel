@@ -130,7 +130,6 @@ export class MessageProcessor {
 
         await responseHandler.startTyping(); // Start persistent typing indicator
 
-        // TODO: Get trimmed context from Plan for response
         // TODO: Instead of a fixed context size, use the plan's tool call to suggest which messages to include
         let { context: responseContext } = await this.contextBuilder.buildMessageContext(message, RESPONSE_CONTEXT_SIZE);
 
@@ -140,7 +139,7 @@ export class MessageProcessor {
             role: 'system',
             content: `User also uploaded images with these automatically generated descriptions: 
             ${flatImageDescriptions}
-            Pass through these descriptions exactly as recieved and place them within a code block (\`\`\`descriptions here\`\`\`) at the end of your response.`
+            Pass through these descriptions exactly as recieved, prefixed like '[Image #]: ' and place them within a code block (\`\`\`descriptions here\`\`\`) at the end of your response.`
           });
         }
 
