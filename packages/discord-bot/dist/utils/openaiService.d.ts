@@ -4,7 +4,7 @@ export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
 export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
 export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
 export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
-export type EmbeddingModelType = 'text-embedding-ada-002';
+export type EmbeddingModelType = 'text-embedding-3-small';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
     content: string;
@@ -95,5 +95,13 @@ export declare class OpenAIService {
      * @param text The text to embed.
      * @returns A Promise that resolves to an array of numbers representing the embedding.
      */
-    embedText(text: string): Promise<number[]>;
+    embedText(text: string, dimensions?: number): Promise<number[]>;
+    /**
+     * Reduces the provided array of OpenAI messages to minimal summaries.
+     * If the input string is sufficiently short, it is returned as-is.
+     * Otherwise, it is summarized.
+     * @param context The context to reduce.
+     * @returns The reduced context.
+     */
+    reduceContext(context: OpenAIMessage[]): Promise<OpenAIMessage[]>;
 }

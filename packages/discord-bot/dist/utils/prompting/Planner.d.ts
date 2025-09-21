@@ -11,11 +11,10 @@ export interface Plan {
         shardId?: number | null;
         afk?: boolean;
     };
-    repoQuery?: string;
 }
 export declare class Planner {
     private readonly openaiService;
     constructor(openaiService: OpenAIService);
-    generatePlan(context?: OpenAIMessage[]): Promise<Plan>;
+    generatePlan(context?: OpenAIMessage[], trigger?: string): Promise<Plan>;
     private validatePlan;
 }

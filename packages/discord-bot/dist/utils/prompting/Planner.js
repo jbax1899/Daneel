@@ -1,8 +1,12 @@
 import { logger } from '../logger.js';
 import { TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 const PLANNING_MODEL = 'gpt-5-mini';
-const PLANNING_OPTIONS = { reasoningEffort: 'medium', verbosity: 'low' };
-const PLAN_SYSTEM_PROMPT = `Only return a function call to "generate-plan"`;
+const PLANNING_OPTIONS = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // TODO: trying out high reasoning effort, and letting it handle verbosity
+const PLAN_SYSTEM_PROMPT = `You are a planning LLM that generates structured responses for the "generate-plan" function.
+Do not omit any required field.
+Only return a function call to "generate-plan", formatted according to its JSON schema.
+Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
+If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.`;
 const defaultPlan = {
     action: 'ignore',
     modality: 'text',
@@ -28,12 +32,12 @@ const planFunction = {
             action: {
                 type: "string",
                 enum: ["message", "react", "ignore"],
-                description: "The action to take. 'message' sends a message response (some combination of text and files), 'react' adds an emoji reaction(s) (use if a response could suffice as emoji, and always if replying to another Discord bot), 'ignore' does nothing (prefer 'react' over 'ignore')."
+                description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, and 'ignore' does nothing. Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
             },
             modality: {
                 type: "string",
                 enum: ["text", "tts"],
-                description: "The modality to use. 'text' sends just a text response, 'tts' sends that text response along with a TTS speech response. Prefer 'tts' for short/causual responses or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer or more complex responses."
+                description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
             },
             reaction: {
                 type: "string",
@@ -49,8 +53,8 @@ const planFunction = {
                     },
                     verbosity: {
                         type: "string",
-                        enum: ["low", "medium", "high"],
-                        description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses. Only use 'high' when asked to be verbose/detailed."
+                        enum: ["low", "medium" /*,"high"*/],
+                        description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses." // Only use 'high' when asked to be verbose/detailed."
                     },
                     tool_choice: {
                         type: "object",
@@ -134,10 +138,14 @@ const planFunction = {
                 required: ["status"]
             }
         },
+        // Disabled for now - It keeps adding WAY too much context, but is rarely needed/useful
+        /*
         repoQuery: {
-            type: "string",
-            description: "If information about this repository (Daneel's open-source code base) is needed, the query to perform a vector database lookup, otherwise leave empty. Separate queries with commas."
+          type: "string",
+          description: "Retrieves information about this repository (Daneel's open-source code base). Do this when asked about the codebase, on request, or if it may be relevant to the conversation. Return a string with up to THREE queries to perform, separated by commas.",
+          default: ""
         },
+        */
         required: ["action", "modality", "openaiOptions", "presence"]
     }
 };
@@ -146,10 +154,14 @@ export class Planner {
     constructor(openaiService) {
         this.openaiService = openaiService;
     }
-    async generatePlan(context = []) {
+    async generatePlan(context = [], trigger = '') {
         try {
             const messages = [...context];
-            const openaiResponse = await this.openaiService.generateResponse(PLANNING_MODEL, [{ role: 'system', content: PLAN_SYSTEM_PROMPT }, ...messages], {
+            const openaiResponse = await this.openaiService.generateResponse(PLANNING_MODEL, [
+                { role: 'system', content: PLAN_SYSTEM_PROMPT },
+                { role: 'system', content: `This planner was triggered because ${trigger}.` }, // The planner should know how it was triggered: Either a Discord direct reply/ping, or it decided to reply itself (e.g. a catchup event)
+                ...messages
+            ], {
                 ...PLANNING_OPTIONS,
                 functions: [planFunction],
                 function_call: { name: 'generate-plan' }
@@ -183,14 +195,15 @@ export class Planner {
         }
     }
     validatePlan(plan) {
-        // Create a deep copy of defaultPlan to avoid mutating it
+        //logger.debug(`Validating plan: ${JSON.stringify(plan)}`);
+        //logger.debug(`Default plan: ${JSON.stringify(defaultPlan)}`);
+        // Deep copy of defaultPlan
         const validatedPlan = JSON.parse(JSON.stringify(defaultPlan));
-        // Merge the plan properties, ensuring nested objects are properly merged
+        // Merge openaiOptions (with nested ttsOptions)
         if (plan.openaiOptions) {
             validatedPlan.openaiOptions = {
                 ...validatedPlan.openaiOptions,
                 ...plan.openaiOptions,
-                // Ensure ttsOptions is properly merged if it exists
                 ...(plan.openaiOptions.ttsOptions ? {
                     ttsOptions: {
                         ...validatedPlan.openaiOptions.ttsOptions,
@@ -200,12 +213,13 @@ export class Planner {
             };
         }
         // Merge other top-level properties
-        return {
+        const mergedPlan = {
             ...validatedPlan,
             ...plan,
-            // Ensure we keep the merged openaiOptions
-            openaiOptions: validatedPlan.openaiOptions
+            openaiOptions: validatedPlan.openaiOptions,
+            //repoQuery: (plan.repoQuery ?? validatedPlan.repoQuery ?? '') as string
         };
+        return mergedPlan;
     }
 }
 //# sourceMappingURL=Planner.js.map
