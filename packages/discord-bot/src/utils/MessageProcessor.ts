@@ -139,7 +139,7 @@ export class MessageProcessor {
             role: 'system',
             content: `User also uploaded images with these automatically generated descriptions: 
             ${flatImageDescriptions}
-            Pass through these descriptions exactly as recieved, prefixed like '[Image #]: ' and place them within a code block (\`\`\`descriptions here\`\`\`) at the end of your response.`
+            Pass through these descriptions exactly as recieved, with a header like 'Descriptions of attached image(s):' and with each description prefixed like '[Image #]: ', and placed all within a code block (\`\`\`example\`\`\`) at the end of your response.`
           });
         }
 
