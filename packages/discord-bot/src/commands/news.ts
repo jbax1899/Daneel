@@ -38,7 +38,7 @@ const newsFunction = {
   }
 };
 
-const command: Command = {
+const newsCommand: Command = {
   data: new SlashCommandBuilder()
     .setName('news')
     .setDescription('Get the latest news')
@@ -95,10 +95,45 @@ const command: Command = {
   async execute(interaction: ChatInputCommandInteraction) {
     // Log command execution with timestamp and interaction ID
     logger.info(`[${new Date().toISOString()}] Executing /news command - Interaction ID: ${interaction.id}`);
+    logger.info(`Interaction details:`, {
+      id: interaction.id,
+      commandName: interaction.commandName,
+      user: interaction.user.tag,
+      channel: interaction.channel?.id,
+      guild: interaction.guild?.id,
+      token: interaction.token ? 'PRESENT' : 'MISSING',
+      isCommand: interaction.isChatInputCommand(),
+      options: interaction.options.data.map(opt => ({ name: opt.name, value: opt.value }))
+    });
+
+    // Immediately acknowledge the interaction
+    let isDeferred = false;
+    try {
+      logger.info(`About to call deferReply() for interaction ${interaction.id}`);
+      await interaction.deferReply();
+      isDeferred = true;
+      logger.info(`Successfully deferred interaction ${interaction.id}`);
+    } catch (deferError) {
+      logger.error(`Failed to defer interaction ${interaction.id}: ${deferError}`);
+      // If defer fails, try to reply directly
+      try {
+        await interaction.reply({
+          content: 'An error occurred while processing your request. Please try again later.',
+          flags: [1 << 6] // EPHEMERAL
+        });
+        logger.info(`Successfully replied directly to interaction ${interaction.id}`);
+      } catch (replyError) {
+        logger.error(`Failed to reply to interaction ${interaction.id}: ${replyError}`);
+      }
+      return;
+    }
     
-    // Let the main handler manage the initial response
-    await interaction.deferReply();
-    
+    // Set a timeout for the entire operation
+    const timeoutMs = 120000; // 2 minutes timeout
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('Operation timed out after 2 minutes')), timeoutMs);
+    });
+
     try {
       const query = interaction.options.getString('query') ?? '';
       const category = interaction.options.getString('category') ?? '';
@@ -119,7 +154,7 @@ const command: Command = {
         webSearch: {
           query: query || category || 'latest news',
           allowedDomains,
-          searchContextSize: 'high',
+          searchContextSize: 'medium', // Reduced from 'high' to speed up
           userLocation: { type: 'approximate' }
         }
       };
@@ -127,7 +162,7 @@ const command: Command = {
       const systemPrompt = `You are a news assistant that fetches and summarizes current news using web search.
       INSTRUCTIONS:
       1. ALWAYS use the generate_news_response function to return results
-      2. Use web search to find the most recent and relevant news
+      2. Use web search to find the most recent and relevant news (aim for within the past 24-48 hours)
       3. Include a concise 1-2 sentence summary of the overall findings
       4. Return ${maxResults} news items by default unless specified otherwise
       5. Format each news item with: title, summary, url, source, and timestamp
@@ -137,18 +172,22 @@ const command: Command = {
       - Max results: ${maxResults}
       - Allowed domains: ${allowedDomains?.join(', ') || 'Any'}`;
 
-      const response = await openaiService.generateResponse(
-        undefined,
-        [
-          { role: 'system' as const, content: systemPrompt },
-          { role: 'user' as const, content: `User provided arguments: ${JSON.stringify({ query, category, maxResults, allowedDomains, reasoningEffort, verbosity })}`}
-        ],
-        {
-          ...openAIOptions,
-          functions: [newsFunction],
-          function_call: { name: "generate_news_response" }
-        }
-      );
+      // Race between OpenAI response and timeout
+      const response = await Promise.race([
+        openaiService.generateResponse(
+          undefined,
+          [
+            { role: 'system' as const, content: systemPrompt },
+            { role: 'user' as const, content: `User provided arguments: ${JSON.stringify({ query, category, maxResults, allowedDomains, reasoningEffort, verbosity })}`}
+          ],
+          {
+            ...openAIOptions,
+            functions: [newsFunction],
+            function_call: { name: "generate_news_response" }
+          }
+        ),
+        timeoutPromise
+      ]);
 
       // Process the tool call response
       const functionCall = response.message?.function_call;
@@ -161,6 +200,17 @@ const command: Command = {
       if (!newsResponse.news || !Array.isArray(newsResponse.news)) {
         throw new Error('Invalid news response format');
       }
+
+      // TODO: REMOVE
+      logger.info(`News response: ${JSON.stringify(newsResponse)}`);
+      logger.info(`Image analysis for ${newsResponse.news.length} articles:`);
+      newsResponse.news.forEach((item: any, index: number) => {
+        const hasThumbnail = !!item.thumbnail;
+        const hasImage = !!item.image;
+        logger.info(`Article ${index + 1}: "${item.title}"`);
+        logger.info(`  - Has thumbnail: ${hasThumbnail} ${hasThumbnail ? `(URL: ${item.thumbnail})` : ''}`);
+        logger.info(`  - Has image: ${hasImage} ${hasImage ? `(URL: ${item.image})` : ''}`);
+      });
 
       // Create embeds for each news item
       const embeds = newsResponse.news.slice(0, maxResults).map((item: any) => {
@@ -193,9 +243,20 @@ const command: Command = {
 
     } catch (error) {
       logger.error(`Error in news command: ${error}`);
-      await interaction.editReply('An error occurred while fetching news. Please try again later.');
+      try {
+        if (isDeferred) {
+          await interaction.editReply('An error occurred while fetching news. Please try again later.');
+        } else {
+          await interaction.reply({
+            content: 'An error occurred while fetching news. Please try again later.',
+            flags: [1 << 6] // EPHEMERAL
+          });
+        }
+      } catch (editError) {
+        logger.error(`Failed to respond to interaction: ${editError}`);
+      }
     }
   }
 };
 
-export default command;
+export default newsCommand;

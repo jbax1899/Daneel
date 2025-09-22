@@ -11,7 +11,7 @@ cloudinary.config({
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
-type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano' | 'o3';
+type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini';
 type ImageQualityType = 'auto' | 'low' | 'medium' | 'high';
 type ImageAspectRatioType = 'auto' | 'square' | 'portrait' | 'landscape';
 type ImageSizeType = 'auto' | '1024x1024' | '1024x1536' | '1536x1024';
@@ -62,14 +62,13 @@ const imageCommand: Command = {
         )
         .addStringOption(option => option
             .setName('model')
-            .setDescription('The model to use (optional; defaults to gpt-4o-mini)')
+            .setDescription('The model to use for prompt adjustment (optional; defaults to gpt-4o-mini)')
             .addChoices(
                 { name: 'gpt-4o', value: 'gpt-4o' },
                 { name: 'gpt-4o-mini', value: 'gpt-4o-mini' },
                 { name: 'gpt-4.1', value: 'gpt-4.1' },
                 { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
-                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
-                { name: 'o3', value: 'o3' }
+                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' }
             )
             .setRequired(false)
         )
@@ -94,6 +93,9 @@ const imageCommand: Command = {
 
         // Start the timer
         const start = Date.now();
+
+        // Defer the reply to show that the command is being processed
+        await interaction.deferReply();
 
         // Get the prompt from the interaction, if none provided, return an error
         const prompt = interaction.options.getString('prompt');
@@ -153,8 +155,7 @@ const imageCommand: Command = {
             .setTimestamp()
             .setFooter({ text: 'Generating...' });
 
-        // Defer the reply to show that the command is being processed
-        await interaction.deferReply();
+        
 
         // Edit the initial reply with the embed
         await interaction.editReply({
