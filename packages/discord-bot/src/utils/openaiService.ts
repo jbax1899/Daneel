@@ -10,11 +10,8 @@ import { ActivityOptions } from 'discord.js';
 // Type Declarations
 // ====================
 
-export type SupportedModel = GPT5ModelType | ImageGenerationModelType; 
+export type SupportedModel = GPT5ModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
-export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
-export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
-export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
 export type EmbeddingModelType = 'text-embedding-3-small'; // Dimensions: 1546
 
 export interface OpenAIMessage {
@@ -85,15 +82,15 @@ export interface OpenAIResponse {
 
 // Extended interface for OpenAI Responses output items
 interface ResponseOutputItemExtended {
-  type?: string; // "reasoning", "function_call", "message", etc.
+  type?: string; // "reasoning", "function_call", "message", "image_generation_call", etc.
   role?: 'user' | 'assistant' | 'system' | 'developer';
   name?: string; // present on type "function_call"
   arguments?: string; // present on type "function_call"
   tool_calls?: Array<{ function: { name: string; arguments?: string } }>;
   function_call?: { name: string; arguments?: string };
   tool?: { name: string; arguments?: string };
-  content?: Array<{ 
-    type: string; 
+  content?: Array<{
+    type: string;
     text?: string;
     annotations?: Array<{
       type: string;
@@ -124,11 +121,6 @@ const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
 export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
-
-export const DEFAULT_IMAGE_GENERATION_MODEL: SupportedModel = 'gpt-image-1';
-export const DEFAULT_IMAGE_GENERATION_RESOLUTION: ImageGenerationResolutionType = '1024x1024';
-export const DEFAULT_IMAGE_GENERATION_QUALITY: ImageGenerationQualityType = 'low';
-
 export const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType = 'text-embedding-3-small';
 
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
@@ -543,9 +535,11 @@ export class OpenAIService {
           logger.debug(`Reduced context: ${JSON.stringify(reducedContext)}`);
 
           // Log the estimated cost of the reduction
-          const inputTokens = response.usage?.prompt_tokens || 0;
-          const outputTokens = response.usage?.completion_tokens || 0;
-          const estimatedCost = this.calculateCost(inputTokens, outputTokens, REDUCTION_MODEL as GPT5ModelType);
+          const estimatedCost = this.calculateCost(
+            response.usage?.prompt_tokens || 0,
+            response.usage?.completion_tokens || 0,
+            REDUCTION_MODEL as GPT5ModelType
+          );
           logger.debug(`Estimated cost of reduction: ${estimatedCost}`);
         }
       } catch (error) {

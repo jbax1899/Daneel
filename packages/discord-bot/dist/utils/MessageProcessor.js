@@ -104,7 +104,6 @@ export class MessageProcessor {
             case 'message':
                 logger.debug(`Generating response for message: ${message.content.slice(0, 100)}...`);
                 await responseHandler.startTyping(); // Start persistent typing indicator
-                // TODO: Get trimmed context from Plan for response
                 // TODO: Instead of a fixed context size, use the plan's tool call to suggest which messages to include
                 let { context: responseContext } = await this.contextBuilder.buildMessageContext(message, RESPONSE_CONTEXT_SIZE);
                 // Add image descriptions to context, if any
@@ -113,7 +112,7 @@ export class MessageProcessor {
                         role: 'system',
                         content: `User also uploaded images with these automatically generated descriptions: 
             ${flatImageDescriptions}
-            Pass through these descriptions exactly as recieved and place them within a code block (\`\`\`descriptions here\`\`\`) at the end of your response.`
+            Pass through these descriptions exactly as recieved, with a header like 'Descriptions of attached image(s):' and with each description prefixed like '[Image #]: ', and placed all within a code block (\`\`\`example\`\`\`) at the end of your response.`
                     });
                 }
                 // If the plan requested information about the repository, retrieve it

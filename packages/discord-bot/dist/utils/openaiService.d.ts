@@ -1,9 +1,6 @@
 import { ActivityOptions } from 'discord.js';
-export type SupportedModel = GPT5ModelType | ImageGenerationModelType;
+export type SupportedModel = GPT5ModelType;
 export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
-export type ImageGenerationModelType = 'gpt-image-1' | 'dall-e-2' | 'dall-e-3';
-export type ImageGenerationResolutionType = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
-export type ImageGenerationQualityType = 'low' | 'medium' | 'high' | 'auto';
 export type EmbeddingModelType = 'text-embedding-3-small';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
@@ -75,9 +72,6 @@ export interface OpenAIResponse {
     newPresence?: ActivityOptions;
 }
 export declare const IMAGE_DESCRIPTION_MODEL: SupportedModel;
-export declare const DEFAULT_IMAGE_GENERATION_MODEL: SupportedModel;
-export declare const DEFAULT_IMAGE_GENERATION_RESOLUTION: ImageGenerationResolutionType;
-export declare const DEFAULT_IMAGE_GENERATION_QUALITY: ImageGenerationQualityType;
 export declare const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType;
 export declare const TTS_DEFAULT_OPTIONS: TTSOptions;
 export declare class OpenAIService {
