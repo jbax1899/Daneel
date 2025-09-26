@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@pinecone-database/pinecone": "^6.1.2",
+    "@snazzah/davey": "^0.1.7",
     "body-parser": "^2.2.0",
     "cloudinary": "^2.7.0",
     "date-fns": "^4.1.0",

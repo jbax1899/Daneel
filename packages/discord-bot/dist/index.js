@@ -23,7 +23,8 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.DirectMessages
+        GatewayIntentBits.DirectMessages,
+        GatewayIntentBits.GuildVoiceStates
     ],
     presence: { status: 'online' }
 });
@@ -98,16 +99,23 @@ client.on(Events.InteractionCreate, async (interaction) => {
     catch (error) {
         logger.error(`Error executing command ${interaction.commandName}:`, error);
         // Only try to send an error message if we haven't already replied
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({
-                content: 'There was an error executing this command!',
-                flags: [1 << 6] // EPHEMERAL
-            }).catch(console.error);
-        }
-        else if (interaction.deferred && !interaction.replied) {
-            await interaction.editReply({
-                content: 'There was an error executing this command!'
-            }).catch(console.error);
+        if (!interaction.replied) {
+            try {
+                if (interaction.deferred) {
+                    await interaction.editReply({
+                        content: 'There was an error executing this command!'
+                    });
+                }
+                else {
+                    await interaction.reply({
+                        content: 'There was an error executing this command!',
+                        flags: [1 << 6] // EPHEMERAL
+                    });
+                }
+            }
+            catch (replyError) {
+                logger.error(`Failed to send error message:`, replyError);
+            }
         }
     }
 });

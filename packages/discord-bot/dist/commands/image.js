@@ -38,8 +38,8 @@ const imageCommand = {
         .setRequired(false))
         .addStringOption(option => option
         .setName('model')
-        .setDescription('The model to use (optional; defaults to gpt-4o-mini)')
-        .addChoices({ name: 'gpt-4o', value: 'gpt-4o' }, { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }, { name: 'gpt-4.1', value: 'gpt-4.1' }, { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' }, { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' }, { name: 'o3', value: 'o3' })
+        .setDescription('The model to use for prompt adjustment (optional; defaults to gpt-4o-mini)')
+        .addChoices({ name: 'gpt-4o', value: 'gpt-4o' }, { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }, { name: 'gpt-4.1', value: 'gpt-4.1' }, { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' }, { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' })
         .setRequired(false))
         .addStringOption(option => option
         .setName('follow_up_response_id')
@@ -59,6 +59,8 @@ const imageCommand = {
         }
         // Start the timer
         const start = Date.now();
+        // Defer the reply to show that the command is being processed
+        await interaction.deferReply();
         // Get the prompt from the interaction, if none provided, return an error
         const prompt = interaction.options.getString('prompt');
         if (!prompt) {
@@ -103,8 +105,6 @@ const imageCommand = {
             .setColor(0x00FF00)
             .setTimestamp()
             .setFooter({ text: 'Generating...' });
-        // Defer the reply to show that the command is being processed
-        await interaction.deferReply();
         // Edit the initial reply with the embed
         await interaction.editReply({
             embeds: [embed]
