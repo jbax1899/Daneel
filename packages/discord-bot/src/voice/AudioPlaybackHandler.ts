@@ -1,11 +1,18 @@
 import { AudioPlayer, VoiceConnection, AudioPlayerStatus, AudioPlayerError, createAudioResource, StreamType } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import { GuildAudioPipeline } from './GuildAudioPipeline.js';
+import { PassThrough } from 'stream';
+import { once } from 'events';
+import { createPlaybackResampler } from './audioTransforms.js';
 
 export class AudioPlaybackHandler {
     private pipelines: Map<string, GuildAudioPipeline> = new Map();
     private audioQueues: Map<string, Buffer[]> = new Map();
     private isProcessingQueue: Map<string, boolean> = new Map();
+    private playbackInputs: Map<string, PassThrough> = new Map();
+    private playbackResamplers: Map<string, ReturnType<typeof createPlaybackResampler>> = new Map();
+    private resamplerQueues: Map<string, Buffer[]> = new Map();
+    private resamplerProcessing: Map<string, boolean> = new Map();
 
     public async playAudioToChannel(connection: VoiceConnection, audioData: Buffer): Promise<void> {
         const guildId = connection.joinConfig.guildId;
@@ -45,7 +52,35 @@ export class AudioPlaybackHandler {
         logger.debug(`[AudioPlayback] Creating new audio pipeline for guild ${guildId}`);
         const pipeline = new GuildAudioPipeline();
         this.pipelines.set(guildId, pipeline);
-        
+
+        const resamplerInput = new PassThrough();
+        const resampler = createPlaybackResampler();
+        const resampledQueue: Buffer[] = [];
+
+        resamplerInput.setMaxListeners(20);
+        resampler.setMaxListeners(20);
+
+        this.playbackInputs.set(guildId, resamplerInput);
+        this.playbackResamplers.set(guildId, resampler);
+        this.resamplerQueues.set(guildId, resampledQueue);
+        this.resamplerProcessing.set(guildId, false);
+
+        resampler.on('data', (chunk: Buffer) => {
+            const queue = this.resamplerQueues.get(guildId);
+            if (!queue) {
+                return;
+            }
+
+            queue.push(chunk);
+            void this.processResampledQueue(guildId, pipeline);
+        });
+
+        resampler.on('error', (error: Error) => {
+            logger.error(`[AudioPlayback] Playback resampler error for guild ${guildId}:`, error);
+        });
+
+        resamplerInput.pipe(resampler);
+
         // Set up player event handlers
         const player = pipeline.getPlayer();
         
@@ -111,9 +146,9 @@ export class AudioPlaybackHandler {
             while (queue.length > 0) {
                 const audioData = queue.shift();
                 if (!audioData) continue;
-    
+
                 try {
-                    await pipeline.writePCM(audioData);
+                    await this.writeToResampler(guildId, audioData);
                 } catch (error) {
                     logger.error('[AudioPlayback] Error writing audio data to pipeline:', error);
                 }
@@ -154,6 +189,74 @@ export class AudioPlaybackHandler {
                 logger.error(`[AudioPlayback] Error cleaning up pipeline for guild ${guildId}:`, error);
             }
             this.pipelines.delete(guildId);
+        }
+
+        const resamplerInput = this.playbackInputs.get(guildId);
+        if (resamplerInput) {
+            try {
+                resamplerInput.removeAllListeners();
+                resamplerInput.end();
+            } catch (error) {
+                logger.error(`[AudioPlayback] Error ending resampler input for guild ${guildId}:`, error);
+            }
+            this.playbackInputs.delete(guildId);
+        }
+
+        const resampler = this.playbackResamplers.get(guildId);
+        if (resampler) {
+            try {
+                resampler.removeAllListeners();
+                resampler.destroy();
+            } catch (error) {
+                logger.error(`[AudioPlayback] Error destroying resampler for guild ${guildId}:`, error);
+            }
+            this.playbackResamplers.delete(guildId);
+        }
+
+        this.resamplerQueues.delete(guildId);
+        this.resamplerProcessing.delete(guildId);
+    }
+
+    private async writeToResampler(guildId: string, audioData: Buffer): Promise<void> {
+        const resamplerInput = this.playbackInputs.get(guildId);
+        if (!resamplerInput) {
+            throw new Error(`No playback resampler input for guild ${guildId}`);
+        }
+
+        if (!resamplerInput.write(audioData)) {
+            await once(resamplerInput, 'drain');
+        }
+    }
+
+    private async processResampledQueue(guildId: string, pipeline: GuildAudioPipeline): Promise<void> {
+        if (this.resamplerProcessing.get(guildId)) {
+            return;
+        }
+
+        const queue = this.resamplerQueues.get(guildId);
+        if (!queue) {
+            return;
+        }
+
+        this.resamplerProcessing.set(guildId, true);
+
+        try {
+            while (queue.length > 0) {
+                const chunk = queue.shift();
+                if (!chunk) {
+                    continue;
+                }
+
+                await pipeline.writePCM(chunk);
+            }
+        } catch (error) {
+            logger.error(`[AudioPlayback] Error writing resampled audio for guild ${guildId}:`, error);
+        } finally {
+            this.resamplerProcessing.set(guildId, false);
+
+            if (queue.length > 0) {
+                void this.processResampledQueue(guildId, pipeline);
+            }
         }
     }
 

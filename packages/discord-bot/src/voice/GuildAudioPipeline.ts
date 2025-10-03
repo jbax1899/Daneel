@@ -3,6 +3,7 @@ import { opus } from 'prism-media';
 import { AudioPlayer, createAudioPlayer, AudioPlayerStatus, NoSubscriberBehavior } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import { once } from 'events';
+import { AUDIO_CONSTANTS } from '../constants/voice.js';
 
 export class GuildAudioPipeline {
     private readonly player: AudioPlayer;
@@ -10,7 +11,7 @@ export class GuildAudioPipeline {
     private readonly opusEncoder: opus.Encoder;
     private pcmBuffer: Buffer = Buffer.alloc(0);
     private isDestroyed: boolean = false;
-    private readonly frameSize: number = 480; // 24kHz * 0.02s = 480
+    private readonly frameSize: number = AUDIO_CONSTANTS.DISCORD_FRAME_SIZE; // 48kHz * 0.02s = 960
     private resourceCreated = false;
 
     constructor() {
@@ -21,7 +22,7 @@ export class GuildAudioPipeline {
         this.opusEncoder = new opus.Encoder({
             frameSize: this.frameSize,
             channels: 1,
-            rate: 24000,
+            rate: AUDIO_CONSTANTS.DISCORD_SAMPLE_RATE,
         });
         
         // Create audio player

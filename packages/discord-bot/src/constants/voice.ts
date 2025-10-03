@@ -2,10 +2,12 @@
 export const AUDIO_CONSTANTS = {
     // Minimum audio buffer size for processing (100ms at 24kHz, 16-bit mono)
     MIN_AUDIO_BUFFER_SIZE: 4800,
-    // Audio sample rate (24kHz)
-    SAMPLE_RATE: 48000,
-    // Audio frame size
-    FRAME_SIZE: 960,
+    // Audio sample rate provided by Discord's voice gateway (48kHz PCM16 mono)
+    DISCORD_SAMPLE_RATE: 48000,
+    DISCORD_FRAME_SIZE: 960,
+    // Resampled realtime rate expected by the OpenAI Realtime API (24kHz PCM16 mono)
+    REALTIME_SAMPLE_RATE: 24000,
+    REALTIME_FRAME_SIZE: 480,
     // Audio channels (mono)
     CHANNELS: 1,
 } as const;
