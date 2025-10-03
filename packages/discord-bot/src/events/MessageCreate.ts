@@ -37,7 +37,8 @@ export class MessageCreate extends Event {
   private readonly messageProcessor: MessageProcessor;      // The message processor that handles the actual message processing logic
   private readonly CATCHUP_AFTER_MESSAGES = 10;             // After X messages, do a catchup
   private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = 5; // After X messages, if mentioned, do a catchup
-  private lastMessageCount = 0;                             // Tracks the number of messages since the last catchup
+  private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>(); // Tracks message counts per channel for catch-up logic
+  private readonly STALE_COUNTER_TTL_MS = 1000 * 60 * 60;   // Counters expire after an hour of inactivity
   private readonly ALLOWED_THREAD_IDS = ['1407811416244617388']; //TODO: hoist this to config
 
   /**
@@ -46,6 +47,11 @@ export class MessageCreate extends Event {
    */
   constructor(dependencies: Dependencies) {
     super({ name: 'messageCreate', once: false });
+
+    if (!dependencies?.openaiService) {
+      throw new Error('MessageCreate event requires an OpenAI service dependency');
+    }
+
     this.messageProcessor = new MessageProcessor({
       openaiService: dependencies.openaiService,
       planner: new Planner(dependencies.openaiService)
@@ -64,16 +70,19 @@ export class MessageCreate extends Event {
       return;
     }
 
+    this.cleanupStaleCounters();
+    const channelKey = this.getChannelCounterKey(message);
+
     // If we just posted a message, reset the counter, and ignore self
     if (message.author.id === message.client.user!.id) {
-      this.lastMessageCount = 0;
-      logger.debug(`Reset message count: ${this.lastMessageCount}`);
+      this.resetCounter(channelKey);
+      logger.debug(`Reset message count for ${channelKey}: 0`);
       return;
     }
 
-    // New message: Increment the counter
-    this.lastMessageCount++;
-    logger.debug(`Last message count: ${this.lastMessageCount}`);
+    // New message: Increment the counter for this channel
+    const messageCount = this.incrementCounter(channelKey);
+    logger.debug(`Last message count for ${channelKey}: ${messageCount}`);
 
     try {
       // Do not ignore if the message mentions the bot with @Daneel, or is a direct Discord reply
@@ -87,11 +96,11 @@ export class MessageCreate extends Event {
       }
       // If we are within the catchup threshold, catch up
       else if (
-        (this.lastMessageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
-        || (this.lastMessageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
+        (messageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
+        || (messageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
       ) {
-        logger.debug(`Catching up to message ID: ${message.id}`);
-        this.lastMessageCount = 0;
+        logger.debug(`Catching up in ${channelKey} to message ID: ${message.id}`);
+        this.resetCounter(channelKey);
         await this.messageProcessor.processMessage(message, false, 'enough messages have passed since Daneel last replied'); // Do not direct-reply to anyone when catching up
       }
     } catch (error) {
@@ -117,11 +126,11 @@ export class MessageCreate extends Event {
    */
   private isReplyToBot(message: Message): boolean {
     if (!message.reference?.messageId) return false;
-    
+
     const isSameChannel = message.reference.guildId === message.guildId &&
                         message.reference.channelId === message.channelId;
     const isReplyingToBot = message.mentions.repliedUser?.id === message.client.user!.id;
-    
+
     return isSameChannel && isReplyingToBot;
   }
 
@@ -135,6 +144,30 @@ export class MessageCreate extends Event {
     return message.channel.isThread() && !this.ALLOWED_THREAD_IDS.includes(message.channel.id);
   }
 
+  private getChannelCounterKey(message: Message): string {
+    return `${message.guildId ?? 'DM'}:${message.channelId}`;
+  }
+
+  private resetCounter(channelKey: string): void {
+    this.channelMessageCounters.delete(channelKey);
+  }
+
+  private incrementCounter(channelKey: string): number {
+    const existing = this.channelMessageCounters.get(channelKey);
+    const count = (existing?.count ?? 0) + 1;
+    this.channelMessageCounters.set(channelKey, { count, lastUpdated: Date.now() });
+    return count;
+  }
+
+  private cleanupStaleCounters(): void {
+    const now = Date.now();
+    for (const [key, value] of this.channelMessageCounters.entries()) {
+      if (now - value.lastUpdated > this.STALE_COUNTER_TTL_MS) {
+        this.channelMessageCounters.delete(key);
+      }
+    }
+  }
+
   /**
    * Handles errors that occur during message processing.
    * Logs the error and attempts to notify the user.
@@ -145,7 +178,7 @@ export class MessageCreate extends Event {
    */
   private async handleError(error: unknown, message: Message): Promise<void> {
     logger.error('Error in MentionBotEvent:', error);
-    
+
     // Attempt to send an error reply to the user
     try {
       const response = 'Sorry, I encountered an error while processing your message.';
