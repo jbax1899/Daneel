@@ -240,7 +240,6 @@ export class AudioPlaybackHandler {
             this.pipelines.delete(guildId);
         }
         this.clearPipelineCleanupTimer(guildId);
-        this.isProcessingQueue.set(guildId, false);
     }
 
     public cleanupGuild(guildId: string): void {
