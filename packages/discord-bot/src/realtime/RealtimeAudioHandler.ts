@@ -1,6 +1,7 @@
 import WebSocket from 'ws';
 import { logger } from '../utils/logger.js';
 import { RealtimeEventHandler } from './RealtimeEventHandler.js';
+import { AUDIO_CONSTANTS } from '../constants/voice.js';
 
 const COMMIT_INACTIVITY_MS = 320;
 
@@ -17,6 +18,7 @@ export class RealtimeAudioHandler {
     private lastAppendTime = 0;
     private pendingSpeaker: PendingSpeaker | null = null;
     private commitTimer: NodeJS.Timeout | null = null;
+    private pendingBytes = 0;
 
     public async sendAudio(
         ws: WebSocket,
@@ -45,6 +47,7 @@ export class RealtimeAudioHandler {
         this.pendingSpeaker = { label: speakerLabel, userId: speakerId };
         this.lastAppendTime = Date.now();
         this.pendingCommit = true;
+        this.pendingBytes += audioBuffer.length;
 
         logger.debug(`[realtime] Sent audio chunk (${audioBuffer.length} bytes) for ${speakerLabel}`);
 
@@ -82,17 +85,31 @@ export class RealtimeAudioHandler {
             await new Promise(resolve => setTimeout(resolve, 20 - elapsed));
         }
 
+        if (this.pendingBytes > 0 && this.pendingBytes < AUDIO_CONSTANTS.MIN_AUDIO_BUFFER_SIZE) {
+            const deficit = AUDIO_CONSTANTS.MIN_AUDIO_BUFFER_SIZE - this.pendingBytes;
+            const silence = Buffer.alloc(deficit);
+            ws.send(JSON.stringify({
+                type: 'input_audio_buffer.append',
+                audio: silence.toString('base64'),
+            }));
+            this.pendingBytes += deficit;
+            logger.debug(`[realtime] Padded audio buffer with ${deficit} bytes of silence`);
+        }
+
         if (this.pendingSpeaker) {
+            const annotation = this.pendingSpeaker.userId
+                ? `<discord_speaker id="${this.pendingSpeaker.userId}">${this.pendingSpeaker.label}</discord_speaker>`
+                : `<discord_speaker>${this.pendingSpeaker.label}</discord_speaker>`;
+
             ws.send(JSON.stringify({
                 type: 'conversation.item.create',
                 item: {
                     type: 'message',
                     role: 'user',
-                    content: [{ type: 'input_audio_buffer' }],
-                    metadata: {
-                        speaker: this.pendingSpeaker.label,
-                        user_id: this.pendingSpeaker.userId,
-                    },
+                    content: [
+                        { type: 'input_text', text: annotation },
+                        { type: 'input_audio_buffer' },
+                    ],
                 },
             }));
         }
@@ -102,6 +119,7 @@ export class RealtimeAudioHandler {
 
         this.pendingCommit = false;
         this.pendingSpeaker = null;
+        this.pendingBytes = 0;
 
         try {
             await eventHandler.waitForAudioCollected();
@@ -119,6 +137,7 @@ export class RealtimeAudioHandler {
         ws.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
         this.pendingCommit = false;
         this.pendingSpeaker = null;
+        this.pendingBytes = 0;
         if (this.commitTimer) {
             clearTimeout(this.commitTimer);
             this.commitTimer = null;
@@ -131,6 +150,7 @@ export class RealtimeAudioHandler {
         this.pendingCommit = false;
         this.pendingSpeaker = null;
         this.lastAppendTime = 0;
+        this.pendingBytes = 0;
         if (this.commitTimer) {
             clearTimeout(this.commitTimer);
             this.commitTimer = null;

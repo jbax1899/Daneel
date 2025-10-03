@@ -2,7 +2,7 @@ import { VoiceConnection } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';
 import { AUDIO_CONSTANTS, TIMEOUT_CONSTANTS } from '../constants/voice.js';
-import { downsampleToRealtime } from './audioTransforms.js';
+import { createCaptureResampler } from './audioTransforms.js';
 import { EventEmitter } from 'events';
 
 interface ActiveReceiver {
@@ -81,21 +81,18 @@ export class AudioCaptureHandler extends EventEmitter {
             },
         });
 
-        const pcmStream = opusStream.pipe(
-            new prism.opus.Decoder({
-                rate: AUDIO_CONSTANTS.DISCORD_SAMPLE_RATE,
-                channels: AUDIO_CONSTANTS.CHANNELS,
-                frameSize: AUDIO_CONSTANTS.DISCORD_FRAME_SIZE,
-            }),
-        );
+        const decoder = new prism.opus.Decoder({
+            rate: AUDIO_CONSTANTS.DISCORD_SAMPLE_RATE,
+            channels: AUDIO_CONSTANTS.CHANNELS,
+            frameSize: AUDIO_CONSTANTS.DISCORD_FRAME_SIZE,
+        });
+        const resampler = createCaptureResampler();
+        const pcmStream = opusStream.pipe(decoder).pipe(resampler);
 
         const onData = (chunk: Buffer) => {
             if (chunk.length === 0) return;
 
-            const resampled = downsampleToRealtime(chunk);
-            if (resampled.length === 0) return;
-
-            const event: AudioChunkEvent = { guildId, userId, audioBuffer: resampled };
+            const event: AudioChunkEvent = { guildId, userId, audioBuffer: chunk };
             this.emit('audioChunk', event);
         };
 
@@ -103,6 +100,14 @@ export class AudioCaptureHandler extends EventEmitter {
             logger.debug(`[${captureKey}] Cleaning up PCM stream`);
             pcmStream.off('data', onData);
             pcmStream.removeAllListeners();
+            resampler.removeAllListeners();
+            decoder.removeAllListeners();
+            try {
+                decoder.unpipe(resampler);
+            } catch {}
+            try {
+                opusStream.unpipe(decoder);
+            } catch {}
             opusStream.removeAllListeners();
             this.activeReceivers.delete(captureKey);
             this.emitSpeakerSilence(guildId, userId);
@@ -113,6 +118,11 @@ export class AudioCaptureHandler extends EventEmitter {
         pcmStream.once('close', cleanup);
         pcmStream.on('error', (err: Error) => {
             logger.error(`[${captureKey}] PCM stream error:`, err);
+            cleanup();
+        });
+
+        decoder.on('error', (err: Error) => {
+            logger.error(`[${captureKey}] Decoder error:`, err);
             cleanup();
         });
 

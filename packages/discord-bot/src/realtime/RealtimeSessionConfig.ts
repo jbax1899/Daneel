@@ -42,7 +42,6 @@ export class RealtimeSessionConfig {
                 type: 'realtime',
                 model: this.options.model,
                 instructions: this.options.instructions,
-                metadata: this.options.sessionMetadata,
                 output_modalities: ['audio'],
                 audio: {
                     input: {

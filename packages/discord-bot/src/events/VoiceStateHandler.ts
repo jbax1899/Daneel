@@ -226,7 +226,6 @@ export class VoiceStateHandler extends Event {
         const context = this.realtimeContextBuilder.buildContext({ participants });
         const realtimeSession = new RealtimeSession({
             instructions: context.instructions,
-            sessionMetadata: context.metadata,
         });
 
         // Attach listeners only once

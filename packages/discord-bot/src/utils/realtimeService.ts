@@ -10,7 +10,6 @@ export interface RealtimeSessionOptions {
     instructions?: string;
     temperature?: number;
     maxResponseOutputTokens?: number;
-    sessionMetadata?: Record<string, unknown>;
 }
 
 export interface RealtimeEvent {

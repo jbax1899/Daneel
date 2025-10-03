@@ -64,11 +64,12 @@ export class VoiceConnectionManager {
             // Stop any ongoing audio playback
             try {
                 const connectionAny = connection as any;
-                if (connectionAny.state?.subscription) {
+                const subscription = connectionAny.state?.subscription;
+                if (subscription) {
                     logger.debug('[cleanupVoiceConnection] Unsubscribing from audio subscription');
-                    connectionAny.state.subscription.unsubscribe();
+                    subscription.unsubscribe();
                     logger.debug('[cleanupVoiceConnection] Attempting to stop audio player');
-                    connectionAny.state.subscription.player?.stop(true);
+                    subscription.player?.stop(true);
                 }
             } catch (error) {
                 logger.error('Error stopping audio playback:', error);

@@ -50,7 +50,7 @@ const waitForPipeline = async (session: any) => {
     await new Promise(resolve => setImmediate(resolve));
 };
 
-test('RealtimeAudioHandler annotates speaker metadata on commit', async () => {
+test('RealtimeAudioHandler annotates speaker label before commit', async () => {
     const handler = new RealtimeAudioHandler();
     const ws = new MockWebSocket();
     const eventHandler = new MockEventHandler();
@@ -59,12 +59,14 @@ test('RealtimeAudioHandler annotates speaker metadata on commit', async () => {
     await handler.sendAudio(ws as any, eventHandler, chunk, 'Alice', 'user-1');
     await handler.flushAudio(ws as any, eventHandler);
 
-    assert.equal(ws.sent.length, 3);
+    assert.equal(ws.sent.length, 4);
     assert.equal(ws.sent[0].type, 'input_audio_buffer.append');
-    assert.equal(ws.sent[1].type, 'conversation.item.create');
-    assert.deepEqual(ws.sent[1].item.metadata, { speaker: 'Alice', user_id: 'user-1' });
-    assert.equal(ws.sent[1].item.content[0].type, 'input_audio_buffer');
-    assert.equal(ws.sent[2].type, 'input_audio_buffer.commit');
+    assert.equal(ws.sent[1].type, 'input_audio_buffer.append');
+    assert.equal(ws.sent[2].type, 'conversation.item.create');
+    assert.equal(ws.sent[2].item.content[0].type, 'input_text');
+    assert.match(ws.sent[2].item.content[0].text, /Alice/);
+    assert.equal(ws.sent[2].item.content[1].type, 'input_audio_buffer');
+    assert.equal(ws.sent[3].type, 'input_audio_buffer.commit');
     assert.equal(eventHandler.collected, 1);
 });
 
