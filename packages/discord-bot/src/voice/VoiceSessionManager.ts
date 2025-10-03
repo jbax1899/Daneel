@@ -1,7 +1,7 @@
 import { VoiceConnection } from '@discordjs/voice';
 import { RealtimeSession } from '../utils/realtimeService.js';
 import { logger } from '../utils/logger.js';
-import { AudioCaptureHandler } from './AudioCaptureHandler.js';
+import { AudioCaptureHandler, AudioChunkEvent } from './AudioCaptureHandler.js';
 import { AudioPlaybackHandler } from './AudioPlaybackHandler.js';
 
 export interface VoiceSession {
@@ -12,25 +12,22 @@ export interface VoiceSession {
     isActive: boolean;
     lastAudioTime: number;
     initiatingUserId?: string;
-    isCreatingResponse?: boolean;
-    ws?: WebSocket;
+    participantLabels: Map<string, string>;
+    audioPipeline: Promise<void>;
 }
 
 export class VoiceSessionManager {
     private activeSessions: Map<string, VoiceSession> = new Map();
 
-    constructor() {
-        // Initialize
-    }
-
     public createSession(
-        connection: VoiceConnection, 
-        realtimeSession: RealtimeSession, 
-        audioCaptureHandler: AudioCaptureHandler, 
-        audioPlaybackHandler: AudioPlaybackHandler, 
-        initiatingUserId?: string
+        connection: VoiceConnection,
+        realtimeSession: RealtimeSession,
+        audioCaptureHandler: AudioCaptureHandler,
+        audioPlaybackHandler: AudioPlaybackHandler,
+        participants: Map<string, string>,
+        initiatingUserId?: string,
     ): VoiceSession {
-        const session: VoiceSession = {
+        return {
             connection,
             realtimeSession,
             audioCaptureHandler,
@@ -38,16 +35,14 @@ export class VoiceSessionManager {
             isActive: false,
             lastAudioTime: Date.now(),
             initiatingUserId,
-            isCreatingResponse: false
+            participantLabels: new Map(participants),
+            audioPipeline: Promise.resolve(),
         };
-
-        return session;
     }
 
     public addSession(guildId: string, session: VoiceSession): void {
         logger.debug(`Adding session for guild ${guildId}, current sessions: ${this.activeSessions.size}`);
 
-        // Clean up any existing session
         const existingSession = this.activeSessions.get(guildId);
         if (existingSession) {
             logger.warn(`Session already exists for guild ${guildId}, cleaning up existing session`);
@@ -56,92 +51,94 @@ export class VoiceSessionManager {
 
         this.activeSessions.set(guildId, session);
 
-        // Set up event listener for processing speaker audio
-        const eventHandler = async (userId: string, audioBuffer: Buffer) => {
-            logger.debug(`Received processSpeakerAudio event for user ${userId} in guild ${guildId}`);
-            await this.processSpeakerAudioForSession(guildId, userId, audioBuffer);
+        const chunkHandler = (event: AudioChunkEvent) => {
+            if (event.guildId !== guildId) return;
+            this.enqueueAudioTask(guildId, async () => {
+                await this.forwardAudioChunk(guildId, event.userId, event.audioBuffer);
+            });
         };
 
-        session.audioCaptureHandler.on('processSpeakerAudio', eventHandler);
-        (session as any).processSpeakerAudioHandler = eventHandler;
+        const silenceHandler = (event: { guildId: string; userId: string }) => {
+            if (event.guildId !== guildId) return;
+            this.enqueueAudioTask(guildId, async () => {
+                await this.flushRealtimeBuffer(guildId);
+            });
+        };
+
+        session.audioCaptureHandler.on('audioChunk', chunkHandler);
+        session.audioCaptureHandler.on('speakerSilence', silenceHandler);
+
+        (session as any).audioChunkHandler = chunkHandler;
+        (session as any).silenceHandler = silenceHandler;
 
         logger.debug(`Added voice session for guild ${guildId}, total sessions: ${this.activeSessions.size}`);
     }
 
-    private async processSpeakerAudioForSession(guildId: string, userId: string, audioBuffer: Buffer): Promise<void> {
+    private enqueueAudioTask(guildId: string, task: () => Promise<void>): void {
+        const session = this.activeSessions.get(guildId);
+        if (!session) return;
+
+        session.audioPipeline = session.audioPipeline
+            .catch((error) => {
+                logger.error(`Audio pipeline error for guild ${guildId}:`, error);
+            })
+            .then(task)
+            .catch((error) => {
+                logger.error(`Failed audio task for guild ${guildId}:`, error);
+            });
+    }
+
+    private async forwardAudioChunk(guildId: string, userId: string, audioBuffer: Buffer): Promise<void> {
         const session = this.activeSessions.get(guildId);
         if (!session) {
-            logger.warn(`No session found for guild ${guildId} when processing speaker audio`);
+            logger.warn(`No session found for guild ${guildId} when forwarding audio chunk`);
             return;
         }
 
-        // Prevent concurrent response creation
-        if (session.isCreatingResponse) {
-            logger.warn(`Already creating response for guild ${guildId}, skipping`);
+        if (!audioBuffer || audioBuffer.length === 0) {
             return;
         }
 
-        session.isCreatingResponse = true;
-        logger.debug(`Processing ${audioBuffer.length} bytes of audio for user ${userId} in guild ${guildId}`);
+        const label = session.participantLabels.get(userId) || userId;
+        logger.debug(`Forwarding ${audioBuffer.length} bytes for ${label} (${userId}) in guild ${guildId}`);
 
-        try {
-            // Verify session is still active
-            if (!this.activeSessions.has(guildId)) {
-                logger.warn(`Session destroyed for guild ${guildId} during processing`);
-                return;
-            }
+        await session.realtimeSession.sendAudio(audioBuffer, label, userId);
+        session.lastAudioTime = Date.now();
+    }
 
-            logger.debug(`Sending ${audioBuffer.length} bytes to realtime session`);
-            // Send audio chunks
-            await session.realtimeSession.sendAudio(audioBuffer);
-            logger.debug(`Audio collected by server for guild ${guildId}`);
-
-            // Create response if session is still active
-            if (this.activeSessions.has(guildId)) {
-                logger.debug(`Creating response for guild ${guildId}`);
-                
-                try {
-                    // Create the response
-                    session.realtimeSession.createResponse();
-                    
-                    // Wait for response completion (with timeout)
-                    const responseTimeout = new Promise((_, reject) => 
-                        setTimeout(() => reject(new Error('Response timeout')), 10000)
-                    );
-                    
-                    await Promise.race([
-                        session.realtimeSession.waitForResponseCompleted(),
-                        responseTimeout
-                    ]);
-                    
-                    logger.debug(`Response completed for guild ${guildId}`);
-                } catch (error) {
-                    if (error instanceof Error && error.message === 'Response timeout') {
-                        logger.warn(`Response timeout for guild ${guildId}`);
-                    } else {
-                        logger.error(`Error during response creation for guild ${guildId}:`, error);
-                    }
-                }
-            }
-
-        } catch (error) {
-            logger.error(`Error processing audio for guild ${guildId}:`, error);
-        } finally {
-            // Reset the flag after a short delay to prevent race conditions
-            setTimeout(() => {
-                if (session) {
-                    session.isCreatingResponse = false;
-                }
-            }, 500);
+    private async flushRealtimeBuffer(guildId: string): Promise<void> {
+        const session = this.activeSessions.get(guildId);
+        if (!session) {
+            return;
         }
+
+        await session.realtimeSession.flushAudio();
     }
 
     private cleanupSessionEventListeners(session: VoiceSession): void {
-        const handler = (session as any).processSpeakerAudioHandler;
-        if (handler) {
-            session.audioCaptureHandler.off('processSpeakerAudio', handler);
-            delete (session as any).processSpeakerAudioHandler;
+        const chunkHandler = (session as any).audioChunkHandler;
+        if (chunkHandler) {
+            session.audioCaptureHandler.off('audioChunk', chunkHandler);
+            delete (session as any).audioChunkHandler;
         }
+
+        const silenceHandler = (session as any).silenceHandler;
+        if (silenceHandler) {
+            session.audioCaptureHandler.off('speakerSilence', silenceHandler);
+            delete (session as any).silenceHandler;
+        }
+    }
+
+    public updateParticipantLabel(guildId: string, userId: string, displayName: string): void {
+        const session = this.activeSessions.get(guildId);
+        if (!session) return;
+        session.participantLabels.set(userId, displayName);
+    }
+
+    public removeParticipant(guildId: string, userId: string): void {
+        const session = this.activeSessions.get(guildId);
+        if (!session) return;
+        session.participantLabels.delete(userId);
     }
 
     public getSession(guildId: string): VoiceSession | undefined {

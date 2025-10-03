@@ -2,12 +2,14 @@ import { VoiceState } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getVoiceConnection } from '@discordjs/voice';
 import { cleanupVoiceConnection } from './VoiceConnectionManager.js';
+import { VoiceSessionManager } from './VoiceSessionManager.js';
 
 export class UserVoiceStateHandler {
     private initiatingUsers: Map<string, string> = new Map();
+    private sessionManager: VoiceSessionManager;
 
-    constructor() {
-        // Initialize
+    constructor(sessionManager: VoiceSessionManager) {
+        this.sessionManager = sessionManager;
     }
 
     public async handleUserVoiceChange(oldState: VoiceState, newState: VoiceState, client: any, startConversationCallback: (guildId: string) => Promise<void>): Promise<void> {
@@ -54,6 +56,9 @@ export class UserVoiceStateHandler {
 
         logger.info(`[handleUserVoiceChange] User ${user.tag} (${user.id}) joined voice channel ${botVoiceChannel.name}`);
 
+        const displayName = newState.member?.displayName || user.username;
+        this.sessionManager.updateParticipantLabel(guildId, user.id, displayName);
+
         // Double-check the bot is still in the voice channel
         const currentBotChannel = newState.guild.members.me?.voice.channel;
         if (!currentBotChannel || currentBotChannel.id !== botVoiceChannel.id) {
@@ -81,6 +86,10 @@ export class UserVoiceStateHandler {
     private async handleUserLeftBotChannel(oldState: VoiceState, botVoiceChannel: any, guildId: string, client: any): Promise<void> {
         const user = oldState.member?.user;
         logger.info(`User ${user?.tag || 'Unknown'} left voice channel ${botVoiceChannel.name}`);
+
+        if (user) {
+            this.sessionManager.removeParticipant(guildId, user.id);
+        }
 
         // If the bot is alone in the voice channel, clean up
         if (botVoiceChannel.members.size <= 1) {

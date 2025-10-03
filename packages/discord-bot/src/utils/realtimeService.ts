@@ -97,6 +97,7 @@ export class RealtimeSession extends EventEmitter {
         const ws = this.wsManager.getWebSocket();
         if (ws) {
             this.sessionConfig.sendSessionConfig(ws);
+            this.sessionConfig.enableVAD(ws);
         }
     }
 
@@ -107,10 +108,10 @@ export class RealtimeSession extends EventEmitter {
         this.wsManager.disconnect();
     }
 
-    public async sendAudio(audioBuffer: Buffer, instructions: string = ''): Promise<void> {
+    public async sendAudio(audioBuffer: Buffer, speakerLabel: string, speakerId?: string): Promise<void> {
         const ws = this.wsManager.getWebSocket();
         if (ws && this.audioHandler) {
-            await this.audioHandler.sendAudio(ws, this.eventHandler, audioBuffer, instructions);
+            await this.audioHandler.sendAudio(ws, this.eventHandler, audioBuffer, speakerLabel, speakerId);
         }
     }
 
@@ -118,10 +119,7 @@ export class RealtimeSession extends EventEmitter {
      * Commit the current audio buffer for processing
      */
     public async commitAudio(): Promise<void> {
-        const ws = this.wsManager?.getWebSocket();
-        if (ws && this.audioHandler) {
-            return this.audioHandler.commitAudio(ws);
-        }
+        await this.flushAudio();
     }
 
     /**
@@ -131,6 +129,13 @@ export class RealtimeSession extends EventEmitter {
         const ws = this.wsManager.getWebSocket();
         if (ws) {
             this.audioHandler.clearAudio(ws);
+        }
+    }
+
+    public async flushAudio(): Promise<void> {
+        const ws = this.wsManager.getWebSocket();
+        if (ws && this.audioHandler) {
+            await this.audioHandler.flushAudio(ws, this.eventHandler);
         }
     }
 
@@ -158,23 +163,23 @@ export class RealtimeSession extends EventEmitter {
         throw new Error('Event handler not initialized');
     }
 
-    public sendGreeting() {
+    public async sendGreeting(): Promise<void> {
         const ws = this.wsManager.getWebSocket();
         if (!ws) return;
-    
-        this.sessionConfig?.enableVAD(ws);
-    
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
         ws.send(JSON.stringify({
             type: 'conversation.item.create',
             item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: 'Hello!' }] }
         }));
-    
+
         ws.send(JSON.stringify({
             type: 'response.create',
             response: {
                 output_modalities: ['audio'],
-                instructions: this.sessionConfig.getInstructions() + ' Greet the user politely.'
+                instructions: (`${this.sessionConfig.getInstructions() ?? ''}` + " Say: Hello!").trim()
             }
         }));
-    }    
+    }
 }
