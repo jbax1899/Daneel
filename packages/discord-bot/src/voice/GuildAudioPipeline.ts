@@ -1,9 +1,9 @@
 import { PassThrough } from 'stream';
 import { opus } from 'prism-media';
 import { AudioPlayer, createAudioPlayer, AudioPlayerStatus, NoSubscriberBehavior } from '@discordjs/voice';
-import { logger } from '../utils/logger.js';
 import { once } from 'events';
 import { AUDIO_CONSTANTS } from '../constants/voice.js';
+import { logger } from '../utils/logger.js';
 
 export class GuildAudioPipeline {
     private readonly player: AudioPlayer;
@@ -32,11 +32,6 @@ export class GuildAudioPipeline {
             }
         });
         
-        // Set up error handling for the encoder
-        this.opusEncoder.on('error', (error: Error) => {
-            logger.error('[AudioPipeline] Opus encoder error:', error);
-        });
-
         // Increase max listeners to prevent warnings
         this.pcmStream.setMaxListeners(20);
         this.opusEncoder.setMaxListeners(20);  
