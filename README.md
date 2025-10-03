@@ -124,6 +124,13 @@ This architecture ensures reliable, natural, low-latency voice conversations wit
 - [ ] Cache chain of thought
 - [ ] Opt-in, user-deletable memory
 
+### Q4 2025
+- Per-command credit telemetry with monthly USD usage summaries, budget threshold alerts, and documented workflows
+- Discord superuser role with scoped elevated commands, MFA pairing, and auditable action logs
+- Opt-in DM data vault covering encryption, retention timelines, `/erase-me`, and consent guidance
+- Consent confirmation mode that previews risky actions and requires explicit approval before execution
+- `/why` explainer outlining response rationale, triggered guardrails, and confidence hints
+
 ## Configuration
 
 ### Required Environment Variables
