@@ -14,6 +14,9 @@ export interface VoiceSession {
     initiatingUserId?: string;
     participantLabels: Map<string, string>;
     audioPipeline: Promise<void>;
+    usageLimitTimer?: NodeJS.Timeout;
+    usageLimitStartedAt?: number;
+    usageLimitAllowedMs?: number;
 }
 
 export class VoiceSessionManager {
@@ -37,6 +40,9 @@ export class VoiceSessionManager {
             initiatingUserId,
             participantLabels: new Map(participants),
             audioPipeline: Promise.resolve(),
+            usageLimitTimer: undefined,
+            usageLimitStartedAt: undefined,
+            usageLimitAllowedMs: undefined,
         };
     }
 
@@ -149,6 +155,10 @@ export class VoiceSessionManager {
         const session = this.activeSessions.get(guildId);
         if (session) {
             try {
+                if (session.usageLimitTimer) {
+                    clearTimeout(session.usageLimitTimer);
+                    session.usageLimitTimer = undefined;
+                }
                 this.cleanupSessionEventListeners(session);
                 session.realtimeSession.disconnect();
             } catch (error) {

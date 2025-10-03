@@ -182,4 +182,22 @@ export class RealtimeSession extends EventEmitter {
             }
         }));
     }
+
+    public async sendFarewell(message: string): Promise<void> {
+        const ws = this.wsManager.getWebSocket();
+        if (!ws) return;
+
+        ws.send(JSON.stringify({
+            type: 'conversation.item.create',
+            item: { type: 'message', role: 'user', content: [{ type: 'input_text', text: message }] }
+        }));
+
+        ws.send(JSON.stringify({
+            type: 'response.create',
+            response: {
+                output_modalities: ['audio'],
+                instructions: (`${this.sessionConfig.getInstructions() ?? ''}` + ` Say: ${message}`).trim()
+            }
+        }));
+    }
 }
