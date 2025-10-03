@@ -17,11 +17,42 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 - /news command: Fetches recent articles from across the web; Optional arguments for refining search
 - /image command: Generates an image given a prompt; Optional argument for dimensions (square, portrait, landscape)
 
-<img width="900" height="362" alt="image" src="https://github.com/user-attachments/assets/b0ce1cc3-e388-408d-9574-4fdc40d540fc" />
-<img width="909" height="953" alt="image" src="https://github.com/user-attachments/assets/49cd2df9-ec29-4eee-85bb-2a77f6ba8537" />
-<img width="892" height="766" alt="image" src="https://github.com/user-attachments/assets/ccd154a8-bb8a-453e-b15c-07f994f741f6" />
-<img width="567" height="540" alt="image" src="https://github.com/user-attachments/assets/c33798c7-091f-4fba-b483-6231beb0ed8d" />
+#### Realtime Voice Chat
+- **Seamless voice conversations** with OpenAI's Realtime API
+- **Advanced audio processing pipeline** with Discord.js Voice
+- **Real-time transcription and response generation**
 
+**How It Works:**
+
+1. **Voice Channel Setup**: Use `/call <voice_channel>` to invite the bot to a voice channel
+2. **Connection Management**: The bot joins the channel and establishes voice connections using Discord.js Voice
+3. **User Detection**: When you join the voice channel, the bot detects your presence and initiates the conversation
+4. **Audio Capture**: Your voice is captured in real-time using Discord's voice receiver
+5. **Audio Processing**: Raw audio (Opus format) is decoded to PCM and buffered for processing
+6. **OpenAI Integration**: Processed audio is sent to OpenAI's Realtime API for transcription and response generation
+7. **Response Playback**: AI responses are converted back to audio and played in the voice channel
+8. **Session Management**: Automatic cleanup when users leave or connections are lost
+
+**Technical Architecture:**
+
+The voice chat system is built with a modular architecture following Single Responsibility Principle:
+
+- **VoiceSessionManager**: Manages voice channel sessions and connection lifecycle
+- **AudioCaptureHandler**: Handles real-time audio capture and processing from Discord
+- **AudioPlaybackHandler**: Manages audio playback to Discord voice channels
+- **UserVoiceStateHandler**: Processes Discord voice state changes and user interactions
+- **VoiceConnectionManager**: Provides connection utilities and cleanup functionality
+- **RealtimeWebSocketManager**: Manages WebSocket connections to OpenAI's API
+- **RealtimeAudioHandler**: Handles audio-specific operations with OpenAI
+- **RealtimeEventHandler**: Processes events and responses from OpenAI
+- **RealtimeSessionConfig**: Manages session configuration and settings
+
+This architecture ensures reliable, natural, low-latency voice conversations with proper error handling and resource management.
+
+<img width="900" height="362" alt="Example of text-to-speech (TTS)" src="https://github.com/user-attachments/assets/b0ce1cc3-e388-408d-9574-4fdc40d540fc" />
+<img width="909" height="953" alt="Example of image analysis" src="https://github.com/user-attachments/assets/49cd2df9-ec29-4eee-85bb-2a77f6ba8537" />
+<img width="892" height="766" alt="Example of /news command" src="https://github.com/user-attachments/assets/ccd154a8-bb8a-453e-b15c-07f994f741f6" />
+<img width="567" height="540" alt="Example of /image command" src="https://github.com/user-attachments/assets/c33798c7-091f-4fba-b483-6231beb0ed8d" />
 
 ### 🌐 Web Client
 - Next.js 15 with React 19
@@ -88,10 +119,10 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 - [X] Image context processing
 - [X] Web search
 - [X] /news command
-- [ ] Plan refines context
+- [X] Plan reduces conversation history tokens to fit more context
+- [X] Live voice chat via Discord call
 - [ ] Cache chain of thought
 - [ ] Opt-in, user-deletable memory
-- [ ] Live voice chat via Discord call
 
 ## Configuration
 
@@ -140,10 +171,76 @@ daneel/
 │   ├── discord-bot/          # Discord bot implementation
 │   │   ├── src/
 │   │   │   ├── commands/     # Bot command handlers
-│   │   │   ├── events/       # Discord event handlers
+│   │   │   │   ├── BaseCommand.ts  # Base command class
+│   │   │   │   ├── call.ts         # Voice call command
+│   │   │   │   ├── help.ts         # Help command
+│   │   │   │   ├── image.ts        # Image generation command
+│   │   │   │   ├── news.ts         # News fetching command
+│   │   │   │   └── ping.ts         # Ping command
+│   │   │   │
+│   │   │   ├── constants/     # Configuration constants
+│   │   │   │   └── voice.ts   # Voice processing constants
+│   │   │   │
+│   │   │   ├── events/        # Discord event handlers
+│   │   │   │   ├── Event.ts        # Base event class
+│   │   │   │   ├── MessageCreate.ts # Message processing events
+│   │   │   │   └── VoiceStateHandler.ts # Voice state change events
+│   │   │   │
+│   │   │   ├── output/       # Output directories
+│   │   │   │   ├── images/   # Image output storage
+│   │   │   │   └── tts/      # Text-to-speech output storage
+│   │   │   │
+│   │   │   ├── realtime/     # Realtime API integration
+│   │   │   │   ├── RealtimeAudioHandler.ts  # Audio processing for OpenAI Realtime
+│   │   │   │   ├── RealtimeEventHandler.ts  # Event handling for Realtime API
+│   │   │   │   ├── RealtimeSessionConfig.ts # Session configuration
+│   │   │   │   ├── RealtimeWebSocketManager.ts # WebSocket connection management
+│   │   │   │   └── types.ts    # Realtime API type definitions
+│   │   │   │
 │   │   │   ├── types/        # TypeScript type definitions
+│   │   │   │   └── discord.d.ts # Extended Discord.js type definitions
+│   │   │   │
 │   │   │   ├── utils/        # Utility functions
+│   │   │   │   ├── prompting/ # Prompt construction and management
+│   │   │   │   │   ├── ContextBuilder.ts # Builds conversation contexts for AI
+│   │   │   │   │   └── Planner.ts  # Determines response strategy (reply/DM/react)
+│   │   │   │   │
+│   │   │   │   ├── response/  # Response handling
+│   │   │   │   │   ├── EmbedBuilder.ts    # Creates and validates Discord embeds
+│   │   │   │   │   ├── ResponseHandler.ts # Handles formatting and sending responses
+│   │   │   │   │   ├── commandHandler.ts # Command loading and registration
+│   │   │   │   │   ├── env.ts          # Environment variable validation
+│   │   │   │   │   ├── eventManager.ts # Event manager utilities
+│   │   │   │   │   ├── logger.ts       # Logging utilities
+│   │   │   │   │   ├── MessageProcessor.ts # Core message processing pipeline
+│   │   │   │   │   ├── openaiService.ts # OpenAI API integration
+│   │   │   │   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
+│   │   │   │   │   └── realtimeService.ts # Realtime API service utilities
+│   │   │   │   │
+│   │   │   │   ├── commandHandler.ts # Command loading and registration
+│   │   │   │   ├── env.ts          # Environment variable validation
+│   │   │   │   ├── eventManager.ts # Event manager utilities
+│   │   │   │   ├── logger.ts       # Logging utilities
+│   │   │   │   ├── MessageProcessor.ts # Core message processing pipeline
+│   │   │   │   ├── openaiService.ts # OpenAI API integration
+│   │   │   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
+│   │   │   │   └── realtimeService.ts # Realtime API service utilities
+│   │   │   │
+│   │   │   ├── voice/        # Voice processing utilities
+│   │   │   │   ├── AudioCaptureHandler.ts  # Real-time audio capture and processing
+│   │   │   │   ├── AudioPlaybackHandler.ts  # Audio playback to Discord voice channels
+│   │   │   │   ├── UserVoiceStateHandler.ts # Processes Discord voice state changes
+│   │   │   │   ├── VoiceConnectionManager.ts # Connection utilities and cleanup
+│   │   │   │   └── VoiceSessionManager.ts    # Manages voice channel sessions
+│   │   │   │
 │   │   │   └── index.ts      # Bot entry point
+│   │   │
+│   │   ├── dist/            # Compiled JavaScript output
+│   │   ├── logs/            # Log files
+│   │   ├── node_modules/    # Package dependencies
+│   │   ├── package.json     # Package configuration
+│   │   ├── tsconfig.json    # TypeScript configuration
+│   │   └── tsconfig.tsbuildinfo # TypeScript build info
 │   │
 │   ├── frontend/             # Web client application
 │   │   └── web/              # Next.js application

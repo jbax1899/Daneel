@@ -26,6 +26,6 @@
       "@shared/*": ["./packages/shared/src/*"]
     }
   },
-  "include": ["packages/**/*.ts", "packages/**/*.tsx"],
+  "include": ["packages/**/*.ts", "packages/**/*.tsx", "mcp/**/*.ts", "mcp/**/types/*.d.ts"],
   "exclude": ["node_modules", "**/node_modules/*", "**/dist/*"]
 }

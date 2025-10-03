@@ -86,7 +86,7 @@ const imageCommand: Command = {
             if (!allowed) {
                 const seconds = retryAfter ?? 0;
                 const minutes = Math.floor(seconds / 60);
-                await interaction.reply({ content: `⚠️ ${error} Try again in ${minutes}m${seconds % 60}s`, ephemeral: true });
+                await interaction.reply({ content: `⚠️ ${error} Try again in ${minutes}m${seconds % 60}s`, flags: [1 << 6] });
                 return;
             }
         }
@@ -102,7 +102,7 @@ const imageCommand: Command = {
         if (!prompt) {
             await interaction.reply({
                 content: '⚠️ No prompt provided.',
-                ephemeral: true
+                flags: [1 << 6]
             });
             return;
         }

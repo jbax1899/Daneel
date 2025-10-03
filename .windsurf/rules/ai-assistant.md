@@ -25,35 +25,67 @@ trigger: always_on
 ```
 discord-bot/
 ├── src/
-│   ├── commands/           # Bot command handlers
-│   │   ├── BaseCommand.ts  # Base command class
-│   │   ├── help.ts         # Help command
-│   │   └── ping.ts         # Ping command
+│   ├── commands/               # Bot command handlers
+│   │   ├── BaseCommand.ts      # Base command class
+│   │   ├── call.ts             # Call command
+│   │   ├── help.ts             # Help command
+│   │   ├── image.ts            # Image command
+│   │   ├── news.ts             # News command
+│   │   └── ping.ts             # Ping command
 │   │
-│   ├── events/             # Discord event handlers
-│   │   ├── Event.ts        # Base event class
-│   │   ├── MentionBotEvent.ts # Handles @mentions and replies
-│   │   └── ready.ts        # Bot ready event handler
+│   ├── constants/              # Constant definitions
+│   │   └── voice.ts            # Voice-related constants
 │   │
-│   ├── types/              # TypeScript type definitions
-│   │   └── discord.d.ts    # Extended Discord.js type definitions
+│   ├── events/                 # Discord event handlers
+│   │   ├── Event.ts            # Base event class
+│   │   ├── MessageCreate.ts    # Handles message creation events
+│   │   └── VoiceStateHandler.ts # Handles voice state updates
 │   │
-│   ├── utils/              # Utility functions
-│   │   ├── commandHandler.ts # Command loading and registration
-│   │   ├── env.ts          # Environment variable validation
-│   │   ├── logger.ts       # Logging utilities
-│   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
+│   ├── output/                 # Output directories
+│   │   ├── images/             # Image output storage
+│   │   └── tts/                # Text-to-speech output storage
+│   │
+│   ├── realtime/               # Realtime audio and session handling
+│   │   ├── RealtimeAudioHandler.ts
+│   │   ├── RealtimeEventHandler.ts
+│   │   ├── RealtimeSessionConfig.ts
+│   │   ├── RealtimeWebSocketManager.ts
+│   │   └── types.ts ✓
+│   │
+│   ├── types/                  # TypeScript type definitions
+│   │   └── discord.d.ts        # Extended Discord.js type definitions
+│   │
+│   ├── utils/                  # Utility functions
+│   │   ├── MessageProcessor.ts
+│   │   ├── RateLimiter.ts
+│   │   ├── commandHandler.ts
+│   │   ├── env.ts
+│   │   ├── eventManager.ts
+│   │   ├── logger.ts
+│   │   ├── openaiService.ts
+│   │   ├── realtimeService.ts
+│   │   ├── prompting/          # Prompt construction and management
+│   │   │   ├── ContextBuilder.ts # Builds conversation contexts for AI
+│   │   │   └── Planner.ts       # Determines response strategy (reply/DM/react)
 │   │   │
-│   │   ├── prompting/      # Prompt construction and management
-│   │   │   ├── Planner.ts  # Determines response strategy (reply/DM/react)
-│   │   │   └── PromptBuilder.ts # Builds conversation contexts for AI
-│   │   │
-│   │   └── response/       # Response handling
-│   │       ├── ResponseHandler.ts # Handles formatting and sending responses
-│   │       └── EmbedBuilder.ts    # Creates and validates Discord embeds
+│   │   └── response/           # Response handling
+│   │       ├── EmbedBuilder.ts      # Creates and validates Discord embeds
+│   │       └── ResponseHandler.ts   # Handles formatting and sending responses
 │   │
-│   ├── MessageProcessor.ts # Core message processing pipeline
-│   └── index.ts            # Bot entry point
+│   ├── voice/                  # Voice utilities
+│   │   ├── AudioCaptureHandler.ts
+│   │   ├── AudioPlaybackHandler.ts
+│   │   ├── UserVoiceStateHandler.ts
+│   │   ├── VoiceConnectionManager.ts
+│   │   └── VoiceSessionManager.ts
+│   │
+│   └── index.ts                # Bot entry point
+├── dist/
+├── logs/
+├── node_modules/
+├── package.json
+├── tsconfig.json
+└── tsconfig.tsbuildinfo
 ```
 
 #### 2. Frontend (`/packages/frontend`)

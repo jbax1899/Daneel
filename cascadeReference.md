@@ -43,7 +43,6 @@ Some rules to follow (for Cascade):
 
 ### Dev Tools
 - Bundler: Turbopack
-- Linting: ESLint + Prettier
 - CI/CD: GitHub Actions
 - Deployment: Fly.io
 
@@ -55,14 +54,30 @@ discord-bot/
 ├── src/
 │   ├── commands/           # Bot command handlers
 │   │   ├── BaseCommand.ts  # Base command class
+│   │   ├── call.ts         # Voice call command
 │   │   ├── help.ts         # Help command
 │   │   ├── image.ts        # Image generation command
-│   │   ├── news.ts          # News fetching command
+│   │   ├── news.ts         # News fetching command
 │   │   └── ping.ts         # Ping command
+│   │
+│   ├── constants/           # Configuration constants
+│   │   └── voice.ts        # Voice processing constants
 │   │
 │   ├── events/             # Discord event handlers
 │   │   ├── Event.ts        # Base event class
-│   │   └── MessageCreate.ts # Handles message creation events
+│   │   ├── MessageCreate.ts # Message processing events
+│   │   └── VoiceStateHandler.ts # Voice state change events
+│   │
+│   ├── output/             # Output directories
+│   │   ├── images/         # Image output storage
+│   │   └── tts/            # Text-to-speech output storage
+│   │
+│   ├── realtime/           # Realtime API integration
+│   │   ├── RealtimeAudioHandler.ts  # Audio processing for OpenAI Realtime
+│   │   ├── RealtimeEventHandler.ts  # Event handling for Realtime API
+│   │   ├── RealtimeSessionConfig.ts # Session configuration
+│   │   ├── RealtimeWebSocketManager.ts # WebSocket connection management
+│   │   └── types.ts        # Realtime API type definitions
 │   │
 │   ├── types/              # TypeScript type definitions
 │   │   └── discord.d.ts    # Extended Discord.js type definitions
@@ -75,6 +90,7 @@ discord-bot/
 │   │   ├── MessageProcessor.ts # Core message processing pipeline
 │   │   ├── openaiService.ts # OpenAI integration for AI responses
 │   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
+│   │   ├── realtimeService.ts # Realtime API service utilities
 │   │   │
 │   │   ├── prompting/      # Prompt construction and management
 │   │   │   ├── ContextBuilder.ts # Builds conversation contexts for AI
@@ -83,6 +99,13 @@ discord-bot/
 │   │   └── response/       # Response handling
 │   │       ├── EmbedBuilder.ts    # Discord embed building utilities
 │   │       └── ResponseHandler.ts # Handles formatting and sending responses
+│   │
+│   ├── voice/              # Voice processing utilities
+│   │   ├── AudioCaptureHandler.ts  # Real-time audio capture and processing
+│   │   ├── AudioPlaybackHandler.ts  # Audio playback to Discord voice channels
+│   │   ├── UserVoiceStateHandler.ts # Processes Discord voice state changes
+│   │   ├── VoiceConnectionManager.ts # Connection utilities and cleanup
+│   │   └── VoiceSessionManager.ts    # Manages voice channel sessions
 │   │
 │   └── index.ts            # Bot entry point
 ```

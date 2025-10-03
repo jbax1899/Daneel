@@ -41,6 +41,14 @@ export abstract class Event {
   public abstract execute(...args: any[]): Promise<void> | void;
 
   /**
+   * Optional method to register an initiating user for events that need it
+   * @param {string} guildId - The ID of the guild
+   * @param {string} userId - The ID of the user
+   * @returns {void}
+   */
+  public registerInitiatingUser?(guildId: string, userId: string): void;
+
+  /**
    * Registers the event with the Discord.js client.
    * @param {Client} client - The Discord.js client instance
    */

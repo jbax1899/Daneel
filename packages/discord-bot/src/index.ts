@@ -6,6 +6,7 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
+import { Collection } from 'discord.js';
 //import express from 'express'; // For webhook
 //import bodyParser from "body-parser"; // For webhook
 
@@ -41,10 +42,14 @@ const eventManager = new EventManager(client, {
   openaiService 
 });
 
+// Initialize client handlers
+client.handlers = new Collection();
+
+// VoiceStateHandler will be instantiated by EventManager (auto-registers itself to client.handlers)
+
 // ====================
 // Load and Register Commands
 // ====================
-
 // Use an async IIFE to handle top-level await
 (async () => {
   try {
@@ -85,7 +90,6 @@ const eventManager = new EventManager(client, {
 // ====================
 // Process Handlers
 // ====================
-
 // Client ready handler
 client.once(Events.ClientReady, () => {
   logger.info(`Logged in as ${client.user?.tag}`);
@@ -98,42 +102,16 @@ client.on(Events.InteractionCreate, async interaction => {
   const command = (interaction.client as any).commands?.get(interaction.commandName);
 
   if (!command) {
-    logger.warn(`No command matching ${interaction.commandName} was found.`);
-    // Only try to reply if not already handled
-    if (!interaction.replied && !interaction.deferred) {
-      return interaction.reply({
-        content: 'This command is not available.',
-        flags: [1 << 6] // EPHEMERAL
-      }).catch(console.error);
-    }
+    logger.error(`No command matching ${interaction.commandName} was found.`);
     return;
   }
 
   logger.info(`Executing command: ${interaction.commandName}`);
   
   try {
-    // Let the command handle its own defer/reply logic
     await command.execute(interaction);
   } catch (error) {
     logger.error(`Error executing command ${interaction.commandName}:`, error);
-    
-    // Only try to send an error message if we haven't already replied
-    if (!interaction.replied) {
-      try {
-        if (interaction.deferred) {
-          await interaction.editReply({
-            content: 'There was an error executing this command!'
-          });
-        } else {
-          await interaction.reply({
-            content: 'There was an error executing this command!',
-            flags: [1 << 6] // EPHEMERAL
-          });
-        }
-      } catch (replyError) {
-        logger.error(`Failed to send error message:`, replyError);
-      }
-    }
   }
 });
 

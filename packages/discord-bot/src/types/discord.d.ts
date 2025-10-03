@@ -4,23 +4,24 @@
  * Extends the base Discord.js types with custom application-specific types.
  */
 
-import { Collection } from 'discord.js';
+import { Collection, Client as DiscordClient } from 'discord.js';
 import { Command } from '../commands/BaseCommand';
+import { Event } from '../events/Event';
 
-/**
- * Extends the Discord.js Client interface with custom properties
- * @module discord.js-extensions
- */
 declare module 'discord.js' {
   /**
    * Extended Discord.js Client interface with custom properties
    * @template Ready - Whether the client is ready (boolean literal type)
    */
-  export interface Client<Ready extends boolean = boolean> {
+  export interface Client<Ready extends boolean = boolean> extends DiscordClient<Ready> {
     /**
      * Collection of registered commands, mapped by command name
-     * @type {Collection<string, Command>}
      */
     commands: Collection<string, Command>;
+    
+    /**
+     * Map of event handlers, mapped by handler name
+     */
+    handlers: Collection<string, any>;
   }
 }

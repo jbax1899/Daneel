@@ -72,12 +72,35 @@ export class EventManager {
           // Check if we found a valid event class
           if (typeof EventClass === 'function' && EventClass.prototype && 
               typeof EventClass.prototype.execute === 'function') {
+            let instantiated = false;
+            // Try (client)
             try {
-              const event = new EventClass(this.dependencies);
+              const event = new EventClass(this.client);
               this.events.push(event);
-              logger.debug(`Successfully loaded event: ${file}`);
-            } catch (error) {
-              logger.error(`Failed to instantiate event from ${file}:`, error);
+              instantiated = true;
+              logger.debug(`Successfully loaded event (client ctor): ${file}`);
+            } catch {}
+
+            // Try (dependencies)
+            if (!instantiated) {
+              try {
+                const event = new EventClass(this.dependencies);
+                this.events.push(event);
+                instantiated = true;
+                logger.debug(`Successfully loaded event (deps ctor): ${file}`);
+              } catch {}
+            }
+
+            // Try () no-arg
+            if (!instantiated) {
+              try {
+                const event = new EventClass();
+                this.events.push(event);
+                instantiated = true;
+                logger.debug(`Successfully loaded event (no-arg ctor): ${file}`);
+              } catch (error) {
+                logger.error(`Failed to instantiate event from ${file}:`, error);
+              }
             }
           } else {
             logger.warn(`Skipping ${file}: No valid event class found`);
