@@ -178,7 +178,7 @@ export class RealtimeSession extends EventEmitter {
             type: 'response.create',
             response: {
                 output_modalities: ['audio'],
-                instructions: `${this.sessionConfig.getInstructions() ?? ''} Greet the user politely.`.trim()
+                instructions: (`${this.sessionConfig.getInstructions() ?? ''}` + " Say: Hello!").trim()
             }
         }));
     }

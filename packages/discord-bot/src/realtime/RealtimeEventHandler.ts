@@ -2,20 +2,16 @@ import { EventEmitter } from 'events';
 import { logger } from '../utils/logger.js';
 import { RealtimeEvent, RealtimeResponseTextDeltaEvent, RealtimeResponseAudioDeltaEvent, RealtimeResponseCompletedEvent, RealtimeErrorEvent } from '../utils/realtimeService.js';
 import { RealtimeWebSocketManager } from './RealtimeWebSocketManager.js';
-import { mkdir, writeFile } from 'fs/promises';
-import { join } from 'path';
 
 export class RealtimeEventHandler extends EventEmitter {
     private wsManager: RealtimeWebSocketManager | null = null;
     private isEventHandlersSetup = false;
     private audioBuffer: Buffer[] = [];
     private isCollectingAudio = false;
-    private readonly audioDumpDir: string;
 
     constructor() {
         super();
         this.setMaxListeners(20); // Increase max listeners to prevent memory leak warnings
-        this.audioDumpDir = join(process.cwd(), 'output', 'audio');
         this.setupInternalEventHandlers();
     }
 
@@ -68,7 +64,6 @@ export class RealtimeEventHandler extends EventEmitter {
                 const bufferedChunks = this.audioBuffer.slice();
                 const totalBytes = bufferedChunks.reduce((n, b) => n + b.length, 0);
                 logger.debug(`[RealtimeEventHandler] Final buffered length: ${totalBytes} bytes`);
-                void this.persistBufferedAudio(totalBytes, bufferedChunks);
             }
             this.isCollectingAudio = false;
             this.audioBuffer = [];
@@ -88,24 +83,6 @@ export class RealtimeEventHandler extends EventEmitter {
         this.on('conversation.item.input_audio_buffer.collected', () => {
             this.emit('audio_collected');
         });
-    }
-
-    private async persistBufferedAudio(totalBytes: number, chunks: Buffer[]): Promise<void> {
-        if (totalBytes === 0 || chunks.length === 0) {
-            return;
-        }
-
-        try {
-            await mkdir(this.audioDumpDir, { recursive: true });
-            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-            const filePath = join(this.audioDumpDir, `response-${timestamp}.pcm`);
-            const combined = Buffer.concat(chunks);
-
-            await writeFile(filePath, combined);
-            logger.info(`[RealtimeEventHandler] Saved response audio dump: ${filePath} (${combined.length} bytes)`);
-        } catch (error) {
-            logger.error('[RealtimeEventHandler] Failed to write audio dump:', error);
-        }
     }
 
     public handleEvent(event: RealtimeEvent): void {
