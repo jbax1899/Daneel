@@ -3,6 +3,7 @@ import { RealtimeSession } from '../utils/realtimeService.js';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';
 import { AUDIO_CONSTANTS, TIMEOUT_CONSTANTS } from '../constants/voice.js';
+import { createCaptureResampler } from './audioTransforms.js';
 import { getVoiceConnection } from '@discordjs/voice';
 import { EventEmitter } from 'events';
 
@@ -59,12 +60,16 @@ export class AudioCaptureHandler extends EventEmitter {
         });
 
         const pcmStream = opusStream.pipe(
-            new prism.opus.Decoder({ 
-                rate: AUDIO_CONSTANTS.SAMPLE_RATE, 
-                channels: AUDIO_CONSTANTS.CHANNELS, 
-                frameSize: AUDIO_CONSTANTS.FRAME_SIZE 
+            new prism.opus.Decoder({
+                rate: AUDIO_CONSTANTS.DISCORD_SAMPLE_RATE,
+                channels: AUDIO_CONSTANTS.CHANNELS,
+                frameSize: AUDIO_CONSTANTS.DISCORD_FRAME_SIZE
             })
         );
+
+        const ffmpegResampler = createCaptureResampler();
+
+        const resampledStream = pcmStream.pipe(ffmpegResampler);
 
         // Create a local buffer for THIS specific speaking session
         const audioChunks: Buffer[] = [];
@@ -107,16 +112,20 @@ export class AudioCaptureHandler extends EventEmitter {
             }, TIMEOUT_CONSTANTS.SILENCE_DURATION * 2); // Slightly longer than the silence duration
         };
 
-        pcmStream.on('data', (chunk: Buffer) => {
-            logger.debug(`[${captureKey}] Received PCM chunk: ${chunk.length} bytes`);
+        resampledStream.on('data', (chunk: Buffer) => {
+            logger.debug(`[${captureKey}] Received resampled PCM chunk: ${chunk.length} bytes`);
             audioChunks.push(chunk);
             resetSilenceTimer();
         });
 
-        pcmStream.on('end', () => {
-            const duration = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0) / (AUDIO_CONSTANTS.SAMPLE_RATE * 2) * 1000;
-            logger.debug(`[${captureKey}] PCM stream ended after ${duration.toFixed(0)}ms, processing audio...`);
+        resampledStream.on('end', () => {
+            const duration = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0) / (AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE * 2) * 1000;
+            logger.debug(`[${captureKey}] Resampled PCM stream ended after ${duration.toFixed(0)}ms, processing audio...`);
             processAudio();
+        });
+
+        ffmpegResampler.on('error', (err: Error) => {
+            logger.error(`[${captureKey}] FFmpeg resampler error:`, err);
         });
 
         opusStream.on('error', (err: Error) => {
@@ -137,7 +146,7 @@ export class AudioCaptureHandler extends EventEmitter {
         const chunkCount = audioChunks.length;
 
         // Calculate duration in milliseconds (16-bit mono at 24kHz)
-        const durationMs = (totalAudioBytes / 2 / AUDIO_CONSTANTS.SAMPLE_RATE) * 1000;
+        const durationMs = (totalAudioBytes / 2 / AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE) * 1000;
 
         // Intent indicators: duration > 300ms AND multiple chunks (not just noise)
         const isIntentional = durationMs > 300 && chunkCount > 3;
