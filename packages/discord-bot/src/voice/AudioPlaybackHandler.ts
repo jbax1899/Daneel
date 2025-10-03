@@ -3,14 +3,20 @@ import { logger } from '../utils/logger.js';
 import { GuildAudioPipeline } from './GuildAudioPipeline.js';
 import { upsampleToDiscord } from './audioTransforms.js';
 
+const PIPELINE_IDLE_CLEANUP_DELAY_MS = 2000;
+const QUEUE_RETRY_DELAY_MS = 100;
+
 export class AudioPlaybackHandler {
     private pipelines: Map<string, GuildAudioPipeline> = new Map();
     private audioQueues: Map<string, Buffer[]> = new Map();
     private isProcessingQueue: Map<string, boolean> = new Map();
+    private pipelineCleanupTimers: Map<string, NodeJS.Timeout> = new Map();
 
     public async playAudioToChannel(connection: VoiceConnection, audioData: Buffer): Promise<void> {
         const guildId = connection.joinConfig.guildId;
         logger.debug(`[AudioPlayback] Adding audio chunk to queue for guild ${guildId}`);
+
+        this.clearPipelineCleanupTimer(guildId);
 
         if (!this.audioQueues.has(guildId)) {
             this.audioQueues.set(guildId, []);
@@ -42,19 +48,33 @@ export class AudioPlaybackHandler {
 
         const player = pipeline.getPlayer();
 
+        pipeline.getOpusEncoder().once('error', (error: Error) => {
+            logger.error(`[AudioPlayback] Opus encoder error for guild ${guildId}:`, error);
+            const queue = this.audioQueues.get(guildId);
+            this.cleanupPipeline(guildId);
+            if (queue && queue.length > 0) {
+                this.retryProcessingQueue(connection);
+            }
+        });
+
         player.on(AudioPlayerStatus.Idle, () => {
             logger.debug(`[AudioPlayback] Player idle for guild ${guildId}, checking for more audio`);
-            this.processAudioQueue(connection).catch((error: Error) => {
-                logger.error(`[AudioPlayback] Error processing next item in queue:`, error);
-                this.isProcessingQueue.set(guildId, false);
-            });
+            this.processAudioQueue(connection)
+                .catch((error: Error) => {
+                    logger.error(`[AudioPlayback] Error processing next item in queue:`, error);
+                })
+                .finally(() => {
+                    const queue = this.audioQueues.get(guildId);
+                    if (!queue || queue.length === 0) {
+                        this.schedulePipelineCleanup(guildId);
+                    }
+                });
         });
 
         player.on('error', (error: AudioPlayerError) => {
             logger.error(`[AudioPlayback] Player error for guild ${guildId}:`, error);
-            this.isProcessingQueue.set(guildId, false);
             this.cleanupPipeline(guildId);
-            setTimeout(() => this.processAudioQueue(connection), 1000);
+            this.retryProcessingQueue(connection);
         });
 
         try {
@@ -76,18 +96,20 @@ export class AudioPlaybackHandler {
 
         if (!queue || queue.length === 0) {
             logger.debug(`[AudioPlayback] Queue is empty for guild ${guildId}`);
-            this.isProcessingQueue.set(guildId, false);
+            return;
+        }
+
+        if (this.isProcessingQueue.get(guildId)) {
             return;
         }
 
         this.isProcessingQueue.set(guildId, true);
+        this.clearPipelineCleanupTimer(guildId);
+
+        let encounteredError = false;
 
         try {
-            const pipeline = this.pipelines.get(guildId);
-            if (!pipeline) {
-                throw new Error(`No pipeline found for guild ${guildId}`);
-            }
-
+            const pipeline = this.pipelines.get(guildId) ?? this.ensurePipeline(connection);
             const player = pipeline.getPlayer();
 
             if (!pipeline.hasResource()) {
@@ -112,15 +134,28 @@ export class AudioPlaybackHandler {
                     await pipeline.writePCM(pcmChunk);
                 } catch (error) {
                     logger.error('[AudioPlayback] Error writing audio data to pipeline:', error);
+                    if (audioData) {
+                        queue.unshift(audioData);
+                    }
+                    encounteredError = true;
+                    this.cleanupPipeline(guildId);
+                    break;
                 }
             }
-            await pipeline.flushResidualBuffer();
 
-            this.isProcessingQueue.set(guildId, false);
+            if (!encounteredError) {
+                await pipeline.flushResidualBuffer();
+            }
         } catch (error) {
+            encounteredError = true;
             logger.error('[AudioPlayback] Error in processAudioQueue:', error);
+            this.cleanupPipeline(guildId);
+        } finally {
             this.isProcessingQueue.set(guildId, false);
-            setTimeout(() => this.processAudioQueue(connection), 1000);
+        }
+
+        if (encounteredError) {
+            this.retryProcessingQueue(connection);
         }
     }
 
@@ -142,6 +177,60 @@ export class AudioPlaybackHandler {
         }
     }
 
+    private clearPipelineCleanupTimer(guildId: string): void {
+        const timer = this.pipelineCleanupTimers.get(guildId);
+        if (timer) {
+            clearTimeout(timer);
+            this.pipelineCleanupTimers.delete(guildId);
+        }
+    }
+
+    private schedulePipelineCleanup(guildId: string): void {
+        if (!this.pipelines.has(guildId) || this.pipelineCleanupTimers.has(guildId)) {
+            return;
+        }
+
+        const timer = setTimeout(() => {
+            this.pipelineCleanupTimers.delete(guildId);
+            const queue = this.audioQueues.get(guildId);
+            if (queue && queue.length > 0) {
+                return;
+            }
+            this.cleanupPipeline(guildId);
+        }, PIPELINE_IDLE_CLEANUP_DELAY_MS);
+
+        if (typeof timer.unref === 'function') {
+            timer.unref();
+        }
+
+        this.pipelineCleanupTimers.set(guildId, timer);
+    }
+
+    private retryProcessingQueue(connection: VoiceConnection): void {
+        const guildId = connection.joinConfig.guildId;
+
+        const timer = setTimeout(() => {
+            const queue = this.audioQueues.get(guildId);
+            if (!queue || queue.length === 0) {
+                return;
+            }
+
+            if (this.isProcessingQueue.get(guildId)) {
+                return;
+            }
+
+            if (connection.state.status === 'destroyed') {
+                return;
+            }
+
+            void this.processAudioQueue(connection);
+        }, QUEUE_RETRY_DELAY_MS);
+
+        if (typeof timer.unref === 'function') {
+            timer.unref();
+        }
+    }
+
     private cleanupPipeline(guildId: string): void {
         const pipeline = this.pipelines.get(guildId);
         if (pipeline) {
@@ -150,6 +239,8 @@ export class AudioPlaybackHandler {
             });
             this.pipelines.delete(guildId);
         }
+        this.clearPipelineCleanupTimer(guildId);
+        this.isProcessingQueue.set(guildId, false);
     }
 
     public cleanupGuild(guildId: string): void {
@@ -164,5 +255,7 @@ export class AudioPlaybackHandler {
         }
         this.audioQueues.clear();
         this.isProcessingQueue.clear();
+        this.pipelineCleanupTimers.forEach((timer) => clearTimeout(timer));
+        this.pipelineCleanupTimers.clear();
     }
 }
