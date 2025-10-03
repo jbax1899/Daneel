@@ -11,6 +11,8 @@ export class AudioPlaybackHandler {
     private audioQueues: Map<string, Buffer[]> = new Map();
     private isProcessingQueue: Map<string, boolean> = new Map();
     private pipelineCleanupTimers: Map<string, NodeJS.Timeout> = new Map();
+    private pipelineErrorHandlers: Map<string, (error: Error) => void> = new Map();
+    private pipelinesBeingDestroyed: Set<string> = new Set();
 
     public async playAudioToChannel(connection: VoiceConnection, audioData: Buffer): Promise<void> {
         const guildId = connection.joinConfig.guildId;
@@ -48,14 +50,26 @@ export class AudioPlaybackHandler {
 
         const player = pipeline.getPlayer();
 
-        pipeline.getOpusEncoder().once('error', (error: Error) => {
+        const encoderErrorHandler = (error: Error) => {
+            if (this.pipelinesBeingDestroyed.has(guildId)) {
+                if (error?.message === 'Premature close') {
+                    logger.debug(`[AudioPlayback] Opus encoder closed while cleaning up guild ${guildId}`);
+                } else {
+                    logger.warn(`[AudioPlayback] Ignoring encoder error during cleanup for guild ${guildId}:`, error);
+                }
+                return;
+            }
+
             logger.error(`[AudioPlayback] Opus encoder error for guild ${guildId}:`, error);
             const queue = this.audioQueues.get(guildId);
             this.cleanupPipeline(guildId);
             if (queue && queue.length > 0) {
                 this.retryProcessingQueue(connection);
             }
-        });
+        };
+
+        pipeline.getOpusEncoder().on('error', encoderErrorHandler);
+        this.pipelineErrorHandlers.set(guildId, encoderErrorHandler);
 
         player.on(AudioPlayerStatus.Idle, () => {
             logger.debug(`[AudioPlayback] Player idle for guild ${guildId}, checking for more audio`);
@@ -234,8 +248,19 @@ export class AudioPlaybackHandler {
     private cleanupPipeline(guildId: string): void {
         const pipeline = this.pipelines.get(guildId);
         if (pipeline) {
+            const handler = this.pipelineErrorHandlers.get(guildId);
+            const encoder = pipeline.getOpusEncoder();
+
+            this.pipelinesBeingDestroyed.add(guildId);
+
             void pipeline.destroy().catch((error: Error) => {
                 logger.error(`[AudioPlayback] Error cleaning up pipeline for guild ${guildId}:`, error);
+            }).finally(() => {
+                this.pipelinesBeingDestroyed.delete(guildId);
+                if (handler) {
+                    encoder.off('error', handler);
+                    this.pipelineErrorHandlers.delete(guildId);
+                }
             });
             this.pipelines.delete(guildId);
         }

@@ -69,10 +69,12 @@ export class RealtimeEventHandler extends EventEmitter {
             this.audioBuffer = [];
         });
 
-        // Handle response completion
-        this.on('response.completed', (event: RealtimeResponseCompletedEvent) => {
+        // Handle response completion events from different schema versions
+        const onResponseCompleted = (event: RealtimeResponseCompletedEvent) => {
             this.emit('responseComplete', event);
-        });
+        };
+
+        this.on('response.completed', onResponseCompleted);
 
         // Handle errors
         this.on('error', (event: RealtimeErrorEvent) => {
@@ -106,6 +108,9 @@ export class RealtimeEventHandler extends EventEmitter {
         } else {
             // Emit both the specific event type and a generic 'event' for other events
             this.emit(event.type, event);
+            if (event.type === 'response.done') {
+                this.emit('response.completed', event as any);
+            }
             this.emit('event', event);
         }
 
