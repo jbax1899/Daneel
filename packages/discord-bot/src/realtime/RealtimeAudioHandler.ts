@@ -2,99 +2,138 @@ import WebSocket from 'ws';
 import { logger } from '../utils/logger.js';
 import { RealtimeEventHandler } from './RealtimeEventHandler.js';
 
+const COMMIT_INACTIVITY_MS = 320;
+
+interface PendingSpeaker {
+    label: string;
+    userId?: string;
+}
+
 /**
- * Audio handler that manages buffer append and commit
+ * Streams PCM audio to the realtime API and commits buffers on cadence.
  */
 export class RealtimeAudioHandler {
-    private pendingCommit: boolean = false;
-    private lastAppendTime: number = 0;
+    private pendingCommit = false;
+    private lastAppendTime = 0;
+    private pendingSpeaker: PendingSpeaker | null = null;
+    private commitTimer: NodeJS.Timeout | null = null;
 
-    constructor() {
-        // Initialize
-    }
-
-    public async sendAudio(ws: WebSocket, eventHandler: RealtimeEventHandler, audioBuffer: Buffer, _instructions: string = ''): Promise<void> {
-        if (!ws || ws.readyState !== WebSocket.OPEN) throw new Error('WebSocket is not connected');
-        if (!audioBuffer || audioBuffer.length === 0) {
-            logger.warn('[realtime] Ignoring empty audio buffer');
-            return;
-        }
-
-        ws.send(JSON.stringify({ type: 'input_audio_buffer.append', audio: audioBuffer.toString('base64') }));
-        this.lastAppendTime = Date.now();
-        this.pendingCommit = true;
-
-        logger.debug(`[realtime] Sent audio chunk: ${audioBuffer.length} bytes`);
-
-        await this.commitAudio(ws);   // commit & clear only
-
-        // wait for server collection; response.create is triggered elsewhere (VoiceSessionManager)
-        if (eventHandler) await eventHandler.waitForAudioCollected();
-    }
-
-    public async commitAudio(ws: WebSocket): Promise<void> {
+    public async sendAudio(
+        ws: WebSocket,
+        eventHandler: RealtimeEventHandler,
+        audioBuffer: Buffer,
+        speakerLabel: string,
+        speakerId?: string,
+    ): Promise<void> {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             throw new Error('WebSocket is not connected');
         }
-    
-        if (!this.pendingCommit) {
-            logger.debug('[realtime] No pending audio to commit');
+        if (!audioBuffer || audioBuffer.length === 0) {
+            logger.debug('[realtime] Ignoring empty audio buffer');
             return;
         }
-    
-        try {
-            // Ensure a small delay after last append
-            const timeSinceLastAppend = Date.now() - this.lastAppendTime;
-            if (timeSinceLastAppend < 100) {
-                await new Promise(resolve => setTimeout(resolve, 100 - timeSinceLastAppend));
-            }
-    
-            // Send commit event
-            ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
-            logger.debug('[realtime] Committed audio buffer');
-    
-            // Clear the local buffer
-            this.clearAudio(ws);
-        } catch (error) {
-            logger.error('[realtime] Error committing audio:', error);
-            throw error;
-        } finally {
-            this.pendingCommit = false;
+
+        if (this.pendingSpeaker && this.pendingSpeaker.label !== speakerLabel) {
+            await this.flushAudio(ws, eventHandler);
         }
+
+        ws.send(JSON.stringify({
+            type: 'input_audio_buffer.append',
+            audio: audioBuffer.toString('base64'),
+        }));
+
+        this.pendingSpeaker = { label: speakerLabel, userId: speakerId };
+        this.lastAppendTime = Date.now();
+        this.pendingCommit = true;
+
+        logger.debug(`[realtime] Sent audio chunk (${audioBuffer.length} bytes) for ${speakerLabel}`);
+
+        this.scheduleCommit(ws, eventHandler);
     }
 
-    public sendResponseRequest(ws: WebSocket, instructions: string = ''): void {
-        if (!ws || ws.readyState !== WebSocket.OPEN) return;
-    
-        const responseEvent = {
-            type: 'response.create',
-            response: {
-                output_modalities: ['audio'],
-                instructions,
-            },
-        };
-        ws.send(JSON.stringify(responseEvent));
-        logger.debug('[realtime] Sent response.create event');
-    }    
+    private scheduleCommit(ws: WebSocket, eventHandler: RealtimeEventHandler): void {
+        if (this.commitTimer) {
+            clearTimeout(this.commitTimer);
+        }
+
+        this.commitTimer = setTimeout(() => {
+            void this.flushAudio(ws, eventHandler).catch((error) => {
+                logger.error('[realtime] Failed to flush audio buffer:', error);
+            });
+        }, COMMIT_INACTIVITY_MS);
+    }
+
+    public async flushAudio(ws: WebSocket, eventHandler: RealtimeEventHandler): Promise<void> {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+            throw new Error('WebSocket is not connected');
+        }
+
+        if (!this.pendingCommit) {
+            return;
+        }
+
+        if (this.commitTimer) {
+            clearTimeout(this.commitTimer);
+            this.commitTimer = null;
+        }
+
+        const elapsed = Date.now() - this.lastAppendTime;
+        if (elapsed < 20) {
+            await new Promise(resolve => setTimeout(resolve, 20 - elapsed));
+        }
+
+        if (this.pendingSpeaker) {
+            ws.send(JSON.stringify({
+                type: 'conversation.item.create',
+                item: {
+                    type: 'message',
+                    role: 'user',
+                    content: [{ type: 'input_audio_buffer' }],
+                    metadata: {
+                        speaker: this.pendingSpeaker.label,
+                        user_id: this.pendingSpeaker.userId,
+                    },
+                },
+            }));
+        }
+
+        ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
+        logger.debug('[realtime] Committed audio buffer');
+
+        this.pendingCommit = false;
+        this.pendingSpeaker = null;
+
+        try {
+            await eventHandler.waitForAudioCollected();
+        } catch (error) {
+            logger.warn('[realtime] Error waiting for audio collection:', error);
+        }
+    }
 
     public clearAudio(ws: WebSocket): void {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             logger.debug('[realtime] WebSocket not ready for clear operation');
             return;
         }
-    
-        const clearEvent = {
-            type: 'input_audio_buffer.clear'
-        };
-        
-        ws.send(JSON.stringify(clearEvent));
+
+        ws.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
         this.pendingCommit = false;
-        
+        this.pendingSpeaker = null;
+        if (this.commitTimer) {
+            clearTimeout(this.commitTimer);
+            this.commitTimer = null;
+        }
+
         logger.debug('[realtime] Cleared audio buffer');
     }
 
     public resetState(): void {
         this.pendingCommit = false;
+        this.pendingSpeaker = null;
         this.lastAppendTime = 0;
+        if (this.commitTimer) {
+            clearTimeout(this.commitTimer);
+            this.commitTimer = null;
+        }
     }
 }

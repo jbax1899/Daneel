@@ -1,4 +1,4 @@
-import { Events, Client, VoiceState, ClientEvents } from 'discord.js';
+import { Events, Client, VoiceState, ClientEvents, VoiceBasedChannel, GuildMember } from 'discord.js';
 import { Event } from './Event.js';
 import { getVoiceConnection, VoiceConnection } from '@discordjs/voice';
 import { RealtimeSession } from '../utils/realtimeService.js';
@@ -8,6 +8,7 @@ import { AudioCaptureHandler } from '../voice/AudioCaptureHandler.js';
 import { AudioPlaybackHandler } from '../voice/AudioPlaybackHandler.js';
 import { UserVoiceStateHandler } from '../voice/UserVoiceStateHandler.js';
 import { VoiceConnectionManager } from '../voice/VoiceConnectionManager.js';
+import { RealtimeContextBuilder, RealtimeContextParticipant } from '../utils/prompting/RealtimeContextBuilder.js';
 
 export class VoiceStateHandler extends Event {
     private sessionManager: VoiceSessionManager;
@@ -16,6 +17,7 @@ export class VoiceStateHandler extends Event {
     private userVoiceStateHandler: UserVoiceStateHandler;
     private connectionManager: VoiceConnectionManager;
     private client: Client;
+    private realtimeContextBuilder: RealtimeContextBuilder;
 
     constructor(client: Client) {
         super({
@@ -27,8 +29,9 @@ export class VoiceStateHandler extends Event {
         this.sessionManager = new VoiceSessionManager();
         this.audioCaptureHandler = new AudioCaptureHandler();
         this.audioPlaybackHandler = new AudioPlaybackHandler();
-        this.userVoiceStateHandler = new UserVoiceStateHandler();
+        this.userVoiceStateHandler = new UserVoiceStateHandler(this.sessionManager);
         this.connectionManager = new VoiceConnectionManager();
+        this.realtimeContextBuilder = new RealtimeContextBuilder();
 
         try {
             const anyClient = this.client as any;
@@ -78,13 +81,17 @@ export class VoiceStateHandler extends Event {
             return;
         }
 
-        const realtimeSession = await this.createRealtimeSession(guildId);
+        const voiceChannel = newState.channel;
+        const { participantMap, contextParticipants } = this.collectVoiceParticipants(voiceChannel);
+
+        const realtimeSession = await this.createRealtimeSession(guildId, contextParticipants);
 
         const session = this.sessionManager.createSession(
             connection,
             realtimeSession,
             this.audioCaptureHandler,
             this.audioPlaybackHandler,
+            participantMap,
             this.userVoiceStateHandler.getInitiatingUser(guildId)
         );
         this.sessionManager.addSession(guildId, session);
@@ -94,6 +101,30 @@ export class VoiceStateHandler extends Event {
         }
 
         logger.info('Voice session initialized successfully');
+    }
+
+    private collectVoiceParticipants(channel: VoiceBasedChannel | null): {
+        participantMap: Map<string, string>;
+        contextParticipants: RealtimeContextParticipant[];
+    } {
+        const participantMap = new Map<string, string>();
+        const contextParticipants: RealtimeContextParticipant[] = [];
+
+        if (!channel) {
+            return { participantMap, contextParticipants };
+        }
+
+        channel.members.forEach((member: GuildMember) => {
+            const displayName = member.displayName || member.user.username;
+            participantMap.set(member.id, displayName);
+            contextParticipants.push({
+                id: member.id,
+                displayName,
+                isBot: member.user.bot,
+            });
+        });
+
+        return { participantMap, contextParticipants };
     }
 
     public registerInitiatingUser(guildId: string, userId: string): void {
@@ -115,13 +146,15 @@ export class VoiceStateHandler extends Event {
         const connection = getVoiceConnection(guildId);
         if (!connection) throw new Error('No voice connection found for this guild');
 
-        const realtimeSession = await this.createRealtimeSession(guildId);
+        const { participantMap, contextParticipants } = this.collectVoiceParticipants(voiceChannel);
+        const realtimeSession = await this.createRealtimeSession(guildId, contextParticipants);
 
         const session = this.sessionManager.createSession(
             connection,
             realtimeSession,
             this.audioCaptureHandler,
             this.audioPlaybackHandler,
+            participantMap,
             this.userVoiceStateHandler.getInitiatingUser(guildId)
         );
         this.sessionManager.addSession(guildId, session);
@@ -154,12 +187,21 @@ export class VoiceStateHandler extends Event {
             const connection = getVoiceConnection(guildId);
             if (!connection) throw new Error('No voice connection found for this guild');
 
-            const realtimeSession = await this.createRealtimeSession(guildId);
+            const guild = this.client.guilds.cache.get(guildId);
+            const channelId = connection.joinConfig.channelId;
+            const voiceChannel = channelId ? guild?.channels.cache.get(channelId) : null;
+            const isVoiceChannel = voiceChannel && voiceChannel.isVoiceBased()
+                ? (voiceChannel as VoiceBasedChannel)
+                : null;
+
+            const { participantMap, contextParticipants } = this.collectVoiceParticipants(isVoiceChannel);
+            const realtimeSession = await this.createRealtimeSession(guildId, contextParticipants);
             session = this.sessionManager.createSession(
                 connection,
                 realtimeSession,
                 this.audioCaptureHandler,
                 this.audioPlaybackHandler,
+                participantMap,
                 this.userVoiceStateHandler.getInitiatingUser(guildId)
             );
             this.sessionManager.addSession(guildId, session);
@@ -168,17 +210,24 @@ export class VoiceStateHandler extends Event {
 
         try {
             logger.info(`Started conversation in guild ${guildId}`);
-            session.realtimeSession.sendGreeting();
+            await session.realtimeSession.sendGreeting();
         } catch (error) {
             logger.error(`Error starting conversation in guild ${guildId}:`, error);
             throw error;
         }
     }
 
-    private async createRealtimeSession(guildId: string): Promise<RealtimeSession> {
+    private async createRealtimeSession(
+        guildId: string,
+        participants: RealtimeContextParticipant[],
+    ): Promise<RealtimeSession> {
         this.audioCaptureHandler.cleanupGuild(guildId);
 
-        const realtimeSession = new RealtimeSession({});
+        const context = this.realtimeContextBuilder.buildContext({ participants });
+        const realtimeSession = new RealtimeSession({
+            instructions: context.instructions,
+            sessionMetadata: context.metadata,
+        });
 
         // Attach listeners only once
         if (!(realtimeSession as any).listenersAttached) {
