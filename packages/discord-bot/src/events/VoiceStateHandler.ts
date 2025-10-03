@@ -184,17 +184,16 @@ export class VoiceStateHandler extends Event {
         if (!(realtimeSession as any).listenersAttached) {
             (realtimeSession as any).listenersAttached = true;
 
-            let isProcessingAudio = false;
-
             realtimeSession.on('audio', (audioData: Buffer) => {
-                if (isProcessingAudio || !audioData || audioData.length === 0) return;
+                if (!audioData || audioData.length === 0) return;
 
                 const session = this.sessionManager.getSession(guildId);
                 if (!session) return;
 
-                isProcessingAudio = true;
-                this.audioPlaybackHandler.playAudioToChannel(session.connection, audioData)
-                    .finally(() => { isProcessingAudio = false; });
+                void this.audioPlaybackHandler.playAudioToChannel(session.connection, audioData)
+                    .catch((error) => {
+                        logger.error('[VoiceStateHandler] Error queuing realtime audio for playback:', error);
+                    });
             });
 
             realtimeSession.on('text', (text: string) => logger.debug(`[BOT TEXT] ${text}`));
