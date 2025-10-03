@@ -10,7 +10,7 @@ export class AudioCaptureHandler extends EventEmitter {
     private activeCaptures: Set<string> = new Set();
     private captureInitialized: Set<string> = new Set();
     private pendingResponsePerUser: Map<string, boolean> = new Map();
-    private speakerQueue: Map<string, { userId: string, audioBuffer: Buffer, timestamp: number }> = new Map();
+    private speakerQueue: Map<string, { guildId: string, userId: string, audioBuffer: Buffer, timestamp: number }> = new Map();
     private isProcessingQueue = false;
 
     constructor() {
@@ -147,14 +147,17 @@ export class AudioCaptureHandler extends EventEmitter {
         return isIntentional;
     }
 
-    private async queueSpeakerAudio(userId: string, audioBuffer: Buffer): Promise<void> {
-        this.speakerQueue.set(userId, {
+    private async queueSpeakerAudio(guildId: string, userId: string, audioBuffer: Buffer): Promise<void> {
+        const queueKey = `${guildId}:${userId}`;
+
+        this.speakerQueue.set(queueKey, {
+            guildId,
             userId,
             audioBuffer,
             timestamp: Date.now()
         });
 
-        logger.debug(`Queued audio for user ${userId}, queue size: ${this.speakerQueue.size}`);
+        logger.debug(`Queued audio for ${queueKey}, queue size: ${this.speakerQueue.size}`);
 
         // Process queue if not already processing
         if (!this.isProcessingQueue) {
@@ -173,25 +176,25 @@ export class AudioCaptureHandler extends EventEmitter {
 
         try {
             // Process speakers in chronological order (oldest first)
-            const sortedSpeakers = Array.from(this.speakerQueue.values())
-                .sort((a, b) => a.timestamp - b.timestamp);
+            const sortedSpeakers = Array.from(this.speakerQueue.entries())
+                .sort(([, a], [, b]) => a.timestamp - b.timestamp);
 
             logger.debug(`Processing speaker queue with ${sortedSpeakers.length} items`);
 
-            for (const speaker of sortedSpeakers) {
+            for (const [queueKey, speaker] of sortedSpeakers) {
                 // Check if we're already processing this user's audio
-                const processingKey = `${speaker.userId}:${speaker.audioBuffer.length}`;
+                const processingKey = `${queueKey}:${speaker.audioBuffer.length}`;
                 if (this.currentlyProcessingAudio.has(processingKey)) {
-                    logger.debug(`Already processing audio for user ${speaker.userId}, skipping duplicate`);
-                    this.speakerQueue.delete(speaker.userId);
+                    logger.debug(`Already processing audio for ${queueKey}, skipping duplicate`);
+                    this.speakerQueue.delete(queueKey);
                     continue;
                 }
 
                 this.currentlyProcessingAudio.add(processingKey);
-                logger.debug(`Processing queued audio for user ${speaker.userId}`);
+                logger.debug(`Processing queued audio for ${queueKey}`);
 
                 // Wait for any ongoing response to complete
-                const captureKey = `${speaker.userId}`;
+                const captureKey = queueKey;
                 const canProceed = await this.waitForPreviousResponse(captureKey);
 
                 if (canProceed) {
@@ -200,21 +203,21 @@ export class AudioCaptureHandler extends EventEmitter {
                     try {
                         // Send the queued audio to the realtime session via event
                         const listenerCount = this.listenerCount('processSpeakerAudio');
-                        logger.debug(`Emitting processSpeakerAudio event for user ${speaker.userId} with ${speaker.audioBuffer.length} bytes (${listenerCount} listeners)`);
+                        logger.debug(`Emitting processSpeakerAudio event for ${queueKey} with ${speaker.audioBuffer.length} bytes (${listenerCount} listeners)`);
                         this.emit('processSpeakerAudio', speaker.userId, speaker.audioBuffer);
-                        logger.debug(`Successfully emitted processSpeakerAudio event for user ${speaker.userId}`);
+                        logger.debug(`Successfully emitted processSpeakerAudio event for ${queueKey}`);
                     } catch (error) {
                         logger.error(`Error emitting processSpeakerAudio event:`, error);
                     } finally {
                         this.pendingResponsePerUser.set(captureKey, false);
                         this.currentlyProcessingAudio.delete(processingKey);
-                        this.speakerQueue.delete(speaker.userId);
+                        this.speakerQueue.delete(queueKey);
                     }
                 } else {
                     // Skip this speaker if we timed out waiting
-                    logger.debug(`Skipping queued audio for user ${speaker.userId} due to timeout`);
+                    logger.debug(`Skipping queued audio for ${queueKey} due to timeout`);
                     this.currentlyProcessingAudio.delete(processingKey);
-                    this.speakerQueue.delete(speaker.userId);
+                    this.speakerQueue.delete(queueKey);
                 }
             }
         } catch (error) {
@@ -249,10 +252,10 @@ export class AudioCaptureHandler extends EventEmitter {
         logger.debug(`[${captureKey}] Intentional speech detected, queuing for processing`);
 
         // Extract user ID from capture key
-        const userId = captureKey.split(':')[1];
+        const [guild, userId] = captureKey.split(':');
 
         // Queue the audio for processing instead of processing immediately
-        await this.queueSpeakerAudio(userId, audioBuffer);
+        await this.queueSpeakerAudio(guild, userId, audioBuffer);
 
         this.activeCaptures.delete(captureKey);
     }
@@ -288,26 +291,16 @@ export class AudioCaptureHandler extends EventEmitter {
 
     public cleanupGuild(guildId: string): void {
         // Clean up any pending responses for this guild
-        for (const key of this.pendingResponsePerUser.keys()) {
-            if (key.startsWith(guildId + ':')) {
-                this.pendingResponsePerUser.delete(key);
-            }
-        }
+        const pendingKeysToRemove = Array.from(this.pendingResponsePerUser.keys()).filter(key => key.startsWith(`${guildId}:`));
+        pendingKeysToRemove.forEach(key => this.pendingResponsePerUser.delete(key));
 
         // Clear any queued audio for users in this guild
-        for (const [userId] of this.speakerQueue.entries()) {
-            if (userId.startsWith(guildId + ':')) {
-                this.speakerQueue.delete(userId);
-            }
-        }
+        const queueKeysToRemove = Array.from(this.speakerQueue.keys()).filter(key => key.startsWith(`${guildId}:`));
+        queueKeysToRemove.forEach(key => this.speakerQueue.delete(key));
 
         // Clear any currently processing audio for users in this guild
-        for (const processingKey of this.currentlyProcessingAudio) {
-            const userId = processingKey.split(':')[0];
-            if (userId.startsWith(guildId + ':')) {
-                this.currentlyProcessingAudio.delete(processingKey);
-            }
-        }
+        const processingKeysToRemove = Array.from(this.currentlyProcessingAudio.values()).filter(key => key.startsWith(`${guildId}:`));
+        processingKeysToRemove.forEach(key => this.currentlyProcessingAudio.delete(key));
 
         logger.debug(`Cleaned up audio capture for guild ${guildId}`);
     }
