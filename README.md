@@ -134,28 +134,57 @@ GUILD_RATE_WINDOW_MS=60000    # Time window in milliseconds (60 seconds)
 
 ## 📁 Project Structure
 
-```
+```text
 daneel/
+├── .dockerignore             # Build context exclusions for Docker
+├── .github/                  # GitHub Actions workflows and templates
+├── .gitignore                # Git ignore patterns
+├── .vscode/                  # VS Code workspace defaults
+├── .windsurf/                # Cascade/Windsurf agent configuration
+├── BuildRepoInitial.js          # Script to chunk repository files and upsert Pinecone embeddings
+├── CreatePineconeIndex.js       # One-off helper to create the Pinecone index used for repo search
+├── Dockerfile                   # Container image definition for deployments
+├── fly.toml                     # Fly.io application configuration
+├── package.json                 # Root workspaces + scripts
+├── tsconfig.json                # Base TypeScript configuration
+├── reference/                 # Scratchpad + design reference material
 ├── packages/
-│   ├── discord-bot/          # Discord bot implementation
-│   │   ├── src/
-│   │   │   ├── commands/     # Bot command handlers
-│   │   │   ├── events/       # Discord event handlers
-│   │   │   ├── types/        # TypeScript type definitions
-│   │   │   ├── utils/        # Utility functions
-│   │   │   └── index.ts      # Bot entry point
-│   │
-│   ├── frontend/             # Web client application
-│   │   └── web/              # Next.js application
-│   │       ├── app/          # App router
-│   │       ├── components/   # UI components
-│   │       └── lib/          # Utility libraries
-│   │
-│   └── shared/               # Shared code between packages
-│       └── src/              # Shared types and utilities
-├── .github/                  # GitHub workflows
-├── .gitignore
-├── package.json              # Root package.json with workspace config
+│   ├── discord-bot/             # Active Discord bot workspace
+│   │   ├── package.json         # Bot-specific dependencies and scripts
+│   │   ├── tsconfig.json        # Bot TypeScript compiler options
+│   │   ├── dist/                # Build output (generated)
+│   │   ├── logs/                # Winston log files (gitignored)
+│   │   └── src/
+│   │       ├── index.ts         # Bootstraps the Discord client and wiring
+│   │       ├── commands/        # Slash command implementations
+│   │       │   ├── BaseCommand.ts # Command interface/typing helper
+│   │       │   ├── call.ts        # `/call` voice-channel pilot (joins/tears down voice calls)
+│   │       │   ├── help.ts        # `/help` command with dynamic command listing
+│   │       │   ├── image.ts       # `/image` command backed by OpenAI image generation + Cloudinary
+│   │       │   ├── news.ts        # `/news` command that orchestrates web search + formatted embeds
+│   │       │   └── ping.ts        # `/ping` health-check responder
+│   │       ├── events/          # Discord gateway event handlers
+│   │       │   ├── Event.ts       # Abstract base for typed event registration
+│   │       │   └── MessageCreate.ts # Message listener that drives planning + responses
+│   │       ├── types/           # Local ambient type augmentations
+│   │       │   └── discord.d.ts   # Extends the Discord client with a command cache
+│   │       └── utils/           # Core bot services + infrastructure
+│   │           ├── MessageProcessor.ts # Main pipeline (context, planning, response orchestration)
+│   │           ├── RateLimiter.ts     # Generic rate-limiter + `/image` cooldown helper
+│   │           ├── commandHandler.ts  # Dynamic loader + deployer for slash commands
+│   │           ├── env.ts             # Environment-variable loading/validation
+│   │           ├── eventManager.ts    # Dynamic loader/binder for gateway events
+│   │           ├── logger.ts          # Winston logger configuration
+│   │           ├── openaiService.ts   # GPT-5 integration, embeddings, TTS, image captions
+│   │           ├── prompting/         # Planning + context helpers
+│   │           │   ├── ContextBuilder.ts # Builds trimmed conversation context w/ summarization
+│   │           │   └── Planner.ts        # Planning LLM that selects actions + presence
+│   │           └── response/          # Outbound messaging helpers
+│   │               ├── EmbedBuilder.ts   # Safer embed builder wrapper with validation
+│   │               └── ResponseHandler.ts # Shared helpers for replying, typing, presence
+│   ├── frontend/              # Next.js assistant UI (currently on pause)
+│   │   └── web/               # React app using assistant-ui & Clerk
+│   └── shared/                # Placeholder for cross-package utilities
 └── README.md
 ```
 

@@ -16,8 +16,8 @@ Some rules to follow (for Cascade):
 
 ## Table of Contents
 
-1. [Project Status](#project-status)
-2. [Technical Stack](#technical-stack)
+1. [Technical Stack](#technical-stack)
+2. [Repository Layout](#repository-layout)
 3. [Packages](#packages)
 4. [Architecture](#architecture)
 
@@ -47,67 +47,81 @@ Some rules to follow (for Cascade):
 - CI/CD: GitHub Actions
 - Deployment: Fly.io
 
+## Repository Layout
+
+```text
+daneel/
+├── .dockerignore             # Build context exclusions for Docker
+├── .github/                  # GitHub Actions workflows and issue templates
+├── .gitignore                # Git ignore patterns
+├── .vscode/                  # VS Code workspace defaults
+├── .windsurf/                # Cascade/Windsurf agent configuration
+├── BuildRepoInitial.js       # Script to chunk repo files and upsert Pinecone embeddings
+├── CreatePineconeIndex.js    # Helper to create the Pinecone index for repo search
+├── Dockerfile                # Container image definition
+├── fly.toml                  # Fly.io deployment settings
+├── package.json              # Root workspaces configuration
+├── tsconfig.json             # Base TypeScript options shared across packages
+├── packages/                 # Workspace packages (bot, frontend, shared)
+├── reference/                # Scratchpad and design references
+└── README.md                 # Project overview and setup guide
+```
+
 ## Packages
 
 ### 1. Discord Bot (`/packages/discord-bot`)
-```
+```text
 discord-bot/
-├── src/
-│   ├── commands/           # Bot command handlers
-│   │   ├── BaseCommand.ts  # Base command class
-│   │   ├── help.ts         # Help command
-│   │   ├── image.ts        # Image generation command
-│   │   ├── news.ts          # News fetching command
-│   │   └── ping.ts         # Ping command
-│   │
-│   ├── events/             # Discord event handlers
-│   │   ├── Event.ts        # Base event class
-│   │   └── MessageCreate.ts # Handles message creation events
-│   │
-│   ├── types/              # TypeScript type definitions
-│   │   └── discord.d.ts    # Extended Discord.js type definitions
-│   │
-│   ├── utils/              # Utility functions
-│   │   ├── commandHandler.ts # Command loading and registration
-│   │   ├── env.ts          # Environment variable validation
-│   │   ├── eventManager.ts # Event loading and registration
-│   │   ├── logger.ts       # Logging utilities
-│   │   ├── MessageProcessor.ts # Core message processing pipeline
-│   │   ├── openaiService.ts # OpenAI integration for AI responses
-│   │   ├── RateLimiter.ts  # Configurable rate limiting for users, channels, and guilds
-│   │   │
-│   │   ├── prompting/      # Prompt construction and management
-│   │   │   ├── ContextBuilder.ts # Builds conversation contexts for AI
-│   │   │   └── Planner.ts    # AI planning and task management
-│   │   │
-│   │   └── response/       # Response handling
-│   │       ├── EmbedBuilder.ts    # Discord embed building utilities
-│   │       └── ResponseHandler.ts # Handles formatting and sending responses
-│   │
-│   └── index.ts            # Bot entry point
+├── package.json              # Bot-specific dependencies and scripts
+├── tsconfig.json             # Compiler options for the bot workspace
+├── dist/                     # Transpiled JavaScript output (generated)
+├── logs/                     # Winston log files written at runtime
+└── src/
+    ├── index.ts              # Bootstraps Discord client, loads commands/events, logs in
+    ├── commands/             # Slash command implementations
+    │   ├── BaseCommand.ts    # Shared typing helpers for slash command modules
+    │   ├── call.ts           # `/call` voice prototype that joins/leaves voice channels
+    │   ├── help.ts           # `/help` dynamic command catalog
+    │   ├── image.ts          # `/image` OpenAI image generator with Cloudinary upload
+    │   ├── news.ts           # `/news` web-search powered news summariser
+    │   └── ping.ts           # `/ping` latency health check
+    ├── events/               # Discord gateway event handlers
+    │   ├── Event.ts          # Abstract base with registration + error handling
+    │   └── MessageCreate.ts  # Message listener that triggers planning + responses
+    ├── types/
+    │   └── discord.d.ts      # Module augmentation adding a command cache to the client
+    └── utils/                # Core services used across the bot
+        ├── MessageProcessor.ts # Pipeline for rate limiting, context building, AI calls, replies
+        ├── RateLimiter.ts       # Configurable rate limit helper + image cooldown tracker
+        ├── commandHandler.ts    # Discovers, caches, and deploys slash commands
+        ├── env.ts               # Loads .env and enforces required configuration
+        ├── eventManager.ts      # Discovers and registers event classes with the client
+        ├── logger.ts            # Winston logger setup (console + file transports)
+        ├── openaiService.ts     # GPT-5 wrapper (text, embeddings, TTS, vision, pricing)
+        ├── prompting/           # Conversation planning utilities
+        │   ├── ContextBuilder.ts # Fetches + summarises history into OpenAI messages
+        │   └── Planner.ts        # Planning LLM to decide actions, presence, and tool usage
+        └── response/            # Response formatting & delivery helpers
+            ├── EmbedBuilder.ts   # Guardrails around Discord embed construction
+            └── ResponseHandler.ts # Message sending, chunking, typing, presence helpers
 ```
 
 ### 2. Frontend (`/packages/frontend`)
-```
+```text
 frontend/
-└── web/                    # Next.js application
-    ├── app/                # App router
-    │   ├── api/            # API routes
-    │   ├── assistant.tsx   # Assistant page
-    │   ├── globals.css     # Global styles
-    │   ├── layout.tsx      # Root layout
-    │   └── page.tsx        # Home page
-    │
-    ├── components/         # Reusable UI components
-    │   ├── assistant-ui/   # Assistant UI components
-    │   ├── ui/             # Base UI components (shadcn/ui)
-    │   ├── app-sidebar.tsx  # Application sidebar
-    │   └── assistant.tsx    # Assistant component
-    │
-    └── lib/                 # Utility libraries
+└── web/                      # Next.js assistant client (currently paused)
+    ├── app/                  # App Router entrypoint + API routes
+    ├── components/           # Assistant UI composition + shared UI building blocks
+    └── lib/                  # Frontend utilities (Clerk, Assistant SDK wiring)
 ```
 
 ### 3. Shared (`/packages/shared`)
-- Shared types and utilities between frontend and backend
-- Common validation schemas
-- Shared business logic
+- Placeholder for future cross-package utilities and types
+- Currently contains scaffolding ready for shared business logic
+
+## Architecture
+
+1. **Bootstrap & registration:** `src/index.ts` wires up the Discord client, loads slash commands via `CommandHandler`, registers event classes through `EventManager`, and logs in using validated environment variables from `env.ts`.
+2. **Event-driven processing:** `MessageCreate` is the primary gateway event, delegating to `MessageProcessor` which enforces rate limits, gathers context with `ContextBuilder`, and requests a plan from the `Planner` LLM.
+3. **AI execution:** `OpenAIService` handles GPT-5 interactions, reasoning tool calls, embeddings, TTS generation, and image descriptions. Command modules reuse the shared instance exported from `index.ts` for specialised behaviours like `/news` and `/image`.
+4. **Response delivery:** `ResponseHandler` and the `response/` helpers manage typing indicators, chunked replies, embeds, file uploads, and presence updates so command logic stays concise.
