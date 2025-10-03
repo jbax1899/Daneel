@@ -23,8 +23,6 @@ export class RealtimeSessionConfig {
         this.options = {
             model: 'gpt-realtime',
             voice: 'echo',
-            temperature: 0.8,
-            maxResponseOutputTokens: 4096,
             instructions: SYSTEM_PROMPT,
             ...options
         };
@@ -48,14 +46,6 @@ export class RealtimeSessionConfig {
 
     public getInstructions(): string | undefined {
         return this.options.instructions;
-    }
-
-    public getTemperature(): number {
-        return this.options.temperature || 0.8;
-    }
-
-    public getMaxResponseOutputTokens(): number {
-        return this.options.maxResponseOutputTokens || 4096;
     }
 
     public sendSessionConfig(ws: WebSocket): void {
@@ -108,8 +98,6 @@ export class RealtimeSessionConfig {
             type: 'response.create',
             response: {
                 output_modalities: ['audio'],
-                temperature: this.options.temperature,
-                max_response_output_tokens: this.options.maxResponseOutputTokens,
                 instructions: this.options.instructions
             }
         };

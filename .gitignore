@@ -10,7 +10,7 @@ node_modules/
 packages/discord-bot/logs/
 
 # Discord bot generated output
-packages/discord-bot/src/output/
+packages/discord-bot/output/
 
 # Reference code
 reference
@@ -18,7 +18,5 @@ reference
 # VSCode settings
 .vscode
 
-# Windsurf/Cascade
-.windsurf/
-cascadeReference.md
-#cascadeReferenceRolybot.md
+# Discord Bot Output
+packages/discord-bot/src/output/

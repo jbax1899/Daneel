@@ -62,6 +62,27 @@ export class GuildAudioPipeline {
             }
         }
     }
+    public async flushResidualBuffer(): Promise<void> {
+        if (this.isDestroyed) {
+            this.pcmBuffer = Buffer.alloc(0);
+            return;
+        }
+
+        if (this.pcmBuffer.length === 0) {
+            return;
+        }
+
+        const frameSizeInBytes = this.frameSize * 2;
+        const remainder = this.pcmBuffer.length % frameSizeInBytes;
+        if (remainder === 0) {
+            return;
+        }
+
+        const padding = Buffer.alloc(frameSizeInBytes - remainder);
+        await this.writePCM(padding);
+    }
+
+
     
     public getPlayer(): AudioPlayer {
         return this.player;
@@ -107,3 +128,4 @@ export class GuildAudioPipeline {
         this.resourceCreated = true;
     }
 }
+

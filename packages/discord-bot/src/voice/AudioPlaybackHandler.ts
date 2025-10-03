@@ -1,4 +1,4 @@
-﻿import { AudioPlayer, VoiceConnection, AudioPlayerStatus, AudioPlayerError, createAudioResource, StreamType } from '@discordjs/voice';
+import { AudioPlayer, VoiceConnection, AudioPlayerStatus, AudioPlayerError, createAudioResource, StreamType } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import { GuildAudioPipeline } from './GuildAudioPipeline.js';
 import { upsampleToDiscord } from './audioTransforms.js';
@@ -114,6 +114,7 @@ export class AudioPlaybackHandler {
                     logger.error('[AudioPlayback] Error writing audio data to pipeline:', error);
                 }
             }
+            await pipeline.flushResidualBuffer();
 
             this.isProcessingQueue.set(guildId, false);
         } catch (error) {

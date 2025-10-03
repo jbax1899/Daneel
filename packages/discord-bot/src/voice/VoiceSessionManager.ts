@@ -92,20 +92,9 @@ export class VoiceSessionManager {
             }
 
             logger.debug(`Sending ${audioBuffer.length} bytes to realtime session`);
-            
             // Send audio chunks
             await session.realtimeSession.sendAudio(audioBuffer);
-
-            // Small delay to ensure server processes the commit
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Wait for server acknowledgment
-            try {
-                await session.realtimeSession.waitForAudioCollected();
-                logger.debug(`Audio collected by server for guild ${guildId}`);
-            } catch (error) {
-                logger.warn(`Timeout waiting for audio collection:`, error);
-            }
+            logger.debug(`Audio collected by server for guild ${guildId}`);
 
             // Create response if session is still active
             if (this.activeSessions.has(guildId)) {
