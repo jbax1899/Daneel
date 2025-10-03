@@ -3,7 +3,7 @@ import { RealtimeSession } from '../utils/realtimeService.js';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';
 import { AUDIO_CONSTANTS, TIMEOUT_CONSTANTS } from '../constants/voice.js';
-import { createCaptureResampler } from './audioTransforms.js';
+import { downsampleToRealtime } from './audioTransforms.js';
 import { getVoiceConnection } from '@discordjs/voice';
 import { EventEmitter } from 'events';
 
@@ -67,10 +67,6 @@ export class AudioCaptureHandler extends EventEmitter {
             })
         );
 
-        const ffmpegResampler = createCaptureResampler();
-
-        const resampledStream = pcmStream.pipe(ffmpegResampler);
-
         // Create a local buffer for THIS specific speaking session
         const audioChunks: Buffer[] = [];
         let isProcessing = false;
@@ -112,20 +108,29 @@ export class AudioCaptureHandler extends EventEmitter {
             }, TIMEOUT_CONSTANTS.SILENCE_DURATION * 2); // Slightly longer than the silence duration
         };
 
-        resampledStream.on('data', (chunk: Buffer) => {
-            logger.debug(`[${captureKey}] Received resampled PCM chunk: ${chunk.length} bytes`);
-            audioChunks.push(chunk);
+        pcmStream.on('data', (chunk: Buffer) => {
+            if (chunk.length === 0) {
+                return;
+            }
+
+            const resampledChunk = downsampleToRealtime(chunk);
+            if (resampledChunk.length === 0) {
+                return;
+            }
+
+            logger.debug(`[${captureKey}] Received resampled PCM chunk: ${resampledChunk.length} bytes`);
+            audioChunks.push(resampledChunk);
             resetSilenceTimer();
         });
 
-        resampledStream.on('end', () => {
+        pcmStream.on('end', () => {
             const duration = audioChunks.reduce((sum, chunk) => sum + chunk.length, 0) / (AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE * 2) * 1000;
-            logger.debug(`[${captureKey}] Resampled PCM stream ended after ${duration.toFixed(0)}ms, processing audio...`);
+            logger.debug(`[${captureKey}] PCM stream ended after ${duration.toFixed(0)}ms, processing audio...`);
             processAudio();
         });
 
-        ffmpegResampler.on('error', (err: Error) => {
-            logger.error(`[${captureKey}] FFmpeg resampler error:`, err);
+        pcmStream.on('error', (err: Error) => {
+            logger.error(`[${captureKey}] PCM stream error:`, err);
         });
 
         opusStream.on('error', (err: Error) => {
