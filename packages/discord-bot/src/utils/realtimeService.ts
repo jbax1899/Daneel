@@ -111,7 +111,7 @@ export class RealtimeSession extends EventEmitter {
     public async sendAudio(audioBuffer: Buffer, speakerLabel: string, speakerId?: string): Promise<void> {
         const ws = this.wsManager.getWebSocket();
         if (ws && this.audioHandler) {
-            await this.audioHandler.sendAudio(ws, this.eventHandler, audioBuffer, speakerLabel, speakerId);
+            await this.audioHandler.sendAudio(ws, audioBuffer, speakerLabel, speakerId);
         }
     }
 
@@ -135,7 +135,7 @@ export class RealtimeSession extends EventEmitter {
     public async flushAudio(): Promise<void> {
         const ws = this.wsManager.getWebSocket();
         if (ws && this.audioHandler) {
-            await this.audioHandler.flushAudio(ws, this.eventHandler);
+            await this.audioHandler.flushAudio(ws);
         }
     }
 

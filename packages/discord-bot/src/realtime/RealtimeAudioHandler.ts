@@ -1,6 +1,5 @@
 import WebSocket from 'ws';
 import { logger } from '../utils/logger.js';
-import { RealtimeEventHandler } from './RealtimeEventHandler.js';
 import { AUDIO_CONSTANTS } from '../constants/voice.js';
 
 const COMMIT_INACTIVITY_MS = 320;
@@ -11,18 +10,18 @@ interface PendingSpeaker {
 }
 
 /**
- * Streams PCM audio to the realtime API and commits buffers on cadence.
+ * Buffers PCM audio chunks and sends them to the realtime API once speech pauses.
  */
 export class RealtimeAudioHandler {
-    private pendingCommit = false;
+    private hasPendingAudio = false;
     private lastAppendTime = 0;
     private pendingSpeaker: PendingSpeaker | null = null;
     private commitTimer: NodeJS.Timeout | null = null;
     private pendingBytes = 0;
+    private pendingChunks: Buffer[] = [];
 
     public async sendAudio(
         ws: WebSocket,
-        eventHandler: RealtimeEventHandler,
         audioBuffer: Buffer,
         speakerLabel: string,
         speakerId?: string,
@@ -36,42 +35,38 @@ export class RealtimeAudioHandler {
         }
 
         if (this.pendingSpeaker && this.pendingSpeaker.label !== speakerLabel) {
-            await this.flushAudio(ws, eventHandler);
+            await this.flushAudio(ws);
         }
-
-        ws.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: audioBuffer.toString('base64'),
-        }));
 
         this.pendingSpeaker = { label: speakerLabel, userId: speakerId };
         this.lastAppendTime = Date.now();
-        this.pendingCommit = true;
+        this.hasPendingAudio = true;
         this.pendingBytes += audioBuffer.length;
+        this.pendingChunks.push(Buffer.from(audioBuffer));
 
-        logger.debug(`[realtime] Sent audio chunk (${audioBuffer.length} bytes) for ${speakerLabel}`);
+        logger.debug(`[realtime] Buffered audio chunk (${audioBuffer.length} bytes) for ${speakerLabel}`);
 
-        this.scheduleCommit(ws, eventHandler);
+        this.scheduleCommit(ws);
     }
 
-    private scheduleCommit(ws: WebSocket, eventHandler: RealtimeEventHandler): void {
+    private scheduleCommit(ws: WebSocket): void {
         if (this.commitTimer) {
             clearTimeout(this.commitTimer);
         }
 
         this.commitTimer = setTimeout(() => {
-            void this.flushAudio(ws, eventHandler).catch((error) => {
+            void this.flushAudio(ws).catch((error) => {
                 logger.error('[realtime] Failed to flush audio buffer:', error);
             });
         }, COMMIT_INACTIVITY_MS);
     }
 
-    public async flushAudio(ws: WebSocket, eventHandler: RealtimeEventHandler): Promise<void> {
+    public async flushAudio(ws: WebSocket): Promise<void> {
         if (!ws || ws.readyState !== WebSocket.OPEN) {
             throw new Error('WebSocket is not connected');
         }
 
-        if (!this.pendingCommit) {
+        if (!this.hasPendingAudio || this.pendingBytes === 0) {
             return;
         }
 
@@ -88,53 +83,51 @@ export class RealtimeAudioHandler {
         if (this.pendingBytes > 0 && this.pendingBytes < AUDIO_CONSTANTS.MIN_AUDIO_BUFFER_SIZE) {
             const deficit = AUDIO_CONSTANTS.MIN_AUDIO_BUFFER_SIZE - this.pendingBytes;
             const silence = Buffer.alloc(deficit);
-            ws.send(JSON.stringify({
-                type: 'input_audio_buffer.append',
-                audio: silence.toString('base64'),
-            }));
+            this.pendingChunks.push(silence);
             this.pendingBytes += deficit;
             logger.debug(`[realtime] Padded audio buffer with ${deficit} bytes of silence`);
         }
+
+        const combinedAudio = Buffer.concat(this.pendingChunks);
+        const audioContent = {
+            type: 'input_audio' as const,
+            audio: {
+                format: {
+                    type: 'audio/pcm',
+                    rate: AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE,
+                    channels: AUDIO_CONSTANTS.CHANNELS,
+                },
+                data: combinedAudio.toString('base64'),
+            },
+        };
+
+        const content: Array<{ type: 'input_text'; text: string } | typeof audioContent> = [];
 
         if (this.pendingSpeaker) {
             const annotation = this.pendingSpeaker.userId
                 ? `<discord_speaker id="${this.pendingSpeaker.userId}">${this.pendingSpeaker.label}</discord_speaker>`
                 : `<discord_speaker>${this.pendingSpeaker.label}</discord_speaker>`;
 
-            ws.send(JSON.stringify({
-                type: 'conversation.item.create',
-                item: {
-                    type: 'message',
-                    role: 'user',
-                    content: [
-                        { type: 'input_text', text: annotation },
-                        {
-                            type: 'input_audio',
-                            audio: {
-                                format: {
-                                    type: 'audio/pcm',
-                                    rate: AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE,
-                                    channels: AUDIO_CONSTANTS.CHANNELS,
-                                },
-                            },
-                        },
-                    ],
-                },
-            }));
+            content.push({ type: 'input_text', text: annotation });
         }
 
-        ws.send(JSON.stringify({ type: 'input_audio_buffer.commit' }));
-        logger.debug('[realtime] Committed audio buffer');
+        content.push(audioContent);
 
-        this.pendingCommit = false;
+        ws.send(JSON.stringify({
+            type: 'conversation.item.create',
+            item: {
+                type: 'message',
+                role: 'user',
+                content,
+            },
+        }));
+        logger.debug('[realtime] Sent conversation item with audio payload');
+
+        this.hasPendingAudio = false;
         this.pendingSpeaker = null;
         this.pendingBytes = 0;
+        this.pendingChunks = [];
 
-        try {
-            await eventHandler.waitForAudioCollected();
-        } catch (error) {
-            logger.warn('[realtime] Error waiting for audio collection:', error);
-        }
     }
 
     public clearAudio(ws: WebSocket): void {
@@ -143,10 +136,10 @@ export class RealtimeAudioHandler {
             return;
         }
 
-        ws.send(JSON.stringify({ type: 'input_audio_buffer.clear' }));
-        this.pendingCommit = false;
+        this.hasPendingAudio = false;
         this.pendingSpeaker = null;
         this.pendingBytes = 0;
+        this.pendingChunks = [];
         if (this.commitTimer) {
             clearTimeout(this.commitTimer);
             this.commitTimer = null;
@@ -156,10 +149,11 @@ export class RealtimeAudioHandler {
     }
 
     public resetState(): void {
-        this.pendingCommit = false;
+        this.hasPendingAudio = false;
         this.pendingSpeaker = null;
         this.lastAppendTime = 0;
         this.pendingBytes = 0;
+        this.pendingChunks = [];
         if (this.commitTimer) {
             clearTimeout(this.commitTimer);
             this.commitTimer = null;

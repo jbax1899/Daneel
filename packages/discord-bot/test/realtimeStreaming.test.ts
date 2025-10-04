@@ -4,7 +4,6 @@ import { RealtimeAudioHandler } from '../src/realtime/RealtimeAudioHandler.js';
 import { AUDIO_CONSTANTS } from '../src/constants/voice.js';
 import { VoiceSessionManager } from '../src/voice/VoiceSessionManager.js';
 import { AudioCaptureHandler } from '../src/voice/AudioCaptureHandler.js';
-import { RealtimeEventHandler } from '../src/realtime/RealtimeEventHandler.js';
 
 class MockWebSocket {
     public sent: any[] = [];
@@ -12,18 +11,6 @@ class MockWebSocket {
 
     send(payload: string) {
         this.sent.push(JSON.parse(payload));
-    }
-}
-
-class MockEventHandler extends RealtimeEventHandler {
-    public collected = 0;
-
-    constructor() {
-        super();
-    }
-
-    async waitForAudioCollected(): Promise<void> {
-        this.collected += 1;
     }
 }
 
@@ -54,24 +41,21 @@ const waitForPipeline = async (session: any) => {
 test('RealtimeAudioHandler annotates speaker label before commit', async () => {
     const handler = new RealtimeAudioHandler();
     const ws = new MockWebSocket();
-    const eventHandler = new MockEventHandler();
     const chunk = Buffer.from([0, 1, 2, 3]);
 
-    await handler.sendAudio(ws as any, eventHandler, chunk, 'Alice', 'user-1');
-    await handler.flushAudio(ws as any, eventHandler);
+    await handler.sendAudio(ws as any, chunk, 'Alice', 'user-1');
+    await handler.flushAudio(ws as any);
 
-    assert.equal(ws.sent.length, 4);
-    assert.equal(ws.sent[0].type, 'input_audio_buffer.append');
-    assert.equal(ws.sent[1].type, 'input_audio_buffer.append');
-    assert.equal(ws.sent[2].type, 'conversation.item.create');
-    assert.equal(ws.sent[2].item.content[0].type, 'input_text');
-    assert.match(ws.sent[2].item.content[0].text, /Alice/);
-    assert.equal(ws.sent[2].item.content[1].type, 'input_audio');
-    assert.equal(ws.sent[2].item.content[1].audio.format.type, 'audio/pcm');
-    assert.equal(ws.sent[2].item.content[1].audio.format.rate, AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE);
-    assert.equal(ws.sent[2].item.content[1].audio.format.channels, AUDIO_CONSTANTS.CHANNELS);
-    assert.equal(ws.sent[3].type, 'input_audio_buffer.commit');
-    assert.equal(eventHandler.collected, 1);
+    assert.equal(ws.sent.length, 1);
+    assert.equal(ws.sent[0].type, 'conversation.item.create');
+    assert.equal(ws.sent[0].item.content[0].type, 'input_text');
+    assert.match(ws.sent[0].item.content[0].text, /Alice/);
+    assert.equal(ws.sent[0].item.content[1].type, 'input_audio');
+    assert.equal(ws.sent[0].item.content[1].audio.format.type, 'audio/pcm');
+    assert.equal(ws.sent[0].item.content[1].audio.format.rate, AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE);
+    assert.equal(ws.sent[0].item.content[1].audio.format.channels, AUDIO_CONSTANTS.CHANNELS);
+    const decoded = Buffer.from(ws.sent[0].item.content[1].audio.data, 'base64');
+    assert.equal(decoded.length, AUDIO_CONSTANTS.MIN_AUDIO_BUFFER_SIZE);
 });
 
 test('VoiceSessionManager forwards multi-speaker audio with display names', async () => {
