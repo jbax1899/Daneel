@@ -163,7 +163,7 @@ export class RealtimeSession extends EventEmitter {
         throw new Error('Event handler not initialized');
     }
 
-    public async sendGreeting(): Promise<void> {
+    public async sendGreeting(message: string): Promise<void> {
         const ws = this.wsManager.getWebSocket();
         if (!ws) return;
 
@@ -178,7 +178,7 @@ export class RealtimeSession extends EventEmitter {
             type: 'response.create',
             response: {
                 output_modalities: ['audio'],
-                instructions: (`${this.sessionConfig.getInstructions() ?? ''}` + " Say: Hello!").trim()
+                instructions: (`BEGIN INSTRUCTIONS: ${this.sessionConfig.getInstructions() ?? ''} END OF INSTRUCTIONS. Say exactly this: ${message}`).trim()
             }
         }));
     }
@@ -196,7 +196,7 @@ export class RealtimeSession extends EventEmitter {
             type: 'response.create',
             response: {
                 output_modalities: ['audio'],
-                instructions: (`${this.sessionConfig.getInstructions() ?? ''}` + ` Say: ${message}`).trim()
+                instructions: (`BEGIN INSTRUCTIONS: ${this.sessionConfig.getInstructions() ?? ''} END OF INSTRUCTIONS. Say exactly this: ${message}`).trim()
             }
         }));
     }

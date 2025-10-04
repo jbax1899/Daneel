@@ -247,7 +247,7 @@ export class VoiceStateHandler extends Event {
         try {
             logger.info(`Started conversation in guild ${guildId}`);
             await this.activateRealtimeLimit(guildId, session);
-            await session.realtimeSession.sendGreeting();
+            await session.realtimeSession.sendGreeting("Hello! I'm Daneel, your AI assistant. How can I help you?");
             session.isActive = true;
         } catch (error) {
             if (session?.initiatingUserId) {
