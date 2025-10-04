@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RealtimeAudioHandler } from '../src/realtime/RealtimeAudioHandler.js';
+import { AUDIO_CONSTANTS } from '../src/constants/voice.js';
 import { VoiceSessionManager } from '../src/voice/VoiceSessionManager.js';
 import { AudioCaptureHandler } from '../src/voice/AudioCaptureHandler.js';
 import { RealtimeEventHandler } from '../src/realtime/RealtimeEventHandler.js';
@@ -65,7 +66,10 @@ test('RealtimeAudioHandler annotates speaker label before commit', async () => {
     assert.equal(ws.sent[2].type, 'conversation.item.create');
     assert.equal(ws.sent[2].item.content[0].type, 'input_text');
     assert.match(ws.sent[2].item.content[0].text, /Alice/);
-    assert.equal(ws.sent[2].item.content[1].type, 'input_audio_buffer');
+    assert.equal(ws.sent[2].item.content[1].type, 'input_audio');
+    assert.equal(ws.sent[2].item.content[1].audio.format.type, 'audio/pcm');
+    assert.equal(ws.sent[2].item.content[1].audio.format.rate, AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE);
+    assert.equal(ws.sent[2].item.content[1].audio.format.channels, AUDIO_CONSTANTS.CHANNELS);
     assert.equal(ws.sent[3].type, 'input_audio_buffer.commit');
     assert.equal(eventHandler.collected, 1);
 });

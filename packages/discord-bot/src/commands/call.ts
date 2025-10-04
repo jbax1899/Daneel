@@ -83,6 +83,32 @@ const callCommand: Command = {
             }
         }
 
+        const handlers = (interaction.client as any).handlers;
+        if (!handlers || typeof handlers.get !== 'function') {
+            throw new Error('Client handlers not initialized');
+        }
+
+        const voiceStateHandler = handlers.get('voiceState') as VoiceStateHandler | undefined;
+        if (!voiceStateHandler) {
+            throw new Error('VoiceStateHandler not found');
+        }
+
+        const allowance = voiceStateHandler.getRealtimeAllowance(interaction.user.id);
+
+        if (!allowance.allowed) {
+            const limitText = formatDuration(allowance.limitMs);
+            const windowText = formatDuration(allowance.windowMs);
+            const retryText = allowance.retryAfterMs !== undefined
+                ? ` Please try again in ${formatDuration(allowance.retryAfterMs)}.`
+                : '';
+            await safeReply(interaction, `You've reached your realtime voice limit of ${limitText} every ${windowText}.${retryText}`);
+            return;
+        }
+
+        const sessionNotice = !allowance.isSuperuser
+            ? ` You have up to ${formatDuration(allowance.remainingMs)} available during this ${formatDuration(allowance.windowMs)} window.`
+            : '';
+
         // Defer the interaction
         await interaction.deferReply({ flags: [1 << 6] }); // flags: [1 << 6] = EPHEMERAL
 
@@ -126,16 +152,6 @@ const callCommand: Command = {
                 selfMute: false,
             });
 
-            // Get the VoiceStateHandler instance from the client
-            if (!interaction.client.handlers) {
-                throw new Error('Client handlers not initialized');
-            }
-
-            const voiceStateHandler = interaction.client.handlers.get('voiceState') as VoiceStateHandler | undefined;
-            if (!voiceStateHandler) {
-                throw new Error('VoiceStateHandler not found');
-            }
-
             // Register the initiating user
             voiceStateHandler.registerInitiatingUser(voiceChannel.guild.id, interaction.user.id);
             logger.debug(`Registered initiating user ${interaction.user.id} for guild ${voiceChannel.guild.id}`);
@@ -155,7 +171,7 @@ const callCommand: Command = {
                 }
 
                 // Update the deferred reply with success message
-                await safeReply(interaction, `I have joined ${voiceChannel.name} - Meet me there!`);
+                await safeReply(interaction, `I have joined ${voiceChannel.name} - Meet me there!${sessionNotice}`);
 
                 // Log the current voice state
                 logger.debug(`Bot voice state after join: ${botMember.voice.channel.id} (${botMember.voice.channel.name})`);
@@ -218,6 +234,34 @@ const callCommand: Command = {
             cleanupVoiceConnection(voiceConnection, interaction.client); // Clean up the connection
         }
     }
+};
+
+const formatDuration = (ms: number): string => {
+    if (!Number.isFinite(ms)) {
+        return 'unlimited time';
+    }
+
+    const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+    if (totalSeconds === 0) {
+        return '0 seconds';
+    }
+
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    const parts: string[] = [];
+    if (hours > 0) {
+        parts.push(`${hours} hour${hours === 1 ? '' : 's'}`);
+    }
+    if (minutes > 0) {
+        parts.push(`${minutes} minute${minutes === 1 ? '' : 's'}`);
+    }
+    if (seconds > 0 && parts.length < 2) {
+        parts.push(`${seconds} second${seconds === 1 ? '' : 's'}`);
+    }
+
+    return parts.slice(0, 2).join(', ');
 };
 
 const safeReply = async (interaction: ChatInputCommandInteraction, content: string) => {

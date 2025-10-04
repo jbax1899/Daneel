@@ -108,7 +108,16 @@ export class RealtimeAudioHandler {
                     role: 'user',
                     content: [
                         { type: 'input_text', text: annotation },
-                        { type: 'input_audio_buffer' },
+                        {
+                            type: 'input_audio',
+                            audio: {
+                                format: {
+                                    type: 'audio/pcm',
+                                    rate: AUDIO_CONSTANTS.REALTIME_SAMPLE_RATE,
+                                    channels: AUDIO_CONSTANTS.CHANNELS,
+                                },
+                            },
+                        },
                     ],
                 },
             }));

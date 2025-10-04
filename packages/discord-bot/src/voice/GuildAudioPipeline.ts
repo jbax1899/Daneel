@@ -10,7 +10,7 @@ export class GuildAudioPipeline {
     private readonly pcmStream: PassThrough;
     private readonly opusEncoder: opus.Encoder;
     private pcmBuffer: Buffer = Buffer.alloc(0);
-    private isDestroyed: boolean = false;
+    private destroyed: boolean = false;
     private readonly frameSize: number = AUDIO_CONSTANTS.DISCORD_FRAME_SIZE; // 48kHz * 0.02s = 960
     private resourceCreated = false;
 
@@ -38,7 +38,7 @@ export class GuildAudioPipeline {
     }
     
     public async writePCM(pcmData: Buffer): Promise<void> {
-        if (this.isDestroyed) {
+        if (this.destroyed) {
             throw new Error('Cannot write to destroyed pipeline');
         }
         
@@ -58,7 +58,7 @@ export class GuildAudioPipeline {
         }
     }
     public async flushResidualBuffer(): Promise<void> {
-        if (this.isDestroyed) {
+        if (this.destroyed) {
             this.pcmBuffer = Buffer.alloc(0);
             return;
         }
@@ -83,23 +83,38 @@ export class GuildAudioPipeline {
         return this.player;
     }
     
+    public isDestroyed(): boolean {
+        return this.destroyed;
+    }
+
     public async destroy(): Promise<void> {
-        if (this.isDestroyed) return;
-        this.isDestroyed = true;
-    
-        // Drain remaining PCM data
-        if (this.pcmBuffer.length > 0) {
-            try {
-                await this.writePCM(Buffer.alloc(0)); // flush remaining frames
-            } catch {}
-        }
-    
+        if (this.destroyed) return;
+        this.destroyed = true;
+
+        this.pcmBuffer = Buffer.alloc(0);
+
         try {
             this.player.stop();
-            this.pcmStream.end();
-            this.opusEncoder.end();
         } catch (error) {
-            logger.error('[AudioPipeline] Error ending streams:', error);
+            logger.error('[AudioPipeline] Error stopping player:', error);
+        }
+
+        try {
+            this.pcmStream.removeAllListeners();
+            this.pcmStream.end();
+        } catch (error) {
+            logger.error('[AudioPipeline] Error ending PCM stream:', error);
+        }
+
+        try {
+            this.opusEncoder.removeAllListeners();
+            if (typeof (this.opusEncoder as any).destroy === 'function') {
+                (this.opusEncoder as any).destroy();
+            } else {
+                this.opusEncoder.end();
+            }
+        } catch (error) {
+            logger.error('[AudioPipeline] Error ending Opus encoder:', error);
         }
     }
     

@@ -9,6 +9,9 @@ import { AudioPlaybackHandler } from '../voice/AudioPlaybackHandler.js';
 import { UserVoiceStateHandler } from '../voice/UserVoiceStateHandler.js';
 import { VoiceConnectionManager } from '../voice/VoiceConnectionManager.js';
 import { RealtimeContextBuilder, RealtimeContextParticipant } from '../utils/prompting/RealtimeContextBuilder.js';
+import { RealtimeUsageLimiter } from '../utils/RealtimeUsageLimiter.js';
+import type { VoiceSession } from '../voice/VoiceSessionManager.js';
+import type { RealtimeAllowance } from '../utils/RealtimeUsageLimiter.js';
 
 export class VoiceStateHandler extends Event {
     private sessionManager: VoiceSessionManager;
@@ -18,6 +21,9 @@ export class VoiceStateHandler extends Event {
     private connectionManager: VoiceConnectionManager;
     private client: Client;
     private realtimeContextBuilder: RealtimeContextBuilder;
+    private realtimeUsageLimiter: RealtimeUsageLimiter;
+    private farewellMessage: string;
+    private responseCompletionGraceMs: number;
 
     constructor(client: Client) {
         super({
@@ -32,6 +38,25 @@ export class VoiceStateHandler extends Event {
         this.userVoiceStateHandler = new UserVoiceStateHandler(this.sessionManager);
         this.connectionManager = new VoiceConnectionManager();
         this.realtimeContextBuilder = new RealtimeContextBuilder();
+
+        const limitMinutes = Number(process.env.REALTIME_LIMIT_MINUTES ?? '1');
+        const windowHours = Number(process.env.REALTIME_LIMIT_WINDOW_HOURS ?? '24');
+        const completionGrace = Number(process.env.REALTIME_COMPLETION_GRACE_MS ?? '10000');
+
+        const parsedLimitMinutes = Number.isFinite(limitMinutes) && limitMinutes > 0 ? limitMinutes : 1;
+        const parsedWindowHours = Number.isFinite(windowHours) && windowHours > 0 ? windowHours : 24;
+        const parsedCompletionGrace = Number.isFinite(completionGrace) && completionGrace > 0 ? completionGrace : 10_000;
+
+        this.realtimeUsageLimiter = new RealtimeUsageLimiter({
+            limitMinutes: parsedLimitMinutes,
+            windowHours: parsedWindowHours,
+            superUserIds: process.env.DEVELOPER_USER_ID ? [process.env.DEVELOPER_USER_ID] : undefined,
+        });
+        this.farewellMessage = process.env.REALTIME_FAREWELL_MESSAGE
+            ?? 'It was great chatting with you! Let\'s talk again soon.';
+        this.responseCompletionGraceMs = parsedCompletionGrace;
+
+        logger.debug(`[VoiceStateHandler] Realtime usage limit configured: ${parsedLimitMinutes} minute(s) every ${parsedWindowHours} hour(s).`);
 
         try {
             const anyClient = this.client as any;
@@ -131,6 +156,10 @@ export class VoiceStateHandler extends Event {
         this.userVoiceStateHandler.registerInitiatingUser(guildId, userId);
     }
 
+    public getRealtimeAllowance(userId: string): RealtimeAllowance {
+        return this.realtimeUsageLimiter.getAllowance(userId);
+    }
+
     public async createSession(guildId: string, channelId: string): Promise<void> {
         if (this.sessionManager.hasSession(guildId)) {
             logger.debug(`Active session already exists for guild ${guildId}, skipping creation`);
@@ -169,6 +198,13 @@ export class VoiceStateHandler extends Event {
         logger.info(`Bot left voice channel in guild ${guildId}`);
 
         const session = this.sessionManager.getSession(guildId);
+        if (session?.usageLimitTimer) {
+            clearTimeout(session.usageLimitTimer);
+            session.usageLimitTimer = undefined;
+        }
+        if (session?.initiatingUserId) {
+            this.realtimeUsageLimiter.endSession(session.initiatingUserId);
+        }
         if (session?.realtimeSession) {
             this.removeRealtimeSessionListeners(session.realtimeSession);
         }
@@ -210,11 +246,105 @@ export class VoiceStateHandler extends Event {
 
         try {
             logger.info(`Started conversation in guild ${guildId}`);
+            await this.activateRealtimeLimit(guildId, session);
             await session.realtimeSession.sendGreeting();
+            session.isActive = true;
         } catch (error) {
+            if (session?.initiatingUserId) {
+                this.realtimeUsageLimiter.cancelSession(session.initiatingUserId);
+            }
             logger.error(`Error starting conversation in guild ${guildId}:`, error);
             throw error;
         }
+    }
+
+    private async activateRealtimeLimit(guildId: string, session: VoiceSession): Promise<void> {
+        const userId = session.initiatingUserId;
+        if (!userId) {
+            logger.debug(`[VoiceStateHandler] No initiating user found for guild ${guildId}, skipping realtime limiter.`);
+            return;
+        }
+
+        try {
+            const active = this.realtimeUsageLimiter.startSession(userId);
+            session.usageLimitStartedAt = active.start;
+            session.usageLimitAllowedMs = active.allowedMs;
+
+            if (session.usageLimitTimer) {
+                clearTimeout(session.usageLimitTimer);
+            }
+
+            if (Number.isFinite(active.allowedMs) && active.allowedMs > 0) {
+                session.usageLimitTimer = setTimeout(() => {
+                    void this.handleRealtimeLimitReached(guildId, userId);
+                }, active.allowedMs);
+                logger.debug(`[VoiceStateHandler] Scheduled realtime limit for user ${userId} in guild ${guildId} after ${active.allowedMs} ms.`);
+            } else {
+                session.usageLimitTimer = undefined;
+            }
+        } catch (error) {
+            logger.error(`[VoiceStateHandler] Failed to start realtime session for user ${userId} in guild ${guildId}:`, error);
+            throw error;
+        }
+    }
+
+    private async handleRealtimeLimitReached(guildId: string, userId: string): Promise<void> {
+        const session = this.sessionManager.getSession(guildId);
+        if (!session) {
+            return;
+        }
+
+        if (session.initiatingUserId !== userId) {
+            return;
+        }
+
+        if (session.usageLimitTimer) {
+            clearTimeout(session.usageLimitTimer);
+            session.usageLimitTimer = undefined;
+        }
+
+        logger.info(`[VoiceStateHandler] Realtime usage limit reached for user ${userId} in guild ${guildId}. Ending session.`);
+
+        await this.waitForResponseCompletion(session.realtimeSession, this.responseCompletionGraceMs);
+
+        try {
+            await session.realtimeSession.sendFarewell(this.farewellMessage);
+            await this.waitForResponseCompletion(session.realtimeSession, this.responseCompletionGraceMs);
+        } catch (error) {
+            logger.error('[VoiceStateHandler] Failed to send farewell message before disconnecting:', error);
+        }
+
+        this.realtimeUsageLimiter.endSession(userId);
+
+        try {
+            this.removeRealtimeSessionListeners(session.realtimeSession);
+        } catch (error) {
+            logger.warn('[VoiceStateHandler] Failed to remove realtime session listeners during limit enforcement:', error);
+        }
+
+        this.sessionManager.removeSession(guildId);
+        this.userVoiceStateHandler.clearInitiatingUser(guildId);
+        this.audioCaptureHandler.cleanupGuild(guildId);
+        this.audioPlaybackHandler.cleanupGuild(guildId);
+        session.isActive = false;
+
+        try {
+            await this.connectionManager.cleanupVoiceConnection(session.connection, this.client);
+        } catch (error) {
+            logger.error('[VoiceStateHandler] Failed to cleanup voice connection after limit enforcement:', error);
+        }
+    }
+
+    private async waitForResponseCompletion(realtimeSession: RealtimeSession, timeoutMs: number): Promise<void> {
+        if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+            await realtimeSession.waitForResponseCompleted().catch(() => undefined);
+            return;
+        }
+
+        await Promise.race([
+            realtimeSession.waitForResponseCompleted().catch(() => undefined),
+            new Promise<void>((resolve) => setTimeout(resolve, timeoutMs)),
+        ]);
     }
 
     private async createRealtimeSession(
