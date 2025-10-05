@@ -264,8 +264,7 @@ const imageCommand: Command = {
 
             // Generate the image using responses API
             const response = await openai.responses.create(requestPayload);
-
-            logger.debug(`OpenAI Response: ${JSON.stringify(response, null, 2)}`);
+            //logger.debug(`OpenAI Response: ${JSON.stringify(response, null, 2)}`);
 
             // Extract image generation call information
             const imageGenerationCalls = response.output.filter(
@@ -292,7 +291,7 @@ const imageCommand: Command = {
                 // Find and update the "Adjusted Prompt" field
                 const adjustedPromptField = embed.data.fields?.find(field => field.name === 'Adjusted Prompt');
                 if (adjustedPromptField) {
-                    adjustedPromptField.value = revisedPrompt;
+                    adjustedPromptField.value = revisedPrompt; 
                 }
             }
             // Find and update the "Output Response ID" field
@@ -302,26 +301,33 @@ const imageCommand: Command = {
             }
 
             // Upload image to Cloudinary
-            const imageUrl = await uploadToCloudinary(Buffer.from(imageData, 'base64'), {
-                originalPrompt: prompt,
-                revisedPrompt,
-                model,
-                quality,
-                size: dimensions,
-                background,
-                response,
-                startTime: start
-            });
+            let imageUrl: string;
+            try {
+                imageUrl = await uploadToCloudinary(Buffer.from(imageData, 'base64'), {
+                    originalPrompt: prompt,
+                    revisedPrompt,
+                    model,
+                    quality,
+                    size: dimensions,
+                    background,
+                    response,
+                    startTime: start
+                });
+                embed.setImage(imageUrl);
+            } catch (uploadError) {
+                logger.error('Error uploading to Cloudinary:', uploadError);
+                // Fallback to sending the image as a file
+                embed.setImage(`data:image/png;base64,${imageData}`);
+                logger.debug('Image sent as file');
+            }
 
-            // Set the image in the embed instead of sending as file
-            embed.setImage(imageUrl);
-
-            // Send final image to Discord
+            // Update embed footer
             const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
             const tokensUsed = response.usage?.total_tokens ?? 'unknown';
             embed.setFooter({ text: `Finished in ${generationTimeSeconds}s • ${tokensUsed} tokens` });
+            
+            // Edit the initial reply with the final embed
             await interaction.editReply({ embeds: [embed] });
-
         } catch (error) {
             logger.error(`Error in image command: ${error}`);
             
