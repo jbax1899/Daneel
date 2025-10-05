@@ -10,7 +10,7 @@
   "scripts": {
     "prestart": "npm run build",
     "start": "node --es-module-specifier-resolution=node dist/index.js",
-    "dev": "cross-env NODE_ENV=development tsx watch src/index.ts",
+    "dev": "npx cross-env NODE_ENV=development npx tsx watch src/index.ts",
     "build": "npm run clean && tsc && npm run copy-files",
     "clean": "rimraf dist",
     "copy-files": "xcopy /s /e /i /y src\\*.* dist\\src\\ 2>nul && xcopy /s /e /i /y src\\commands\\*.* dist\\commands\\ 2>nul && xcopy /s /e /i /y src\\events\\*.* dist\\events\\ 2>nul && xcopy /s /e /i /y src\\utils\\*.* dist\\utils\\ 2>nul || echo No files to copy",
