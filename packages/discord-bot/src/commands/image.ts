@@ -1,10 +1,21 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import { ChatInputCommandInteraction, SlashCommandBuilder, EmbedBuilder, type APIEmbedField } from 'discord.js';
 import { Command } from './BaseCommand.js';
 import { OpenAI } from 'openai';
+import { APIError } from 'openai/error';
 import type { Response, ResponseCreateParamsNonStreaming, ResponseInput, ResponseOutputItem, Tool, ToolChoiceTypes } from 'openai/resources/responses/responses';
 import { logger } from '../utils/logger.js';
 import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { CombinedPropertyError } from '@sapphire/shapeshift';
+import {
+    describeTokenUsage,
+    estimateImageGenerationCost,
+    estimateTextCost,
+    formatUsd,
+    type ImageGenerationQuality,
+    type ImageGenerationSize,
+    type TextModelPricingKey
+} from '../utils/pricing.js';
 
 const cloudinaryConfig = {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -23,14 +34,67 @@ if (isCloudinaryConfigured) {
 }
 
 type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
-type ImageQualityType = 'auto' | 'low' | 'medium' | 'high';
+type ImageQualityType = ImageGenerationQuality;
 type ImageAspectRatioType = 'auto' | 'square' | 'portrait' | 'landscape';
-type ImageSizeType = 'auto' | '1024x1024' | '1024x1536' | '1536x1024';
+type ImageSizeType = ImageGenerationSize;
 type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
 
 type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCall & {
     revised_prompt?: string | null;
 };
+
+const EMBED_FIELD_VALUE_LIMIT = 1024;
+const EMBED_FOOTER_TEXT_LIMIT = 2048;
+const EMBED_DESCRIPTION_LIMIT = 4096;
+
+function sanitizeForEmbed(value: string): string {
+    return value.replace(/\u0000/g, '');
+}
+
+function truncateForEmbed(value: string, limit: number, options: { includeTruncationNote?: boolean } = {}): string {
+    const sanitized = sanitizeForEmbed(value);
+
+    if (sanitized.length <= limit) {
+        return sanitized;
+    }
+
+    const ellipsis = '…';
+    const truncationNote = options.includeTruncationNote ? '\n*(truncated)*' : '';
+    const availableLength = Math.max(0, limit - ellipsis.length - truncationNote.length);
+    const truncated = sanitized.slice(0, availableLength);
+    return `${truncated}${ellipsis}${truncationNote}`;
+}
+
+function setEmbedFooterText(embed: EmbedBuilder, text: string) {
+    embed.setFooter({ text: truncateForEmbed(text, EMBED_FOOTER_TEXT_LIMIT) });
+}
+
+function setEmbedDescription(embed: EmbedBuilder, description: string) {
+    embed.setDescription(truncateForEmbed(description, EMBED_DESCRIPTION_LIMIT));
+}
+
+function setOrAddEmbedField(
+    embed: EmbedBuilder,
+    name: string,
+    value: string,
+    { inline = false, includeTruncationNote = false, maxLength = EMBED_FIELD_VALUE_LIMIT }: {
+        inline?: boolean;
+        includeTruncationNote?: boolean;
+        maxLength?: number;
+    } = {}
+) {
+    const formattedValue = truncateForEmbed(value, maxLength, { includeTruncationNote });
+    const field: APIEmbedField = inline ? { name, value: formattedValue, inline } : { name, value: formattedValue };
+
+    const fields = embed.data.fields ?? [];
+    const index = fields.findIndex(existingField => existingField.name === name);
+
+    if (index >= 0) {
+        embed.spliceFields(index, 1, field);
+    } else {
+        embed.addFields(field);
+    }
+}
 
 class CloudinaryConfigurationError extends Error {
     constructor(message = 'Cloudinary configuration is missing.') {
@@ -184,28 +248,22 @@ const imageCommand: Command = {
         // Create an initial embed to show the image generation progress
         const embed = new EmbedBuilder()
             .setTitle('🎨 Image Generation')
-            //.setDescription(`User has requested an image to be generated based on the prompt:`)
-            .addFields(
-                { name: 'Prompt', value: prompt }
-            )
             .setColor(0x00FF00)
-            .setTimestamp()
-            .setFooter({ text: 'Generating...' });
+            .setTimestamp();
+
+        setOrAddEmbedField(embed, 'Prompt', prompt, { includeTruncationNote: true });
+        setEmbedFooterText(embed, 'Generating...');
 
         if (adjustPrompt) {
-            embed.addFields(
-                { name: 'Adjusted Prompt', value: '...' }
-            );
+            setOrAddEmbedField(embed, 'Adjusted Prompt', '...');
         }
 
-        embed.addFields(
-            { name: 'Size', value: dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', inline: true },
-            { name: 'Quality', value: qualityRestricted ? `${quality} (restricted)` : quality, inline: true },
-            { name: 'Background', value: background, inline: true },
-            { name: 'Model', value: model, inline: true },
-            { name: 'Input Response ID', value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None', inline: true },
-            { name: 'Output Response ID', value: '...', inline: true }
-        );
+        setOrAddEmbedField(embed, 'Size', dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', { inline: true });
+        setOrAddEmbedField(embed, 'Quality', qualityRestricted ? `${quality} (restricted)` : quality, { inline: true });
+        setOrAddEmbedField(embed, 'Background', background, { inline: true });
+        setOrAddEmbedField(embed, 'Model', model, { inline: true });
+        setOrAddEmbedField(embed, 'Input Response ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
+        setOrAddEmbedField(embed, 'Output Response ID', '...', { inline: true });
 
         // Edit the initial reply with the embed
         await interaction.editReply({
@@ -264,7 +322,23 @@ const imageCommand: Command = {
 
             // Generate the image using responses API
             const response = await openai.responses.create(requestPayload);
-            //logger.debug(`OpenAI Response: ${JSON.stringify(response, null, 2)}`);
+
+            if (response.error) {
+                const errorMessage = mapResponseError(response.error);
+                logger.warn(`OpenAI response error for image command: ${response.error.code} - ${response.error.message}`);
+                embed.setColor(0xFF0000);
+                setEmbedFooterText(embed, errorMessage);
+                await interaction.editReply({ embeds: [embed] });
+                return;
+            }
+
+            if (response.incomplete_details?.reason === 'content_filter') {
+                const safetyMessage = 'OpenAI safety filters blocked this prompt. Please modify your prompt and try again.';
+                embed.setColor(0xFF0000);
+                setEmbedFooterText(embed, safetyMessage);
+                await interaction.editReply({ embeds: [embed] });
+                return;
+            }
 
             // Extract image generation call information
             const imageGenerationCalls = response.output.filter(
@@ -275,30 +349,46 @@ const imageCommand: Command = {
                 throw new Error('No image generation call found in response. The model may not have decided to generate an image.');
             }
 
-            const imageCall = imageGenerationCalls[0];
-            const imageData = imageCall.result;
+            const imageCallWithResult = imageGenerationCalls.find(call => Boolean(call.result));
+            const imageCall = imageCallWithResult ?? imageGenerationCalls[0];
+            const imageData = imageCall?.result;
 
             // Check if image data exists
-            if (!imageData) {
+            if (!imageCall || !imageData) {
                 throw new Error('No image data found in the image generation call result.');
             }
 
             logger.debug(`Image generation successful - ID: ${imageCall.id}, Status: ${imageCall.status}`);
 
             // Update embed fields
-            const revisedPrompt = imageCall.revised_prompt || 'None';
-            if (adjustPrompt && revisedPrompt !== 'None') {
-                // Find and update the "Adjusted Prompt" field
-                const adjustedPromptField = embed.data.fields?.find(field => field.name === 'Adjusted Prompt');
-                if (adjustedPromptField) {
-                    adjustedPromptField.value = revisedPrompt; 
-                }
+            const revisedPrompt = imageCall.revised_prompt ?? null;
+            if (adjustPrompt) {
+                setOrAddEmbedField(embed, 'Adjusted Prompt', revisedPrompt ?? 'None', { includeTruncationNote: true });
             }
-            // Find and update the "Output Response ID" field
-            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
-            if (outputResponseIdField && response.id) {
-                outputResponseIdField.value = `\`${response.id}\``;
+
+            if (response.id) {
+                setOrAddEmbedField(embed, 'Output Response ID', `\`${response.id}\``, { inline: true });
             }
+
+            const usage = response.usage;
+            const inputTokens = usage?.input_tokens ?? 0;
+            const outputTokens = usage?.output_tokens ?? 0;
+            const totalTokens = usage?.total_tokens ?? (inputTokens + outputTokens);
+
+            const textCostEstimate = estimateTextCost(model as TextModelPricingKey, inputTokens, outputTokens);
+            const successfulImageCount = imageGenerationCalls.filter(call => Boolean(call.result)).length || 1;
+            const imageCostEstimate = estimateImageGenerationCost({ quality, size: dimensions, imageCount: successfulImageCount });
+            const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
+
+            logger.debug(`Image generation usage - inputTokens: ${inputTokens}, outputTokens: ${outputTokens}, images: ${successfulImageCount}, estimatedCost: ${formatUsd(totalCost)}`);
+
+            const usageFieldValue = [
+                `Text tokens → In: ${inputTokens} • Out: ${outputTokens} • Total: ${totalTokens}`,
+                `Image calls → ${imageCostEstimate.imageCount} × ${imageCostEstimate.effectiveSize} (${imageCostEstimate.effectiveQuality})`,
+                `Estimated cost → Text ${formatUsd(textCostEstimate.totalCost)} • Image ${formatUsd(imageCostEstimate.totalCost)} • Total ${formatUsd(totalCost)}`
+            ].join('\n');
+
+            setOrAddEmbedField(embed, 'Usage', usageFieldValue);
 
             // Upload image to Cloudinary
             let imageUrl: string;
@@ -310,8 +400,19 @@ const imageCommand: Command = {
                     quality,
                     size: dimensions,
                     background,
-                    response,
-                    startTime: start
+                    startTime: start,
+                    usage: {
+                        inputTokens,
+                        outputTokens,
+                        totalTokens,
+                        imageCount: imageCostEstimate.imageCount
+                    },
+                    cost: {
+                        text: textCostEstimate.totalCost,
+                        image: imageCostEstimate.totalCost,
+                        total: totalCost,
+                        perImage: imageCostEstimate.perImageCost
+                    }
                 });
                 embed.setImage(imageUrl);
             } catch (uploadError) {
@@ -323,34 +424,32 @@ const imageCommand: Command = {
 
             // Update embed footer
             const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
-            const tokensUsed = response.usage?.total_tokens ?? 'unknown';
-            embed.setFooter({ text: `Finished in ${generationTimeSeconds}s • ${tokensUsed} tokens` });
-            
+            setEmbedFooterText(
+                embed,
+                `Finished in ${generationTimeSeconds}s • ${describeTokenUsage(usage)} • Cost ≈ ${formatUsd(totalCost)}`
+            );
+
             // Edit the initial reply with the final embed
             await interaction.editReply({ embeds: [embed] });
         } catch (error) {
-            logger.error(`Error in image command: ${error}`);
-            
-            // Enhanced error handling with specific messages
-            let errorMessage = 'An unknown error occurred while generating the image.';
-            if (error instanceof Error) {
-                if (error.message.includes('model')) {
-                    errorMessage = 'Model error: The specified model is not supported for image generation.';
-                } else if (error.message.includes('quota')) {
-                    errorMessage = 'Quota exceeded: Please try again later.';
-                } else if (error.message.includes('safety')) {
-                    errorMessage = 'Your request was rejected by the safety system: Please modify your prompt and try again.';
-                } else if (error.message.includes('network') || error.message.includes('timeout')) {
-                    errorMessage = 'Network error: Please try again later.';
-                } else if (error instanceof CloudinaryConfigurationError) {
-                    errorMessage = 'Cloudinary is not configured. Please contact the administrator.';
-                } else {
-                    errorMessage = error.message;
-                }
+            logger.error('Error in image command:', error);
+
+            const errorMessage = resolveImageCommandError(error);
+            embed.setColor(0xFF0000);
+
+            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
+            if (outputResponseIdField && outputResponseIdField.value === '...') {
+                setOrAddEmbedField(embed, 'Output Response ID', 'n/a', { inline: true });
             }
 
-            embed.setFooter({ text: errorMessage });
-            await interaction.editReply({ embeds: [embed] });
+            setEmbedFooterText(embed, errorMessage);
+            setEmbedDescription(embed, errorMessage);
+
+            try {
+                await interaction.editReply({ embeds: [embed] });
+            } catch (replyError) {
+                logger.error('Failed to edit reply after image command error:', replyError);
+            }
         }
     }
 };
@@ -362,8 +461,19 @@ interface UploadMetadata {
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
-    response: Response;
     startTime: number;
+    usage: {
+        inputTokens: number;
+        outputTokens: number;
+        totalTokens: number;
+        imageCount: number;
+    };
+    cost: {
+        text: number;
+        image: number;
+        total: number;
+        perImage: number;
+    };
 }
 
 /**
@@ -375,7 +485,7 @@ async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMetadata)
     }
 
     try {
-        logger.debug(`Uploading image to Cloudinary...`);
+        logger.debug(`Uploading image to Cloudinary with estimated cost ${formatUsd(metadata.cost.total)} and ${metadata.usage.totalTokens} tokens...`);
 
         const uploadResult = await cloudinary.uploader.upload(
             `data:image/png;base64,${imageBuffer.toString('base64')}`,
@@ -390,8 +500,15 @@ async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMetadata)
                     size: metadata.size,
                     background: metadata.background,
                     generated_at: new Date().toISOString(),
-                    tokens_used: metadata.response.usage?.total_tokens ?? 'unknown',
-                    generation_time: `${(Date.now() - metadata.startTime) / 1000}s`
+                    generation_time: `${(Date.now() - metadata.startTime) / 1000}s`,
+                    tokens_used: metadata.usage.totalTokens.toString(),
+                    text_input_tokens: metadata.usage.inputTokens.toString(),
+                    text_output_tokens: metadata.usage.outputTokens.toString(),
+                    image_count: metadata.usage.imageCount.toString(),
+                    cost_text_usd: formatUsd(metadata.cost.text),
+                    cost_image_usd: formatUsd(metadata.cost.image),
+                    cost_total_usd: formatUsd(metadata.cost.total),
+                    cost_per_image_usd: formatUsd(metadata.cost.perImage)
                 },
                 tags: ['ai-generated', 'discord-bot', metadata.model, metadata.quality]
             }
@@ -403,6 +520,98 @@ async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMetadata)
         logger.error(`Cloudinary upload error: ${error}`);
         throw error;
     }
+}
+
+function mapResponseError(error: NonNullable<Response['error']>): string {
+    switch (error.code) {
+        case 'image_content_policy_violation':
+            return 'OpenAI safety filters blocked this prompt. Please modify your prompt and try again.';
+        case 'rate_limit_exceeded':
+            return 'OpenAI rate limit hit. Please wait a few moments and try again.';
+        case 'invalid_prompt':
+            return `OpenAI could not process the prompt: ${error.message}`;
+        case 'server_error':
+            return 'OpenAI had a temporary issue generating the image. Please try again.';
+        case 'invalid_image':
+        case 'invalid_image_format':
+        case 'invalid_base64_image':
+        case 'invalid_image_url':
+        case 'image_too_large':
+        case 'image_too_small':
+        case 'image_parse_error':
+        case 'invalid_image_mode':
+        case 'image_file_too_large':
+        case 'unsupported_image_media_type':
+        case 'empty_image_file':
+        case 'failed_to_download_image':
+        case 'image_file_not_found':
+            return `Image processing error: ${error.message}`;
+        default:
+            return `OpenAI error: ${error.message}`;
+    }
+}
+
+function resolveImageCommandError(error: unknown): string {
+    if (error instanceof CloudinaryConfigurationError) {
+        return 'Cloudinary is not configured. Please contact the administrator.';
+    }
+
+    if (error instanceof CombinedPropertyError) {
+        logger.warn('Discord embed validation failed while preparing an image response: %s', error);
+        return 'Discord rejected the response format. Please try again with a shorter or simpler prompt.';
+    }
+
+    if (error instanceof APIError) {
+        const code = extractApiErrorCode(error);
+        if (code === 'content_policy_violation' || code === 'image_content_policy_violation') {
+            return 'OpenAI safety filters blocked this prompt. Please modify your prompt and try again.';
+        }
+        if (code === 'rate_limit_exceeded' || error.status === 429) {
+            return 'OpenAI rate limit hit. Please wait a few moments and try again.';
+        }
+        if (error.status === 401 || error.status === 403) {
+            return 'OpenAI rejected our request. Please contact the administrator.';
+        }
+        if (error.status === 400 && /invalid[_\s-]*prompt/i.test(error.message ?? '')) {
+            return 'OpenAI reported that the prompt was invalid. Please try again with a simpler request.';
+        }
+        if (error.status >= 500) {
+            return 'OpenAI had a temporary issue generating the image. Please try again.';
+        }
+        return error.message || 'OpenAI returned an unexpected error.';
+    }
+
+    if (error instanceof Error) {
+        const message = error.message || 'Unknown error.';
+        if (/content filter|safety system|moderation/i.test(message)) {
+            return 'OpenAI safety filters blocked this prompt. Please modify your prompt and try again.';
+        }
+        if (/quota/i.test(message)) {
+            return 'Quota exceeded: Please try again later.';
+        }
+        if (/network|timeout|fetch/i.test(message)) {
+            return 'Network error: Please try again later.';
+        }
+        if (/model/i.test(message)) {
+            return 'Model error: The specified model is not supported for image generation.';
+        }
+        return message;
+    }
+
+    return 'An unknown error occurred while generating the image.';
+}
+
+function extractApiErrorCode(error: APIError): string | undefined {
+    if (typeof error.code === 'string') {
+        return error.code;
+    }
+
+    const apiError = error.error as { code?: string } | undefined;
+    if (apiError && typeof apiError.code === 'string') {
+        return apiError.code;
+    }
+
+    return undefined;
 }
 
 export default imageCommand;

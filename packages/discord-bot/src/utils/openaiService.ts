@@ -3,15 +3,16 @@ import path, { dirname } from 'path';
 import fs from 'fs';
 import OpenAI from 'openai';
 import fetch from 'node-fetch';
-import { logger } from './logger.js'
+import { logger } from './logger.js';
 import { ActivityOptions } from 'discord.js';
+import { estimateTextCost, formatUsd, type GPT5ModelType } from './pricing.js';
 
 // ====================
 // Type Declarations
 // ====================
 
+export type { GPT5ModelType } from './pricing.js';
 export type SupportedModel = GPT5ModelType;
-export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
 export type EmbeddingModelType = 'text-embedding-3-small'; // Dimensions: 1546
 
 export interface OpenAIMessage {
@@ -109,13 +110,6 @@ interface ResponseOutputItemExtended {
 
 const DEFAULT_GPT5_MODEL: SupportedModel = 'gpt-5-mini';
 const DEFAULT_MODEL: SupportedModel = DEFAULT_GPT5_MODEL;
-const GPT5_PRICING: Record<GPT5ModelType, { input: number; output: number }> = {
-  // Pricing per 1M tokens
-  // https://platform.openai.com/docs/pricing
-  'gpt-5': { input: 1.25, output: 10 },
-  'gpt-5-mini': { input: 0.25, output: 2.0 },
-  'gpt-5-nano': { input: 0.05, output: 0.4 },
-};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
@@ -309,16 +303,17 @@ export class OpenAIService {
           ...(citations.length > 0 && { citations })
         },
         finish_reason: finishReason,
-        usage: {
-          input_tokens: response.usage?.input_tokens ?? 0,
-          output_tokens: response.usage?.output_tokens ?? 0,
-          total_tokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
-          cost: this.calculateCost(
-            response.usage?.input_tokens ?? 0,
-            response.usage?.output_tokens ?? 0,
-            model
-          )
-        }
+        usage: (() => {
+          const inputTokens = response.usage?.input_tokens ?? 0;
+          const outputTokens = response.usage?.output_tokens ?? 0;
+          const cost = estimateTextCost(model, inputTokens, outputTokens);
+          return {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            total_tokens: inputTokens + outputTokens,
+            cost: formatUsd(cost.totalCost)
+          };
+        })()
       };
 
     } catch (error) {
@@ -416,16 +411,17 @@ export class OpenAIService {
           content: choice.message.content || '',
         },
         finish_reason: choice.finish_reason || 'stop',
-        usage: chatResponse.usage ? {
-          input_tokens: chatResponse.usage.prompt_tokens,
-          output_tokens: chatResponse.usage.completion_tokens,
-          total_tokens: chatResponse.usage.total_tokens,
-          cost: this.calculateCost(
-            chatResponse.usage.prompt_tokens || 0,
-            chatResponse.usage.completion_tokens || 0,
-            IMAGE_DESCRIPTION_MODEL as GPT5ModelType
-          )
-        } : undefined
+        usage: chatResponse.usage ? (() => {
+          const inputTokens = chatResponse.usage.prompt_tokens || 0;
+          const outputTokens = chatResponse.usage.completion_tokens || 0;
+          const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL as GPT5ModelType, inputTokens, outputTokens);
+          return {
+            input_tokens: inputTokens,
+            output_tokens: outputTokens,
+            total_tokens: chatResponse.usage.total_tokens,
+            cost: formatUsd(cost.totalCost)
+          };
+        })() : undefined
       };
       logger.debug(`Image description generated: ${imageDescriptionResponse.message?.content}${imageDescriptionResponse.usage ? ` (Cost: ${imageDescriptionResponse.usage.cost})` : ''}`);
       return imageDescriptionResponse;
@@ -433,13 +429,6 @@ export class OpenAIService {
       logger.error('Error generating image description:', error);
       throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  private calculateCost(inputTokens: number, outputTokens: number, model: GPT5ModelType): string {
-    const pricing = GPT5_PRICING[model];
-    const inputCost = (inputTokens / 1_000_000) * pricing.input;
-    const outputCost = (outputTokens / 1_000_000) * pricing.output;
-    return `$${(inputCost + outputCost).toFixed(6)}`;
   }
 
   /**
@@ -535,12 +524,12 @@ export class OpenAIService {
           logger.debug(`Reduced context: ${JSON.stringify(reducedContext)}`);
 
           // Log the estimated cost of the reduction
-          const estimatedCost = this.calculateCost(
+          const reductionCost = estimateTextCost(
+            REDUCTION_MODEL as GPT5ModelType,
             response.usage?.prompt_tokens || 0,
-            response.usage?.completion_tokens || 0,
-            REDUCTION_MODEL as GPT5ModelType
+            response.usage?.completion_tokens || 0
           );
-          logger.debug(`Estimated cost of reduction: ${estimatedCost}`);
+          logger.debug(`Estimated cost of reduction: ${formatUsd(reductionCost.totalCost)}`);
         }
       } catch (error) {
         logger.error('Error reducing context:', error);
