@@ -178,7 +178,7 @@ const imageCommand: Command = {
         if ((quality === 'medium' || quality === 'high') && !isSuperUser) {
             quality = 'low';
             qualityRestricted = true;
-            logger.warn(`User ${interaction.user.id} attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
+            logger.warn(`User ${interaction.user.id} (${interaction.user.username}/${interaction.user.tag}) attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
         }
         const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? 'gpt-4o-mini';
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
