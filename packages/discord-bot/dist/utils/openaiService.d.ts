@@ -1,6 +1,7 @@
 import { ActivityOptions } from 'discord.js';
+import { type GPT5ModelType } from './pricing.js';
+export type { GPT5ModelType } from './pricing.js';
 export type SupportedModel = GPT5ModelType;
-export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
 export type EmbeddingModelType = 'text-embedding-3-small';
 export interface OpenAIMessage {
     role: 'user' | 'assistant' | 'system' | 'developer';
@@ -83,7 +84,6 @@ export declare class OpenAIService {
     generateSpeech(input: string, instructions: TTSOptions, filename: string, format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm'): Promise<string>;
     generateImageDescription(imageUrl: string, // URL from Discord attachment
     context?: string): Promise<OpenAIResponse>;
-    private calculateCost;
     /**
      * Embeds text using the default embedding model.
      * @param text The text to embed.

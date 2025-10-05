@@ -1,0 +1,11 @@
+export const EMBED_FIELD_VALUE_LIMIT = 1024;
+export const EMBED_FOOTER_TEXT_LIMIT = 2048;
+export const EMBED_DESCRIPTION_LIMIT = 4096;
+export const EMBED_TITLE_LIMIT = 256;
+export const PROMPT_DISPLAY_LIMIT = 512;
+export const CLOUDINARY_CONTEXT_VALUE_LIMIT = 950;
+export const PARTIAL_IMAGE_LIMIT = 3; // OpenAI's limit is 3
+export const REFLECTION_TITLE_LIMIT = EMBED_TITLE_LIMIT;
+export const REFLECTION_DESCRIPTION_LIMIT = EMBED_DESCRIPTION_LIMIT;
+export const REFLECTION_MESSAGE_LIMIT = 2000; // Discord's max is 2000
+//# sourceMappingURL=constants.js.map
