@@ -327,7 +327,7 @@ const imageCommand: Command = {
             const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
             setEmbedFooterText(
                 embed,
-                `Finished in ${generationTimeSeconds}s • Cost ≈ ${formatUsd(totalCost)} (${((imageCostEstimate.totalCost / totalCost) * 100).toFixed(2)}% image / ${((textCostEstimate.totalCost / totalCost) * 100).toFixed(2)}% text)`
+                `Finished in ${generationTimeSeconds}s • Cost ≈ ${formatUsd(totalCost, 4)} (${((imageCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% image / ${((textCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% text)`
             );
 
             await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });

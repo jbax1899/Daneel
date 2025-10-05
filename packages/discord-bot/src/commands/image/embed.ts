@@ -85,7 +85,8 @@ export function buildPromptFieldValue(value: string | null | undefined, options:
         : sanitized;
 
     if (exceedsThreshold && options.fullContentUrl) {
-        preview = `${preview}\n[View full ${options.label}](${options.fullContentUrl})`;
+        // TODO: Add a link to the image on Cloudinary with metadata visible. This currently points to just the image, which is not very useful.
+        //preview = `${preview}\n[View full ${options.label}](${options.fullContentUrl})`;
     }
 
     return truncateForEmbed(preview, EMBED_FIELD_VALUE_LIMIT);
