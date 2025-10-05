@@ -1,0 +1,10 @@
+export declare const EMBED_FIELD_VALUE_LIMIT = 1024;
+export declare const EMBED_FOOTER_TEXT_LIMIT = 2048;
+export declare const EMBED_DESCRIPTION_LIMIT = 4096;
+export declare const EMBED_TITLE_LIMIT = 256;
+export declare const PROMPT_DISPLAY_LIMIT = 512;
+export declare const CLOUDINARY_CONTEXT_VALUE_LIMIT = 950;
+export declare const PARTIAL_IMAGE_LIMIT = 3;
+export declare const REFLECTION_TITLE_LIMIT = 256;
+export declare const REFLECTION_DESCRIPTION_LIMIT = 4096;
+export declare const REFLECTION_MESSAGE_LIMIT = 2000;

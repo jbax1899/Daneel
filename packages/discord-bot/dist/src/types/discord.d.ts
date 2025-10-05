@@ -6,6 +6,7 @@
 
 import { Collection, Client as DiscordClient } from 'discord.js';
 import { Command } from '../commands/BaseCommand';
+import { Event } from '../events/Event';
 
 declare module 'discord.js' {
   /**

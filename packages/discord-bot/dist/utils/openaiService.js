@@ -4,18 +4,12 @@ import fs from 'fs';
 import OpenAI from 'openai';
 import fetch from 'node-fetch';
 import { logger } from './logger.js';
+import { estimateTextCost, formatUsd } from './pricing.js';
 // ====================
 // Constants / Variables
 // ====================
 const DEFAULT_GPT5_MODEL = 'gpt-5-mini';
 const DEFAULT_MODEL = DEFAULT_GPT5_MODEL;
-const GPT5_PRICING = {
-    // Pricing per 1M tokens
-    // https://platform.openai.com/docs/pricing
-    'gpt-5': { input: 1.25, output: 10 },
-    'gpt-5-mini': { input: 0.25, output: 2.0 },
-    'gpt-5-nano': { input: 0.05, output: 0.4 },
-};
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
@@ -173,12 +167,17 @@ export class OpenAIService {
                     ...(citations.length > 0 && { citations })
                 },
                 finish_reason: finishReason,
-                usage: {
-                    input_tokens: response.usage?.input_tokens ?? 0,
-                    output_tokens: response.usage?.output_tokens ?? 0,
-                    total_tokens: (response.usage?.input_tokens ?? 0) + (response.usage?.output_tokens ?? 0),
-                    cost: this.calculateCost(response.usage?.input_tokens ?? 0, response.usage?.output_tokens ?? 0, model)
-                }
+                usage: (() => {
+                    const inputTokens = response.usage?.input_tokens ?? 0;
+                    const outputTokens = response.usage?.output_tokens ?? 0;
+                    const cost = estimateTextCost(model, inputTokens, outputTokens);
+                    return {
+                        input_tokens: inputTokens,
+                        output_tokens: outputTokens,
+                        total_tokens: inputTokens + outputTokens,
+                        cost: formatUsd(cost.totalCost)
+                    };
+                })()
             };
         }
         catch (error) {
@@ -261,12 +260,17 @@ export class OpenAIService {
                     content: choice.message.content || '',
                 },
                 finish_reason: choice.finish_reason || 'stop',
-                usage: chatResponse.usage ? {
-                    input_tokens: chatResponse.usage.prompt_tokens,
-                    output_tokens: chatResponse.usage.completion_tokens,
-                    total_tokens: chatResponse.usage.total_tokens,
-                    cost: this.calculateCost(chatResponse.usage.prompt_tokens || 0, chatResponse.usage.completion_tokens || 0, IMAGE_DESCRIPTION_MODEL)
-                } : undefined
+                usage: chatResponse.usage ? (() => {
+                    const inputTokens = chatResponse.usage.prompt_tokens || 0;
+                    const outputTokens = chatResponse.usage.completion_tokens || 0;
+                    const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL, inputTokens, outputTokens);
+                    return {
+                        input_tokens: inputTokens,
+                        output_tokens: outputTokens,
+                        total_tokens: chatResponse.usage.total_tokens,
+                        cost: formatUsd(cost.totalCost)
+                    };
+                })() : undefined
             };
             logger.debug(`Image description generated: ${imageDescriptionResponse.message?.content}${imageDescriptionResponse.usage ? ` (Cost: ${imageDescriptionResponse.usage.cost})` : ''}`);
             return imageDescriptionResponse;
@@ -275,12 +279,6 @@ export class OpenAIService {
             logger.error('Error generating image description:', error);
             throw new Error(`Failed to process image: ${error instanceof Error ? error.message : String(error)}`);
         }
-    }
-    calculateCost(inputTokens, outputTokens, model) {
-        const pricing = GPT5_PRICING[model];
-        const inputCost = (inputTokens / 1_000_000) * pricing.input;
-        const outputCost = (outputTokens / 1_000_000) * pricing.output;
-        return `$${(inputCost + outputCost).toFixed(6)}`;
     }
     /**
      * Embeds text using the default embedding model.
@@ -365,8 +363,8 @@ export class OpenAIService {
                     }
                     logger.debug(`Reduced context: ${JSON.stringify(reducedContext)}`);
                     // Log the estimated cost of the reduction
-                    const estimatedCost = this.calculateCost(response.usage?.prompt_tokens || 0, response.usage?.completion_tokens || 0, REDUCTION_MODEL);
-                    logger.debug(`Estimated cost of reduction: ${estimatedCost}`);
+                    const reductionCost = estimateTextCost(REDUCTION_MODEL, response.usage?.prompt_tokens || 0, response.usage?.completion_tokens || 0);
+                    logger.debug(`Estimated cost of reduction: ${formatUsd(reductionCost.totalCost)}`);
                 }
             }
             catch (error) {

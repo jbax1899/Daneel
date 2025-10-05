@@ -110,7 +110,7 @@ client.on(Events.InteractionCreate, async interaction => {
   try {
     await command.execute(interaction);
   } catch (error) {
-    logger.error(`Error executing command ${interaction.commandName}:`, error);
+    logger.error(`Error executing command ${interaction.commandName}: ${error}`);
   }
 });
 
@@ -118,11 +118,11 @@ client.on(Events.InteractionCreate, async interaction => {
 // Handle Uncaught Exceptions
 // ====================
 process.on('unhandledRejection', (error: Error) => {
-  logger.error('Unhandled promise rejection:', error);
+  logger.error(`Unhandled promise rejection: ${error}`);
 });
 
 process.on('uncaughtException', (error: Error) => {
-  logger.error('Uncaught exception:', error);
+  logger.error(`Uncaught exception: ${error}`);
   process.exit(1);
 });
 
@@ -147,7 +147,7 @@ appServer.post("/github-webhook", async (req, res) => {
 
     res.sendStatus(200);
   } catch (err) {
-    console.error("Webhook processing error:", err);
+    console.error(`Webhook processing error: ${err}`);
     res.sendStatus(500);
   }
 });

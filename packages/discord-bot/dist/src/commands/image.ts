@@ -1,47 +1,46 @@
-import { ChatInputCommandInteraction, SlashCommandBuilder, EmbedBuilder } from 'discord.js';
+import {
+    AttachmentBuilder,
+    ChatInputCommandInteraction,
+    EmbedBuilder,
+    SlashCommandBuilder
+} from 'discord.js';
 import { Command } from './BaseCommand.js';
 import { OpenAI } from 'openai';
-import type { Response, ResponseCreateParamsNonStreaming, ResponseInput, ResponseOutputItem, Tool, ToolChoiceTypes } from 'openai/resources/responses/responses';
 import { logger } from '../utils/logger.js';
 import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
-import { v2 as cloudinary } from 'cloudinary';
+import {
+    describeTokenUsage,
+    estimateImageGenerationCost,
+    estimateTextCost,
+    formatUsd,
+    type TextModelPricingKey
+} from '../utils/pricing.js';
+import {
+    buildPromptFieldValue,
+    setEmbedDescription,
+    setEmbedFooterText,
+    setOrAddEmbedField,
+    truncateForEmbed
+} from './image/embed.js';
+import {
+    EMBED_TITLE_LIMIT,
+    PARTIAL_IMAGE_LIMIT,
+    PROMPT_DISPLAY_LIMIT
+} from './image/constants.js';
+import {
+    isCloudinaryConfigured,
+    uploadToCloudinary
+} from './image/cloudinary.js';
+import { generateImageWithReflection } from './image/openai.js';
+import { resolveImageCommandError } from './image/errors.js';
+import type {
+    ImageBackgroundType,
+    ImageGenerationCallWithPrompt,
+    ImageQualityType,
+    ImageResponseModel,
+    ImageSizeType
+} from './image/types.js';
 
-const cloudinaryConfig = {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
-};
-
-const isCloudinaryConfigured = Boolean(
-    cloudinaryConfig.cloud_name && cloudinaryConfig.api_key && cloudinaryConfig.api_secret
-);
-
-if (isCloudinaryConfigured) {
-    cloudinary.config(cloudinaryConfig);
-} else {
-    logger.warn('Cloudinary credentials are missing. Image uploads are disabled.');
-}
-
-type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
-type ImageQualityType = 'auto' | 'low' | 'medium' | 'high';
-type ImageAspectRatioType = 'auto' | 'square' | 'portrait' | 'landscape';
-type ImageSizeType = 'auto' | '1024x1024' | '1024x1536' | '1536x1024';
-type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
-
-type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCall & {
-    revised_prompt?: string | null;
-};
-
-class CloudinaryConfigurationError extends Error {
-    constructor(message = 'Cloudinary configuration is missing.') {
-        super(message);
-        this.name = 'CloudinaryConfigurationError';
-    }
-}
-
-/**
- * Generates an image based on the provided prompt.
- */
 const imageCommand: Command = {
     data: new SlashCommandBuilder()
         .setName('image')
@@ -105,8 +104,6 @@ const imageCommand: Command = {
         ),
 
     async execute(interaction: ChatInputCommandInteraction) {
-        // Check rate limit per user, channel, and guild
-        // Bypass for developer user
         if (interaction.user.id !== process.env.DEVELOPER_USER_ID) {
             const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(interaction.user.id);
             if (!allowed) {
@@ -117,7 +114,6 @@ const imageCommand: Command = {
             }
         }
 
-        // Get the prompt from the interaction, if none provided, return an error
         const prompt = interaction.options.getString('prompt');
         if (!prompt) {
             await interaction.reply({
@@ -128,24 +124,11 @@ const imageCommand: Command = {
         }
         logger.debug(`Received image generation request with prompt: ${prompt}`);
 
-        // Defer the reply to show that the command is being processed
         await interaction.deferReply();
-
-        // Start the timer
         const start = Date.now();
 
-        // Check if Cloudinary is configured
-        if (!isCloudinaryConfigured) {
-            await interaction.editReply({
-                content: '⚠️ Image generation is temporarily unavailable because Cloudinary credentials are not configured.',
-                flags: [1 << 6]
-            });
-            return;
-        }
-
-        // Grab the aspect ratio from the interaction, if provided
-        let dimensions: ImageSizeType = 'auto'; // By default, use auto to let OpenAI determine the aspect ratio
-        const aspectRatio = interaction.options.getString('aspect_ratio') as ImageAspectRatioType | null;
+        let dimensions: ImageSizeType = 'auto';
+        const aspectRatio = interaction.options.getString('aspect_ratio') as ('square' | 'portrait' | 'landscape') | null;
         if (aspectRatio) {
             switch (aspectRatio) {
                 case 'square':
@@ -160,7 +143,6 @@ const imageCommand: Command = {
             }
         }
 
-        // Get parameters
         const isSuperUser = interaction.user.id === process.env.DEVELOPER_USER_ID;
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
         let quality: ImageQualityType = requestedQuality ?? 'low';
@@ -170,233 +152,216 @@ const imageCommand: Command = {
             qualityRestricted = true;
             logger.warn(`User ${interaction.user.id} attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
         }
+
         const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? 'gpt-4o-mini';
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
         const adjustPrompt = interaction.options.getBoolean('adjust_prompt') ?? true;
         let followUpResponseId = interaction.options.getString('follow_up_response_id');
+        const promptExceedsDisplayLimit = prompt.length > PROMPT_DISPLAY_LIMIT;
 
-        // If the response ID was not prefixed with 'resp_', add it
         if (followUpResponseId && !followUpResponseId.startsWith('resp_')) {
             followUpResponseId = `resp_${followUpResponseId}`;
             logger.warn(`Follow-up response ID was not prefixed with 'resp_'. Adding prefix: ${followUpResponseId}`);
         }
 
-        // Create an initial embed to show the image generation progress
         const embed = new EmbedBuilder()
             .setTitle('🎨 Image Generation')
-            //.setDescription(`User has requested an image to be generated based on the prompt:`)
-            .addFields(
-                { name: 'Prompt', value: prompt }
-            )
-            .setColor(0x00FF00)
-            .setTimestamp()
-            .setFooter({ text: 'Generating...' });
+            .setColor(0x5865F2)
+            .setTimestamp();
+
+        setOrAddEmbedField(embed, 'Prompt', prompt, { includeTruncationNote: promptExceedsDisplayLimit });
+        setEmbedFooterText(embed, 'Generating…');
 
         if (adjustPrompt) {
-            embed.addFields(
-                { name: 'Adjusted Prompt', value: '...' }
-            );
+            setOrAddEmbedField(embed, 'Adjusted Prompt', '…');
+        } else {
+            setOrAddEmbedField(embed, 'Adjusted Prompt', 'Prompt adjustment disabled');
         }
 
-        embed.addFields(
-            { name: 'Size', value: dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', inline: true },
-            { name: 'Quality', value: qualityRestricted ? `${quality} (restricted)` : quality, inline: true },
-            { name: 'Background', value: background, inline: true },
-            { name: 'Model', value: model, inline: true },
-            { name: 'Input Response ID', value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None', inline: true },
-            { name: 'Output Response ID', value: '...', inline: true }
-        );
+        setOrAddEmbedField(embed, 'Size', dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', { inline: true });
+        setOrAddEmbedField(embed, 'Quality', qualityRestricted ? `${quality} (restricted)` : quality, { inline: true });
+        setOrAddEmbedField(embed, 'Background', background, { inline: true });
+        setOrAddEmbedField(embed, 'Model', model, { inline: true });
+        setOrAddEmbedField(embed, 'Input Response ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
+        setOrAddEmbedField(embed, 'Output Response ID', '…', { inline: true });
 
-        // Edit the initial reply with the embed
-        await interaction.editReply({
-            embeds: [embed]
-        });
+        await interaction.editReply({ embeds: [embed] });
+
+        const openai = new OpenAI();
+        let editChain = Promise.resolve();
+
+        const queueEmbedUpdate = (task: () => Promise<void>) => {
+            editChain = editChain.then(async () => {
+                try {
+                    await task();
+                } catch (error) {
+                    logger.warn('Failed to update image preview embed:', error);
+                }
+            });
+            return editChain;
+        };
 
         try {
-            const openai = new OpenAI();
-
-            // Prepare the input for the responses API
-            const input: ResponseInput = [
-                {
-                    role: 'user',
-                    type: 'message',
-                    content: [{ type: 'input_text', text: prompt }]
-                }
-            ];
-
-            // User has requested to not adjust the prompt
-            // Technically OpenAI will still try to adjust the prompt, this will keep it roughly the same
-            if (!adjustPrompt) {
-                input.unshift({
-                    role: 'developer',
-                    type: 'message',
-                    content: [
-                        {
-                            type: 'input_text',
-                            text: `User has requested to not adjust the prompt. Do not modify, expand, or rephrase the user's text in any way. Use the prompt exactly as provided.`
-                        }
-                    ]
-                });
-            }
-
-            // Configure the image generation tool with all options
-            const imageTool: Tool.ImageGeneration = {
-                type: 'image_generation',
-                size: dimensions,
-                quality,
-                background
-            };
-
-            const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
-
-            const tools: Tool[] = [imageTool];
-
-            // Add previous response context if this is a follow-up
-            const requestPayload: ResponseCreateParamsNonStreaming = {
-                model,
-                input,
-                tools,
-                tool_choice: toolChoice,
-                previous_response_id: followUpResponseId ?? null
-            };
-
-            logger.debug(`Request payload: ${JSON.stringify(requestPayload, null, 2)}`);
-
-            // Generate the image using responses API
-            const response = await openai.responses.create(requestPayload);
-
-            logger.debug(`OpenAI Response: ${JSON.stringify(response, null, 2)}`);
-
-            // Extract image generation call information
-            const imageGenerationCalls = response.output.filter(
-                (output): output is ImageGenerationCallWithPrompt => output.type === 'image_generation_call'
-            );
-
-            if (imageGenerationCalls.length === 0) {
-                throw new Error('No image generation call found in response. The model may not have decided to generate an image.');
-            }
-
-            const imageCall = imageGenerationCalls[0];
-            const imageData = imageCall.result;
-
-            // Check if image data exists
-            if (!imageData) {
-                throw new Error('No image data found in the image generation call result.');
-            }
-
-            logger.debug(`Image generation successful - ID: ${imageCall.id}, Status: ${imageCall.status}`);
-
-            // Update embed fields
-            const revisedPrompt = imageCall.revised_prompt || 'None';
-            if (adjustPrompt && revisedPrompt !== 'None') {
-                // Find and update the "Adjusted Prompt" field
-                const adjustedPromptField = embed.data.fields?.find(field => field.name === 'Adjusted Prompt');
-                if (adjustedPromptField) {
-                    adjustedPromptField.value = revisedPrompt;
-                }
-            }
-            // Find and update the "Output Response ID" field
-            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
-            if (outputResponseIdField && response.id) {
-                outputResponseIdField.value = `\`${response.id}\``;
-            }
-
-            // Upload image to Cloudinary
-            const imageUrl = await uploadToCloudinary(Buffer.from(imageData, 'base64'), {
-                originalPrompt: prompt,
-                revisedPrompt,
+            const generation = await generateImageWithReflection({
+                openai,
+                prompt,
                 model,
                 quality,
                 size: dimensions,
                 background,
-                response,
-                startTime: start
+                allowPromptAdjustment: adjustPrompt,
+                followUpResponseId,
+                onPartialImage: payload => queueEmbedUpdate(async () => {
+                    const previewName = `image-preview-${payload.index + 1}.png`;
+                    const attachment = new AttachmentBuilder(Buffer.from(payload.base64, 'base64'), { name: previewName });
+                    setEmbedFooterText(embed, `Rendering preview ${payload.index + 1}/${PARTIAL_IMAGE_LIMIT}…`);
+                    embed.setImage(`attachment://${previewName}`);
+                    await interaction.editReply({ embeds: [embed], files: [attachment] });
+                })
             });
 
-            // Set the image in the embed instead of sending as file
-            embed.setImage(imageUrl);
+            await editChain;
 
-            // Send final image to Discord
-            const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
-            const tokensUsed = response.usage?.total_tokens ?? 'unknown';
-            embed.setFooter({ text: `Finished in ${generationTimeSeconds}s • ${tokensUsed} tokens` });
-            await interaction.editReply({ embeds: [embed] });
+            const { response, imageCall, finalImageBase64, reflection } = generation;
+            const usage = response.usage;
+            const inputTokens = usage?.input_tokens ?? 0;
+            const outputTokens = usage?.output_tokens ?? 0;
+            const totalTokens = usage?.total_tokens ?? (inputTokens + outputTokens);
 
-        } catch (error) {
-            logger.error(`Error in image command: ${error}`);
-            
-            // Enhanced error handling with specific messages
-            let errorMessage = 'An unknown error occurred while generating the image.';
-            if (error instanceof Error) {
-                if (error.message.includes('model')) {
-                    errorMessage = 'Model error: The specified model is not supported for image generation.';
-                } else if (error.message.includes('quota')) {
-                    errorMessage = 'Quota exceeded: Please try again later.';
-                } else if (error.message.includes('safety')) {
-                    errorMessage = 'Your request was rejected by the safety system: Please modify your prompt and try again.';
-                } else if (error.message.includes('network') || error.message.includes('timeout')) {
-                    errorMessage = 'Network error: Please try again later.';
-                } else if (error instanceof CloudinaryConfigurationError) {
-                    errorMessage = 'Cloudinary is not configured. Please contact the administrator.';
-                } else {
-                    errorMessage = error.message;
-                }
+            const imageCallOutputs = response.output.filter(
+                (output): output is ImageGenerationCallWithPrompt => output.type === 'image_generation_call' && Boolean(output.result)
+            );
+            const successfulImageCount = imageCallOutputs.length || 1;
+
+            const textCostEstimate = estimateTextCost(model as TextModelPricingKey, inputTokens, outputTokens);
+            const imageCostEstimate = estimateImageGenerationCost({
+                quality,
+                size: dimensions,
+                imageCount: successfulImageCount
+            });
+            const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
+
+            logger.debug(
+                `Image generation usage - inputTokens: ${inputTokens}, outputTokens: ${outputTokens}, images: ${successfulImageCount}, estimatedCost: ${formatUsd(totalCost)}`
+            );
+
+            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
+            if (outputResponseIdField) {
+                setOrAddEmbedField(embed, 'Output Response ID', response.id ? `\`${response.id}\`` : 'n/a', { inline: true });
             }
 
-            embed.setFooter({ text: errorMessage });
-            await interaction.editReply({ embeds: [embed] });
+            const progressIndex = embed.data.fields?.findIndex(field => field.name === 'Progress') ?? -1;
+            if (progressIndex >= 0) {
+                embed.spliceFields(progressIndex, 1);
+            }
+
+            const embedTitle = reflection.title ? `🎨 ${reflection.title}` : '🎨 Image Generation';
+            embed.setTitle(truncateForEmbed(embedTitle, EMBED_TITLE_LIMIT));
+
+            if (reflection.description) {
+                setEmbedDescription(embed, reflection.description);
+            }
+
+            const revisedPrompt = reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null;
+
+            const finalImageBuffer = Buffer.from(finalImageBase64, 'base64');
+            let imageUrl: string | null = null;
+            let attachment: AttachmentBuilder | null = null;
+
+            if (isCloudinaryConfigured) {
+                try {
+                    imageUrl = await uploadToCloudinary(finalImageBuffer, {
+                        originalPrompt: prompt,
+                        revisedPrompt,
+                        title: reflection.title,
+                        description: reflection.description,
+                        reflectionMessage: reflection.reflection,
+                        model,
+                        quality,
+                        size: dimensions,
+                        background,
+                        startTime: start,
+                        usage: {
+                            inputTokens,
+                            outputTokens,
+                            totalTokens,
+                            imageCount: successfulImageCount,
+                            combinedInputTokens: inputTokens,
+                            combinedOutputTokens: outputTokens,
+                            combinedTotalTokens: totalTokens
+                        },
+                        cost: {
+                            text: textCostEstimate.totalCost,
+                            image: imageCostEstimate.totalCost,
+                            total: totalCost,
+                            perImage: imageCostEstimate.perImageCost
+                        }
+                    });
+                    embed.setImage(imageUrl);
+                } catch (uploadError) {
+                    logger.error('Error uploading to Cloudinary:', uploadError);
+                    attachment = new AttachmentBuilder(finalImageBuffer, { name: `daneel-image-${Date.now()}.png` });
+                    embed.setImage(`attachment://${attachment.name}`);
+                }
+            } else {
+                logger.warn('Cloudinary credentials missing; sending generated image as attachment.');
+                attachment = new AttachmentBuilder(finalImageBuffer, { name: `daneel-image-${Date.now()}.png` });
+                embed.setImage(`attachment://${attachment.name}`);
+            }
+
+            const promptFieldValue = buildPromptFieldValue(prompt, {
+                label: 'prompt',
+                fullContentUrl: imageUrl ?? undefined
+            });
+            setOrAddEmbedField(embed, 'Prompt', promptFieldValue);
+
+            if (adjustPrompt) {
+                const adjustedPromptValue = buildPromptFieldValue(revisedPrompt ?? 'Model reused the original prompt.', {
+                    label: 'adjusted prompt',
+                    fullContentUrl: imageUrl ?? undefined,
+                    whenMissing: 'Model reused the original prompt.'
+                });
+                setOrAddEmbedField(embed, 'Adjusted Prompt', adjustedPromptValue);
+            }
+
+            const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
+            setEmbedFooterText(
+                embed,
+                `Finished in ${generationTimeSeconds}s • Cost ≈ ${formatUsd(totalCost, 4)} (${((imageCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% image / ${((textCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% text)`
+            );
+
+            await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
+
+            if (reflection.reflection) {
+                const followUpMessage = truncateForEmbed(reflection.reflection, 2000, { includeTruncationNote: true });
+                if (followUpMessage.trim().length > 0) {
+                    await interaction.followUp({ content: followUpMessage });
+                }
+            }
+        } catch (error) {
+            await editChain;
+            logger.error('Error in image command:', error);
+
+            const errorMessage = resolveImageCommandError(error);
+            embed.setColor(0xFF0000);
+
+            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
+            if (outputResponseIdField && outputResponseIdField.value === '…') {
+                setOrAddEmbedField(embed, 'Output Response ID', 'n/a', { inline: true });
+            }
+
+            try {
+                await interaction.editReply({ content: `⚠️ ${errorMessage}`, embeds: [] });
+            } catch (replyError) {
+                logger.error('Failed to edit reply after image command error:', replyError);
+                try {
+                    await interaction.followUp({ content: `⚠️ ${errorMessage}` });
+                } catch (followUpError) {
+                    logger.error('Failed to send follow-up after image command error:', followUpError);
+                }
+            }
         }
     }
 };
-
-interface UploadMetadata {
-    originalPrompt: string;
-    revisedPrompt?: string | null;
-    model: ImageResponseModel;
-    quality: ImageQualityType;
-    size: ImageSizeType;
-    background: ImageBackgroundType;
-    response: Response;
-    startTime: number;
-}
-
-/**
- * Uploads an image buffer to Cloudinary and returns the URL
- */
-async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMetadata): Promise<string> {
-    if (!isCloudinaryConfigured) {
-        throw new CloudinaryConfigurationError();
-    }
-
-    try {
-        logger.debug(`Uploading image to Cloudinary...`);
-
-        const uploadResult = await cloudinary.uploader.upload(
-            `data:image/png;base64,${imageBuffer.toString('base64')}`,
-            {
-                resource_type: 'image',
-                public_id: `ai-image-${Date.now()}`,
-                context: {
-                    original_prompt: metadata.originalPrompt,
-                    revised_prompt: metadata.revisedPrompt,
-                    model: metadata.model,
-                    quality: metadata.quality,
-                    size: metadata.size,
-                    background: metadata.background,
-                    generated_at: new Date().toISOString(),
-                    tokens_used: metadata.response.usage?.total_tokens ?? 'unknown',
-                    generation_time: `${(Date.now() - metadata.startTime) / 1000}s`
-                },
-                tags: ['ai-generated', 'discord-bot', metadata.model, metadata.quality]
-            }
-        );
-
-        logger.debug(`Image uploaded to Cloudinary: ${uploadResult.secure_url}`);
-        return uploadResult.secure_url;
-    } catch (error) {
-        logger.error(`Cloudinary upload error: ${error}`);
-        throw error;
-    }
-}
 
 export default imageCommand;
