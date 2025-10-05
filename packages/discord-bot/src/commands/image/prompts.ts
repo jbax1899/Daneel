@@ -23,7 +23,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
         adjustmentClause,
         'After the tool call, reply with a single-line JSON object with the keys `title`, `description`, `reflection`, and `adjusted_prompt`.',
         'The JSON must not use code fences. Use standard double-quoted JSON. No commentary.',
-        'Keep `title` ≤ 80 characters, `description` ≤ 300 characters, and `reflection` ≤ 350 characters.',
+        'Keep `title` ≤ 80 characters, `description` ≤ 300 characters.',
         'Write the reflection in first person as Daneel, briefly describing the artistic intent.',
         'Set `adjusted_prompt` to the exact text you used for the image generation call (if unchanged, reuse the original prompt).'
     ].join(' ');
