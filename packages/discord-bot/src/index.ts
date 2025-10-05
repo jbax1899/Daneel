@@ -1,4 +1,4 @@
-import { Client, GatewayIntentBits, Events } from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
@@ -6,7 +6,6 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
-import { Collection } from 'discord.js';
 //import express from 'express'; // For webhook
 //import bodyParser from "body-parser"; // For webhook
 

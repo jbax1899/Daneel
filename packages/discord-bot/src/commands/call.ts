@@ -1,8 +1,8 @@
-import { logger } from '@/utils/logger.js';
+import { logger } from '../utils/logger.js';
 import { Command } from './BaseCommand.js';
 import { ChatInputCommandInteraction, SlashCommandBuilder, ChannelType, VoiceChannel, PermissionResolvable } from 'discord.js';
 import { entersState, getVoiceConnection, getVoiceConnections, joinVoiceChannel, VoiceConnection, VoiceConnectionStatus } from '@discordjs/voice';
-import VoiceStateHandler, { cleanupVoiceConnection } from '../events/VoiceStateHandler.js';
+import { VoiceStateHandler, cleanupVoiceConnection } from '../events/VoiceStateHandler.js';
 
 /*
 * @name call

@@ -73,21 +73,21 @@ export class EventManager {
           if (typeof EventClass === 'function' && EventClass.prototype && 
               typeof EventClass.prototype.execute === 'function') {
             let instantiated = false;
-            // Try (client)
+            // Try (dependencies)
             try {
-              const event = new EventClass(this.client);
+              const event = new EventClass(this.dependencies);
               this.events.push(event);
               instantiated = true;
-              logger.debug(`Successfully loaded event (client ctor): ${file}`);
+              logger.debug(`Successfully loaded event (deps ctor): ${file}`);
             } catch {}
 
-            // Try (dependencies)
+            // Try (client)
             if (!instantiated) {
               try {
-                const event = new EventClass(this.dependencies);
+                const event = new EventClass(this.client);
                 this.events.push(event);
                 instantiated = true;
-                logger.debug(`Successfully loaded event (deps ctor): ${file}`);
+                logger.debug(`Successfully loaded event (client ctor): ${file}`);
               } catch {}
             }
 

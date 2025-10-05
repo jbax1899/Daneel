@@ -18,12 +18,16 @@ const envPath = path.resolve(__dirname, '../../../../.env');
 logger.debug(`Loading environment variables from: ${envPath}`);
 
 // Load environment variables from .env file in the root directory
-const { error, parsed } = dotenv.config({ path: envPath });
+try { 
+  const { error, parsed } = dotenv.config({ path: envPath }); 
 
-if (error) {
-  logger.warn(`Failed to load .env file: ${error.message}`);
-} else if (parsed) {
-  logger.debug(`Loaded environment variables: ${Object.keys(parsed).join(', ')}`);
+  if (error) {
+    logger.warn(`Failed to load .env file: ${error.message}`);
+  } else if (parsed) {
+    logger.debug(`Loaded environment variables: ${Object.keys(parsed).join(', ')}`);
+  }
+} catch { 
+  logger.warn("No .env found (expected on Fly.io deployments)");
 }
 
 /**
