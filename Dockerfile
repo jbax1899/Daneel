@@ -21,7 +21,7 @@ WORKDIR /app
 
 # Install build dependencies (needed for @discordjs/opus)
 RUN apt-get update && apt-get install -y python3 make g++ && \
-    npm config set python python3
+    npm config set python "/usr/bin/python3" --location=global
 
 # Copy package files
 COPY package*.json ./
