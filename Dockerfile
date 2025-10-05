@@ -5,7 +5,7 @@ WORKDIR /app
 # Copy package files
 COPY packages/frontend/web/package*.json ./
 
-# Install dependencies
+# Install frontend dependencies
 RUN npm install
 
 # Copy frontend source
@@ -14,27 +14,31 @@ COPY packages/frontend/web/ ./
 # Build the frontend
 RUN npm run build
 
-# Stage 2: Build the bot
-FROM node:22.14.0-slim as bot-builder
+
+# Stage 2: Build the Discord bot
+FROM node:22.14.0-slim AS bot-builder
 WORKDIR /app
+
+# Install build dependencies (needed for @discordjs/opus)
+RUN apt-get update && apt-get install -y python3 make g++ && \
+    npm config set python python3
 
 # Copy package files
 COPY package*.json ./
 COPY packages/discord-bot/package*.json packages/discord-bot/
 
-# Install root dependencies
+# Install dependencies (includes @discordjs/opus build)
 RUN npm install --include=dev
 
-# Copy application code
+# Copy and build bot
 COPY . .
-
-# Build TypeScript
 RUN npx tsc -p packages/discord-bot/tsconfig.json
 
-# Install production dependencies
+# Prune dev dependencies to reduce image size
 RUN cd packages/discord-bot && npm install --production
 
-# Final stage
+
+# Stage 3: Final runtime image
 FROM node:22.14.0-slim
 WORKDIR /app
 
@@ -42,7 +46,7 @@ WORKDIR /app
 RUN mkdir -p ./.next/static
 
 # Copy built frontend
-COPY --from=frontend-builder /app/.next/standalone ./
+COPY --from=frontend-builder /app/.next/standalone ./ 
 COPY --from=frontend-builder /app/.next/static ./.next/static
 
 # Copy built bot
@@ -50,14 +54,11 @@ COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/di
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
 RUN cd packages/discord-bot && npm install --production
 
-# Create a simple start script
+# Simple startup script
 RUN echo '#!/bin/sh\n\
-    cd /app/packages/discord-bot && node dist/index.js & \n\
-    cd /app && node server.js\n\
-    ' > /app/start.sh && chmod +x /app/start.sh
+cd /app/packages/discord-bot && node dist/index.js & \n\
+cd /app && node server.js\n\
+' > /app/start.sh && chmod +x /app/start.sh
 
-# Expose the port the app runs on
 EXPOSE 3000
-
-# Start the application
 CMD ["/app/start.sh"]
