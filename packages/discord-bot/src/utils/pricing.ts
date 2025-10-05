@@ -87,8 +87,8 @@ export function estimateTextCost(model: TextModelPricingKey, inputTokens: number
 
 export function estimateImageGenerationCost(options: ImageGenerationCostOptions): ImageGenerationCostEstimate {
     const imageCount = Math.max(1, options.imageCount ?? 1);
-    const effectiveQuality = options.quality === 'auto' ? 'low' : options.quality;
-    const effectiveSize = options.size === 'auto' ? '1024x1024' : options.size;
+    const effectiveQuality = options.quality === 'auto' ? 'low' : options.quality; // 
+    const effectiveSize = options.size === 'auto' ? '1024x1024' : options.size; // TODO: retrieve actual size chosen by OpenAI
 
     const qualityPricing = IMAGE_GENERATION_COST_TABLE[effectiveQuality];
     const perImageCost = qualityPricing?.[effectiveSize] ?? 0;

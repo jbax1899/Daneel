@@ -214,7 +214,6 @@ const imageCommand: Command = {
                 onPartialImage: payload => queueEmbedUpdate(async () => {
                     const previewName = `image-preview-${payload.index + 1}.png`;
                     const attachment = new AttachmentBuilder(Buffer.from(payload.base64, 'base64'), { name: previewName });
-                    setOrAddEmbedField(embed, 'Progress', `Preview ${payload.index + 1}/${PARTIAL_IMAGE_LIMIT}`);
                     setEmbedFooterText(embed, `Rendering preview ${payload.index + 1}/${PARTIAL_IMAGE_LIMIT}…`);
                     embed.setImage(`attachment://${previewName}`);
                     await interaction.editReply({ embeds: [embed], files: [attachment] });
@@ -264,17 +263,6 @@ const imageCommand: Command = {
             }
 
             const revisedPrompt = reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null;
-            const combinedUsage = {
-                input_tokens: inputTokens,
-                output_tokens: outputTokens,
-                total_tokens: totalTokens
-            };
-
-            const usageLines = [
-                describeTokenUsage(combinedUsage),
-                `Image calls → ${imageCostEstimate.imageCount} × ${imageCostEstimate.effectiveSize} (${imageCostEstimate.effectiveQuality})`
-            ];
-            setOrAddEmbedField(embed, 'Usage', usageLines.join('\n'));
 
             const finalImageBuffer = Buffer.from(finalImageBase64, 'base64');
             let imageUrl: string | null = null;
@@ -339,7 +327,7 @@ const imageCommand: Command = {
             const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
             setEmbedFooterText(
                 embed,
-                `Finished in ${generationTimeSeconds}s • ${describeTokenUsage(combinedUsage)} • Cost ≈ ${formatUsd(totalCost)}`
+                `Finished in ${generationTimeSeconds}s • Cost ≈ ${formatUsd(totalCost)} (${((imageCostEstimate.totalCost / totalCost) * 100).toFixed(2)}% image / ${((textCostEstimate.totalCost / totalCost) * 100).toFixed(2)}% text)`
             );
 
             await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
