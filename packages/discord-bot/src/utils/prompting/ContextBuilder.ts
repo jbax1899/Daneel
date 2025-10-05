@@ -1,7 +1,6 @@
 import { Message } from 'discord.js';
-import { OpenAIMessage } from '../openaiService.js';
+import { OpenAIMessage, OpenAIService } from '../openaiService.js';
 import { logger } from '../logger.js';
-import { OpenAIService } from '../openaiService.js';
 
 export class ContextBuilder {
     private readonly openaiService: OpenAIService;
