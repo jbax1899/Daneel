@@ -51,6 +51,11 @@ const imageCommand: Command = {
             .setDescription('The prompt to generate the image from')
             .setRequired(true)
         )
+        .addBooleanOption(option => option
+            .setName('adjust_prompt')
+            .setDescription('Allow the AI to adjust the prompt prior to generation (defaults to true)')
+            .setRequired(false)
+        )
         .addStringOption(option => option
             .setName('aspect_ratio')
             .setDescription('The aspect ratio to use (optional; defaults to auto)')
@@ -97,11 +102,6 @@ const imageCommand: Command = {
             .setName('follow_up_response_id')
             .setDescription('Response ID from a previous image generation for follow-up (optional)')
             .setRequired(false)
-        )
-        .addBooleanOption(option => option
-            .setName('adjust_prompt')
-            .setDescription('Allow the AI to adjust the prompt prior to generation (defaults to true)')
-            .setRequired(false)
         ),
 
     async execute(interaction: ChatInputCommandInteraction) {
@@ -117,12 +117,6 @@ const imageCommand: Command = {
             }
         }
 
-        // Start the timer
-        const start = Date.now();
-
-        // Defer the reply to show that the command is being processed
-        await interaction.deferReply();
-
         // Get the prompt from the interaction, if none provided, return an error
         const prompt = interaction.options.getString('prompt');
         if (!prompt) {
@@ -134,6 +128,13 @@ const imageCommand: Command = {
         }
         logger.debug(`Received image generation request with prompt: ${prompt}`);
 
+        // Defer the reply to show that the command is being processed
+        await interaction.deferReply();
+
+        // Start the timer
+        const start = Date.now();
+
+        // Check if Cloudinary is configured
         if (!isCloudinaryConfigured) {
             await interaction.editReply({
                 content: '⚠️ Image generation is temporarily unavailable because Cloudinary credentials are not configured.',
@@ -185,21 +186,26 @@ const imageCommand: Command = {
             .setTitle('🎨 Image Generation')
             //.setDescription(`User has requested an image to be generated based on the prompt:`)
             .addFields(
-                { name: 'Prompt', value: prompt },
-                { name: 'Adjusted Prompt', value: adjustPrompt ? '...' : 'Disabled (using prompt as-is)' },
-                { name: 'Size', value: dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', inline: true },
-                { name: 'Quality', value: qualityRestricted ? `${quality} (restricted)` : quality, inline: true },
-                { name: 'Background', value: background, inline: true },
-                { name: 'Model', value: model, inline: true },
-                { name: 'Ref. Response ID', value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None', inline: true },
-                { name: 'Prompt Adjustment', value: adjustPrompt ? 'Enabled' : 'Disabled', inline: true },
-                { name: 'Output Response ID', value: '...', inline: true }
+                { name: 'Prompt', value: prompt }
             )
             .setColor(0x00FF00)
             .setTimestamp()
             .setFooter({ text: 'Generating...' });
 
-        
+        if (adjustPrompt) {
+            embed.addFields(
+                { name: 'Adjusted Prompt', value: '...' }
+            );
+        }
+
+        embed.addFields(
+            { name: 'Size', value: dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', inline: true },
+            { name: 'Quality', value: qualityRestricted ? `${quality} (restricted)` : quality, inline: true },
+            { name: 'Background', value: background, inline: true },
+            { name: 'Model', value: model, inline: true },
+            { name: 'Input Response ID', value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None', inline: true },
+            { name: 'Output Response ID', value: '...', inline: true }
+        );
 
         // Edit the initial reply with the embed
         await interaction.editReply({
@@ -218,11 +224,18 @@ const imageCommand: Command = {
                 }
             ];
 
+            // User has requested to not adjust the prompt
+            // Technically OpenAI will still try to adjust the prompt, this will keep it roughly the same
             if (!adjustPrompt) {
                 input.unshift({
                     role: 'developer',
                     type: 'message',
-                    content: [{ type: 'input_text', text: 'Generate the image exactly as described by the user prompt without altering or rephrasing it.' }]
+                    content: [
+                        {
+                            type: 'input_text',
+                            text: `User has requested to not adjust the prompt. Do not modify, expand, or rephrase the user's text in any way. Use the prompt exactly as provided.`
+                        }
+                    ]
                 });
             }
 
@@ -274,8 +287,8 @@ const imageCommand: Command = {
             logger.debug(`Image generation successful - ID: ${imageCall.id}, Status: ${imageCall.status}`);
 
             // Update embed fields
-            const revisedPrompt = imageCall.revised_prompt;
-            if (revisedPrompt) {
+            const revisedPrompt = imageCall.revised_prompt || 'None';
+            if (adjustPrompt && revisedPrompt !== 'None') {
                 // Find and update the "Adjusted Prompt" field
                 const adjustedPromptField = embed.data.fields?.find(field => field.name === 'Adjusted Prompt');
                 if (adjustedPromptField) {
