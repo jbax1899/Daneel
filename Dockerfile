@@ -19,11 +19,6 @@ RUN npm run build
 FROM node:22.14.0-slim AS bot-builder
 WORKDIR /app
 
-# Install build dependencies (needed for @discordjs/opus)
-RUN apt-get update && apt-get install -y python3 make g++ && \
-    export PYTHON=/usr/bin/python3 && \
-    echo "PYTHON=/usr/bin/python3" >> /etc/environment
-
 # Copy package files
 COPY package*.json ./
 COPY packages/discord-bot/package*.json packages/discord-bot/
