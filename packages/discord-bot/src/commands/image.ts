@@ -4,18 +4,15 @@ import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import { v2 as cloudinary } from 'cloudinary';
+import { ResponseCreateParamsNonStreaming } from 'openai/resources/responses/responses.js';
+
+type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini';
 
 cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
     api_secret: process.env.CLOUDINARY_API_SECRET
 });
-
-type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini';
-type ImageQualityType = 'auto' | 'low' | 'medium' | 'high';
-type ImageAspectRatioType = 'auto' | 'square' | 'portrait' | 'landscape';
-type ImageSizeType = 'auto' | '1024x1024' | '1024x1536' | '1536x1024';
-type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
 
 /**
  * Generates an image based on the provided prompt.
@@ -28,6 +25,15 @@ const imageCommand: Command = {
             .setName('prompt')
             .setDescription('The prompt to generate the image from')
             .setRequired(true)
+        )
+        .addStringOption(option => option
+            .setName('adjust_prompt')
+            .setDescription('Whether or not to use the prompt adjustment model (optional; defaults to Yes)')
+            .addChoices(
+                { name: 'Yes', value: 'yes' },
+                { name: 'No', value: 'no' }
+            )
+            .setRequired(false)
         )
         .addStringOption(option => option
             .setName('aspect_ratio')
@@ -44,7 +50,7 @@ const imageCommand: Command = {
             .setDescription('Image quality (optional; defaults to low)')
             .addChoices(
                 //{ name: 'Auto', value: 'auto' },
-                { name: 'Low', value: 'low' },
+                { name: 'Low', value: 'low' }, // Only valid option for non-superusers
                 //{ name: 'Medium', value: 'medium' },
                 //{ name: 'High', value: 'high' }
             )
@@ -91,26 +97,18 @@ const imageCommand: Command = {
             }
         }
 
+        logger.debug(`Received image generation request with prompt: ${interaction.options.getString('prompt')}`);
+
         // Start the timer
         const start = Date.now();
 
         // Defer the reply to show that the command is being processed
         await interaction.deferReply();
 
-        // Get the prompt from the interaction, if none provided, return an error
+        // Get parameters
         const prompt = interaction.options.getString('prompt');
-        if (!prompt) {
-            await interaction.reply({
-                content: '⚠️ No prompt provided.',
-                flags: [1 << 6]
-            });
-            return;
-        }
-        logger.debug(`Received image generation request with prompt: ${prompt}`);
-
-        // Grab the aspect ratio from the interaction, if provided
-        let dimensions: ImageSizeType = 'auto'; // By default, use auto to let OpenAI determine the aspect ratio
-        let aspect_ratio: ImageAspectRatioType = interaction.options.getString('aspect_ratio') as ImageAspectRatioType;
+        let dimensions: ImageGeneration.SizeType = 'auto'; // By default, use auto to let OpenAI determine the aspect ratio
+        let aspect_ratio: ImageGeneration.AspectRatioType = interaction.options.getString('aspect_ratio') as ImageGeneration.AspectRatioType;
         if (aspect_ratio) {
             switch (aspect_ratio) {
                 case 'square':
@@ -124,8 +122,7 @@ const imageCommand: Command = {
                     break;
             }
         }
-
-        // Get parameters
+        const adjustPrompt = interaction.options.getString('adjust_prompt') || 'yes' as 'yes' | 'no';
         const quality = interaction.options.getString('quality') || 'low' as ImageQualityType;
         const model = interaction.options.getString('model') || 'gpt-4o-mini' as ImageResponseModel;
         const background = interaction.options.getString('background') || 'auto' as ImageBackgroundType;
@@ -140,7 +137,6 @@ const imageCommand: Command = {
         // Create an initial embed to show the image generation progress
         const embed = new EmbedBuilder()
             .setTitle('🎨 Image Generation')
-            //.setDescription(`User has requested an image to be generated based on the prompt:`)
             .addFields(
                 { name: 'Prompt', value: prompt},
                 { name: 'Adjusted Prompt', value: `...`},
@@ -155,37 +151,32 @@ const imageCommand: Command = {
             .setTimestamp()
             .setFooter({ text: 'Generating...' });
 
-        
-
         // Edit the initial reply with the embed
-        await interaction.editReply({
-            embeds: [embed]
-        });
+        await interaction.editReply({ embeds: [embed] });
 
+        // Generate the image
         try {
             const openai = new OpenAI();
 
-            // Prepare the input for the responses API
-            const input: any[] = [{
-                role: 'user' as const,
-                content: [{ type: 'input_text' as const, text: prompt }]
-            }];
-
-            // Configure the image generation tool with all options
-            const imageTool: any = {
-                type: 'image_generation' as const,
-                size: dimensions,
-                quality: quality,
-                background: background
-            };
-
-            // Add previous response context if this is a follow-up
-            const requestPayload: any = {
+            // Prepare the request payload
+            const requestPayload:ResponseCreateParamsNonStreaming = {
                 model: model,
-                input,
-                tools: [imageTool],
+                input: [
+                    {
+                        role: 'user',
+                        content: [{ type: 'input_text', text: prompt }]
+                    }
+                ],
+                tools: [
+                    {
+                        type: 'image_generation',
+                        size: dimensions,
+                        quality: quality,
+                        background: background
+                    }
+                ],
                 tool_choice: { type: 'image_generation' }, // Force image generation
-                previous_response_id: followUpResponseId || null
+                previous_response_id: followUpResponseId || null // Add previous response context if this is a follow-up
             };
 
             logger.debug(`Request payload: ${JSON.stringify(requestPayload, null, 2)}`);
