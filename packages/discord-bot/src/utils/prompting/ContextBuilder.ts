@@ -2,6 +2,19 @@ import { Message } from 'discord.js';
 import { OpenAIMessage, OpenAIService } from '../openaiService.js';
 import { logger } from '../logger.js';
 
+const VERBOSE_CONTEXT_ENV_FLAG = 'DISCORD_BOT_LOG_FULL_CONTEXT';
+
+export const isFullContextLoggingEnabled = (): boolean =>
+    (process.env[VERBOSE_CONTEXT_ENV_FLAG] || '').toLowerCase() === 'true';
+
+export const logContextIfVerbose = (context: OpenAIMessage[]): void => {
+    if (!isFullContextLoggingEnabled()) {
+        return;
+    }
+
+    logger.debug(`Full context: ${JSON.stringify(context)}`);
+};
+
 export class ContextBuilder {
     private readonly openaiService: OpenAIService;
     private readonly DEFAULT_CONTEXT_MESSAGES = 12;
@@ -144,7 +157,7 @@ export class ContextBuilder {
             { role: 'system', content: this.DEFAULT_SYSTEM_PROMPT },
             ...reducedHistory
         ];
-        logger.debug(`Full context: ${JSON.stringify(context)}`); // todo: remove
+        logContextIfVerbose(context);
 
         logger.debug(`Final context built with ${context.length} messages (${reducedHistory.length} history + 1 system)`);
         return { context };
