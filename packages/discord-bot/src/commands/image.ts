@@ -38,7 +38,8 @@ import type {
     ImageGenerationCallWithPrompt,
     ImageQualityType,
     ImageResponseModel,
-    ImageSizeType
+    ImageSizeType,
+    ImageStylePreset
 } from './image/types.js';
 
 const imageCommand: Command = {
@@ -72,6 +73,17 @@ const imageCommand: Command = {
                 { name: 'Low', value: 'low' },
                 { name: 'Medium', value: 'medium' },
                 { name: 'High', value: 'high' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
+            .setName('style')
+            .setDescription('Image style preset (optional; defaults to natural)')
+            .addChoices(
+                { name: 'Natural', value: 'natural' },
+                { name: 'Vivid', value: 'vivid' },
+                { name: 'Anime', value: 'anime' },
+                { name: 'Line Art', value: 'line_art' }
             )
             .setRequired(false)
         )
@@ -155,6 +167,7 @@ const imageCommand: Command = {
 
         const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? 'gpt-4o-mini';
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
+        const style = (interaction.options.getString('style') as ImageStylePreset | null) ?? 'natural';
         const adjustPrompt = interaction.options.getBoolean('adjust_prompt') ?? true;
         let followUpResponseId = interaction.options.getString('follow_up_response_id');
         const promptExceedsDisplayLimit = prompt.length > PROMPT_DISPLAY_LIMIT;
@@ -180,6 +193,7 @@ const imageCommand: Command = {
 
         setOrAddEmbedField(embed, 'Size', dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', { inline: true });
         setOrAddEmbedField(embed, 'Quality', qualityRestricted ? `${quality} (restricted)` : quality, { inline: true });
+        setOrAddEmbedField(embed, 'Style', style, { inline: true });
         setOrAddEmbedField(embed, 'Background', background, { inline: true });
         setOrAddEmbedField(embed, 'Model', model, { inline: true });
         setOrAddEmbedField(embed, 'Input Response ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
@@ -209,6 +223,7 @@ const imageCommand: Command = {
                 quality,
                 size: dimensions,
                 background,
+                style,
                 allowPromptAdjustment: adjustPrompt,
                 followUpResponseId,
                 onPartialImage: payload => queueEmbedUpdate(async () => {
@@ -232,6 +247,7 @@ const imageCommand: Command = {
                 (output): output is ImageGenerationCallWithPrompt => output.type === 'image_generation_call' && Boolean(output.result)
             );
             const successfulImageCount = imageCallOutputs.length || 1;
+            const finalStyle = imageCall.style_preset ?? style;
 
             const textCostEstimate = estimateTextCost(model as TextModelPricingKey, inputTokens, outputTokens);
             const imageCostEstimate = estimateImageGenerationCost({
@@ -280,6 +296,7 @@ const imageCommand: Command = {
                         quality,
                         size: dimensions,
                         background,
+                        style: finalStyle,
                         startTime: start,
                         usage: {
                             inputTokens,
@@ -323,6 +340,8 @@ const imageCommand: Command = {
                 });
                 setOrAddEmbedField(embed, 'Adjusted Prompt', adjustedPromptValue);
             }
+
+            setOrAddEmbedField(embed, 'Style', finalStyle, { inline: true });
 
             const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
             setEmbedFooterText(

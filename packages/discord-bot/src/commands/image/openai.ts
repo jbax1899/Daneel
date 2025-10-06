@@ -20,6 +20,7 @@ import type {
     ImageQualityType,
     ImageResponseModel,
     ImageSizeType,
+    ImageStylePreset,
     PartialImagePayload,
     ReflectionFields
 } from './types.js';
@@ -32,6 +33,7 @@ interface GenerateImageOptions {
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
+    style: ImageStylePreset;
     allowPromptAdjustment: boolean;
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
@@ -46,7 +48,18 @@ interface GenerationOutcome {
 }
 
 export async function generateImageWithReflection(options: GenerateImageOptions): Promise<GenerationOutcome> {
-    const { openai, prompt, model, quality, size, background, allowPromptAdjustment, followUpResponseId, onPartialImage } = options;
+    const {
+        openai,
+        prompt,
+        model,
+        quality,
+        size,
+        background,
+        style,
+        allowPromptAdjustment,
+        followUpResponseId,
+        onPartialImage
+    } = options;
 
     const input: ResponseInput = [
         {
@@ -61,7 +74,8 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
                 allowPromptAdjustment,
                 size,
                 quality,
-                background
+                background,
+                style
             }) }]
         },
         {
@@ -71,13 +85,14 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         }
     ];
 
-    const imageTool: Tool.ImageGeneration = {
+    const imageTool = {
         type: 'image_generation',
         size,
         quality,
         background,
+        style_preset: style,
         partial_images: PARTIAL_IMAGE_LIMIT
-    };
+    } satisfies Tool.ImageGeneration & { style_preset: ImageStylePreset };
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
 

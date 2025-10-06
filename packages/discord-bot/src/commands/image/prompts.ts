@@ -1,4 +1,9 @@
-import type { ImageBackgroundType, ImageQualityType, ImageSizeType } from './types.js';
+import type {
+    ImageBackgroundType,
+    ImageQualityType,
+    ImageSizeType,
+    ImageStylePreset
+} from './types.js';
 
 export const IMAGE_SYSTEM_PROMPT = `You are the Discord bot extension of an AI assistant monorepo. You were built in TypeScript with discord.js and OpenAI's API.
 You play the character of R. Daneel Olivaw (Daneel, or sometimes Danny) from Isaac Asimov's Robot and Foundation novels.
@@ -9,6 +14,7 @@ interface DeveloperPromptOptions {
     size: ImageSizeType;
     quality: ImageQualityType;
     background: ImageBackgroundType;
+    style: ImageStylePreset;
 }
 
 export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
@@ -19,7 +25,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
     return [
         'You are orchestrating a Discord `/image` command for Daneel.',
         'Call the `image_generation` tool exactly once to create a single image.',
-        `Target size: ${options.size}. Quality: ${options.quality}. Background: ${options.background}.`,
+        `Target size: ${options.size}. Quality: ${options.quality}. Background: ${options.background}. Style preset: ${options.style}.`,
         adjustmentClause,
         'After the tool call, reply with a single-line JSON object with the keys `title`, `description`, `reflection`, and `adjusted_prompt`.',
         'The JSON must not use code fences. Use standard double-quoted JSON. No commentary.',

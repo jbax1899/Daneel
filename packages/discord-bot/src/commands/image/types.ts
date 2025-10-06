@@ -5,9 +5,11 @@ export type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1
 export type ImageQualityType = ImageGenerationQuality;
 export type ImageSizeType = ImageGenerationSize;
 export type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
+export type ImageStylePreset = 'natural' | 'vivid' | 'anime' | 'line_art';
 
 export type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCall & {
     revised_prompt?: string | null;
+    style_preset?: ImageStylePreset | null;
 };
 
 export interface ReflectionFields {
@@ -49,6 +51,7 @@ export interface UploadMetadata {
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
+    style: ImageStylePreset;
     startTime: number;
     usage: CloudinaryUsageMetadata;
     cost: CloudinaryCostMetadata;
