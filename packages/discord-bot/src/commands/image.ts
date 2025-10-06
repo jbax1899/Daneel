@@ -6,7 +6,7 @@ import { formatUsd } from '../utils/pricing.js';
 import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
 import { DEFAULT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
-import { buildImageResultPresentation, executeImageGeneration, toTitleCase } from './image/sessionHelpers.js';
+import { buildImageResultPresentation, executeImageGeneration, formatStylePreset, toTitleCase } from './image/sessionHelpers.js';
 import { resolveImageCommandError } from './image/errors.js';
 import type {
     ImageBackgroundType,
@@ -68,39 +68,45 @@ export async function runImageGenerationSession(
         .setColor(0x5865F2)
         .setTimestamp()
         .setDescription(truncateForEmbed(prompt, PROMPT_DISPLAY_LIMIT))
-        .setFooter({ text: 'Generating…' })
-        .addFields([
-            {
-                name: 'Size',
-                value: sizeFieldValue,
-                inline: true
-            },
-            {
-                name: 'Quality',
-                value: toTitleCase(quality),
-                inline: true
-            },
-            {
-                name: 'Input ID',
-                value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None',
-                inline: true
-            },
-            {
-                name: 'Style',
-                value: toTitleCase(style),
-                inline: true
-            },
-            {
-                name: 'Background',
-                value: toTitleCase(background),
-                inline: true
-            },
-            {
-                name: 'Output ID',
-                value: '…',
-                inline: true
-            }
-        ]);
+        .setFooter({ text: 'Generating…' });
+
+    const statusFields = [
+        {
+            name: 'Size',
+            value: sizeFieldValue,
+            inline: true
+        },
+        {
+            name: 'Quality',
+            value: toTitleCase(quality),
+            inline: true
+        },
+        {
+            name: 'Style',
+            value: formatStylePreset(style),
+            inline: true
+        },
+        {
+            name: 'Background',
+            value: toTitleCase(background),
+            inline: true
+        },
+        {
+            name: 'Output ID',
+            value: '…',
+            inline: true
+        }
+    ];
+
+    if (followUpResponseId) {
+        statusFields.splice(2, 0, {
+            name: 'Input ID',
+            value: `\`${followUpResponseId}\``,
+            inline: true
+        });
+    }
+
+    embed.addFields(statusFields);
 
     await interaction.editReply({ embeds: [embed], components: [], files: [] });
 

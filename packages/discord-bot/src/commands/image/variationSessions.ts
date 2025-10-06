@@ -23,7 +23,7 @@ import {
     IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
     IMAGE_VARIATION_STYLE_SELECT_PREFIX
 } from './constants.js';
-import { formatRetryCountdown, toTitleCase } from './sessionHelpers.js';
+import { formatRetryCountdown, formatStylePreset, toTitleCase } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -89,6 +89,7 @@ const BACKGROUND_OPTIONS: Array<{ value: ImageBackgroundType; label: string }> =
 ];
 
 const STYLE_OPTIONS: Array<{ value: ImageStylePreset; label: string }> = [
+    { value: 'unspecified', label: 'Auto' },
     { value: 'natural', label: 'Natural' },
     { value: 'vivid', label: 'Vivid' },
     { value: 'photorealistic', label: 'Photorealistic' },
@@ -264,19 +265,19 @@ function buildSelectRow(
     selectedValue: string,
     placeholder: string
 ): ActionRowBuilder<MessageActionRowComponentBuilder> {
+    const selectedOption = options.find(option => option.value === selectedValue);
+    const currentLabel = selectedOption?.label ?? 'previous setting';
+
     const menu = new StringSelectMenuBuilder()
         .setCustomId(customId)
-        .setMinValues(1)
+        .setMinValues(0)
         .setMaxValues(1)
-        .setPlaceholder(placeholder)
-        .addOptions(
-            options.map(option =>
-                new StringSelectMenuOptionBuilder()
-                    .setLabel(option.label)
-                    .setValue(option.value)
-                    .setDefault(option.value === selectedValue)
-            )
-        );
+        .setPlaceholder(`${placeholder} (current: ${currentLabel})`)
+        .addOptions(options.map(option =>
+            new StringSelectMenuOptionBuilder()
+                .setLabel(option.label)
+                .setValue(option.value)
+        ));
 
     return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu);
 }
@@ -338,7 +339,7 @@ export function buildVariationConfiguratorView(
         },
         {
             name: 'Style',
-            value: toTitleCase(session.style),
+            value: formatStylePreset(session.style),
             inline: true
         },
         {
@@ -375,24 +376,6 @@ export function buildVariationConfiguratorView(
         )
     ];
 
-    const promptButtons = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
-        new ButtonBuilder()
-            .setCustomId(`${IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX}${session.responseId}`)
-            .setLabel('Edit prompt')
-            .setStyle(ButtonStyle.Secondary),
-        new ButtonBuilder()
-            .setCustomId(`${IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX}${session.responseId}`)
-            .setLabel('Reset to original prompt')
-            .setStyle(ButtonStyle.Secondary)
-            .setDisabled(session.prompt === session.originalPrompt),
-        new ButtonBuilder()
-            .setCustomId(`${IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX}${session.responseId}`)
-            .setLabel('Cancel')
-            .setStyle(ButtonStyle.Danger)
-    );
-
-    rows.push(promptButtons);
-
     const now = Date.now();
     const onCooldown = Boolean(session.cooldownUntil && session.cooldownUntil > now);
     const countdown = onCooldown && session.cooldownUntil
@@ -405,7 +388,30 @@ export function buildVariationConfiguratorView(
         .setDisabled(Boolean(onCooldown))
         .setLabel(onCooldown && countdown ? `Retry image generation (${countdown})` : 'Generate variation');
 
-    promptButtons.addComponents(actionButton);
+    const editPromptButton = new ButtonBuilder()
+        .setCustomId(`${IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX}${session.responseId}`)
+        .setLabel('Edit prompt')
+        .setStyle(ButtonStyle.Secondary);
+
+    const resetPromptButton = new ButtonBuilder()
+        .setCustomId(`${IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX}${session.responseId}`)
+        .setLabel('Reset to original prompt')
+        .setStyle(ButtonStyle.Secondary)
+        .setDisabled(session.prompt === session.originalPrompt);
+
+    const cancelButton = new ButtonBuilder()
+        .setCustomId(`${IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX}${session.responseId}`)
+        .setLabel('Cancel')
+        .setStyle(ButtonStyle.Danger);
+
+    const promptButtons = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+        editPromptButton,
+        resetPromptButton,
+        actionButton,
+        cancelButton
+    );
+
+    rows.push(promptButtons);
 
     return {
         embeds: [embed],

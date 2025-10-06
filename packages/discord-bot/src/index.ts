@@ -155,7 +155,7 @@ client.on(Events.InteractionCreate, async interaction => {
     const selected = values?.[0];
 
     if (!selected) {
-      await interaction.reply({ content: '⚠️ Please choose an option before proceeding.', ephemeral: true });
+      await interaction.deferUpdate();
       return;
     }
 

@@ -68,8 +68,13 @@ function parseStyle(value: string | null | undefined): ImageStylePreset {
         return 'unspecified';
     }
 
-    const normalised = value.trim().toLowerCase().replace(/\s+/g, '_') as ImageStylePreset;
-    return STYLE_SET.has(normalised) ? normalised : 'unspecified';
+    const normalised = value.trim().toLowerCase();
+    if (normalised === 'auto') {
+        return 'unspecified';
+    }
+
+    const formatted = normalised.replace(/\s+/g, '_') as ImageStylePreset;
+    return STYLE_SET.has(formatted) ? formatted : 'unspecified';
 }
 
 function parseAspectRatio(value: string | null | undefined): ImageGenerationContext['aspectRatio'] {
@@ -130,25 +135,25 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
     }
 
     const originalPromptResult = collectPromptSections(fieldMap, 'Original Prompt');
-    if (!originalPromptResult.prompt) {
-        logger.warn('Unable to recover original prompt from embed fields.');
+    const refinedPromptResult = collectPromptSections(fieldMap, 'Refined Prompt');
+    const prompt = refinedPromptResult.prompt ?? originalPromptResult.prompt;
+
+    if (!prompt) {
+        logger.warn('Unable to recover any prompt from embed fields.');
         return null;
     }
 
-    const refinedPromptResult = collectPromptSections(fieldMap, 'Refined Prompt');
-    const activePromptField = collectPromptSections(fieldMap, 'Prompt for Variations');
-    const prompt = activePromptField.prompt ?? refinedPromptResult.prompt ?? originalPromptResult.prompt;
+    if (!originalPromptResult.prompt) {
+        logger.warn('Original prompt missing from embed; using recovered prompt as fallback.');
+    }
 
     const aspectRatio = parseAspectRatio(fieldMap.get('Aspect Ratio'));
     const size = parseSize(fieldMap.get('Size'));
 
-    const allowAdjustmentRaw = fieldMap.get('Allow Prompt Adjustment');
-    const allowPromptAdjustment = allowAdjustmentRaw
-        ? allowAdjustmentRaw.trim().toLowerCase() !== 'false'
-        : true;
-
-    const refinedPrompt = refinedPromptResult.prompt;
-    const refinedPromptTruncated = refinedPromptResult.truncated;
+    const refinedPrompt = refinedPromptResult.prompt && refinedPromptResult.prompt !== prompt
+        ? refinedPromptResult.prompt
+        : null;
+    const refinedPromptTruncated = refinedPrompt ? refinedPromptResult.truncated : false;
     const originalPromptTruncated = originalPromptResult.truncated;
 
     if (originalPromptTruncated || refinedPromptTruncated) {
@@ -157,7 +162,7 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
 
     return {
         prompt,
-        originalPrompt: originalPromptResult.prompt,
+        originalPrompt: originalPromptResult.prompt ?? prompt,
         refinedPrompt,
         model: parseModel(fieldMap.get('Model')),
         size,
@@ -166,7 +171,7 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
         quality: parseQuality(fieldMap.get('Quality')),
         background: parseBackground(fieldMap.get('Background')),
         style: parseStyle(fieldMap.get('Style')),
-        allowPromptAdjustment
+        allowPromptAdjustment: true
     };
 }
 

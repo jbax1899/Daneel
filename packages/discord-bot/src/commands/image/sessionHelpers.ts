@@ -213,7 +213,10 @@ export function buildImageResultPresentation(
     }: { followUpResponseId?: string | null } = {}
 ): ImageResultPresentation {
     const originalPrompt = context.originalPrompt ?? context.prompt;
-    const refinedPrompt = artifacts.revisedPrompt ?? context.refinedPrompt ?? null;
+    const candidateRefinedPrompt = artifacts.revisedPrompt ?? context.refinedPrompt ?? null;
+    const refinedPrompt = candidateRefinedPrompt && candidateRefinedPrompt !== originalPrompt
+        ? candidateRefinedPrompt
+        : null;
     const activePrompt = refinedPrompt ?? context.prompt;
 
     const followUpContext: ImageGenerationContext = {
@@ -284,8 +287,10 @@ export function buildImageResultPresentation(
     assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
-    assertField('Style', toTitleCase(followUpContext.style), { inline: true });
-    assertField('Input ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
+    assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
+    if (followUpResponseId) {
+        assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
+    }
     assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
     const recordPrompt = (label: string, value: string | null | undefined): boolean => {
@@ -316,10 +321,12 @@ export function buildImageResultPresentation(
     };
 
     const originalTruncated = recordPrompt('Original Prompt', originalPrompt);
-    const refinedTruncated = refinedPrompt && refinedPrompt !== originalPrompt
-        ? recordPrompt('Refined Prompt', refinedPrompt)
-        : false;
-    const activeTruncated = recordPrompt('Prompt for Variations', activePrompt);
+    let refinedTruncated = false;
+    if (refinedPrompt) {
+        refinedTruncated = recordPrompt('Refined Prompt', refinedPrompt);
+    }
+
+    const activeTruncated = refinedPrompt ? refinedTruncated : originalTruncated;
 
     embed.addFields(fields);
 
@@ -368,9 +375,14 @@ export function buildImageResultPresentation(
  * limit messaging and button labels.
  */
 function formatCostForFooter(amount: number): string {
-    if (amount > 0 && amount < 1) {
-        const cents = Math.max(1, Math.round(amount * 100));
-        return `${cents}¢`;
+    if (amount < 1) {
+        if (amount <= 0) {
+            return '0¢';
+        }
+
+        const cents = Math.round(amount * 100);
+        const displayCents = cents > 0 ? cents : 1;
+        return `${displayCents}¢`;
     }
 
     return formatUsd(amount, 2);
@@ -401,6 +413,14 @@ export function formatRetryCountdown(seconds: number): string {
  */
 export function toTitleCase(value: string): string {
     return value.replace(/_/g, ' ').replace(/\b\w/g, char => char.toUpperCase());
+}
+
+export function formatStylePreset(value: ImageStylePreset): string {
+    if (!value || value === 'unspecified') {
+        return 'Auto';
+    }
+
+    return toTitleCase(value);
 }
 
 /**
