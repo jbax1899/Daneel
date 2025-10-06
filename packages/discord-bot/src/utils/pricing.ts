@@ -30,33 +30,36 @@ export interface ImageGenerationCostEstimate {
 }
 
 const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: number }> = {
-    // Pricing per 1M tokens (USD) sourced from https://platform.openai.com/pricing (2025-03)
-    'gpt-5': { input: 1.25, output: 10 },
-    'gpt-5-mini': { input: 0.25, output: 2.0 },
-    'gpt-5-nano': { input: 0.05, output: 0.4 },
-    'gpt-4o': { input: 5, output: 15 },
-    'gpt-4o-mini': { input: 0.15, output: 0.6 },
-    'gpt-4.1': { input: 15, output: 60 },
-    'gpt-4.1-mini': { input: 3, output: 12 },
-    'gpt-4.1-nano': { input: 1, output: 4 }
+    // Pricing per 1M tokens (USD) sourced from https://platform.openai.com/pricing (2025-04)
+    'gpt-5': { input: 1.25, output: 10.00 },
+    'gpt-5-mini': { input: 0.25, output: 2.00 },
+    'gpt-5-nano': { input: 0.05, output: 0.40 },
+    'gpt-4o': { input: 2.50, output: 10.00 },
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },
+    'gpt-4.1': { input: 2.00, output: 8.00 },
+    'gpt-4.1-mini': { input: 0.40, output: 1.60 },
+    'gpt-4.1-nano': { input: 0.10, output: 0.40 }
 };
 
-const IMAGE_GENERATION_COST_TABLE: Record<Exclude<ImageGenerationQuality, 'auto'>, Record<'1024x1024' | '1024x1536' | '1536x1024', number>> = {
-    // Pricing per image in USD for gpt-image-1 (2025-03)
+const IMAGE_GENERATION_COST_TABLE: Record<
+    Exclude<ImageGenerationQuality, 'auto'>,
+    Record<'1024x1024' | '1024x1536' | '1536x1024', number>
+> = {
+    // Pricing per image in USD for gpt-image-1 (2025-04)
     low: {
-        '1024x1024': 0.04,
-        '1024x1536': 0.06,
-        '1536x1024': 0.06
+        '1024x1024': 0.011,
+        '1024x1536': 0.016,
+        '1536x1024': 0.016
     },
     medium: {
-        '1024x1024': 0.08,
-        '1024x1536': 0.12,
-        '1536x1024': 0.12
+        '1024x1024': 0.042,
+        '1024x1536': 0.063,
+        '1536x1024': 0.063
     },
     high: {
-        '1024x1024': 0.12,
-        '1024x1536': 0.18,
-        '1536x1024': 0.18
+        '1024x1024': 0.167,
+        '1024x1536': 0.25,
+        '1536x1024': 0.25
     }
 };
 
