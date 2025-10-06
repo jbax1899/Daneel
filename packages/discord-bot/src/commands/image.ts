@@ -9,7 +9,6 @@ import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import {
-    describeTokenUsage,
     estimateImageGenerationCost,
     estimateTextCost,
     formatUsd,
@@ -23,9 +22,11 @@ import {
     truncateForEmbed
 } from './image/embed.js';
 import {
+    DEFAULT_MODEL,
     EMBED_TITLE_LIMIT,
     PARTIAL_IMAGE_LIMIT,
-    PROMPT_DISPLAY_LIMIT
+    PROMPT_DISPLAY_LIMIT,
+    REFLECTION_MESSAGE_LIMIT
 } from './image/constants.js';
 import {
     isCloudinaryConfigured,
@@ -38,7 +39,8 @@ import type {
     ImageGenerationCallWithPrompt,
     ImageQualityType,
     ImageResponseModel,
-    ImageSizeType
+    ImageSizeType,
+    ImageStylePreset
 } from './image/types.js';
 
 const imageCommand: Command = {
@@ -76,6 +78,38 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
+            .setName('style')
+            .setDescription('Image style preset (optional; defaults to unspecified)')
+            .addChoices(
+                { name: 'Natural', value: 'natural' },
+                { name: 'Vivid', value: 'vivid' },
+                { name: 'Photorealistic', value: 'photorealistic' },
+                { name: 'Cinematic', value: 'cinematic' },
+                { name: 'Oil Painting', value: 'oil_painting' },
+                { name: 'Watercolor', value: 'watercolor' },
+                { name: 'Digital Painting', value: 'digital_painting' },
+                { name: 'Line Art', value: 'line_art' },
+                { name: 'Sketch', value: 'sketch' },
+                { name: 'Cartoon', value: 'cartoon' },
+                { name: 'Anime', value: 'anime' },
+                { name: 'Comic Book', value: 'comic' },
+                { name: 'Pixel Art', value: 'pixel_art' },
+                { name: 'Cyberpunk', value: 'cyberpunk' },
+                { name: 'Fantasy Art', value: 'fantasy_art' },
+                { name: 'Surrealist', value: 'surrealist' },
+                { name: 'Minimalist', value: 'minimalist' },
+                { name: 'Vintage', value: 'vintage' },
+                { name: 'Noir', value: 'noir' },
+                { name: '3D Render', value: '3d_render' },
+                { name: 'Steampunk', value: 'steampunk' },
+                { name: 'Abstract', value: 'abstract' },
+                { name: 'Pop Art', value: 'pop_art' },
+                { name: 'Dreamcore', value: 'dreamcore' },
+                { name: 'Isometric', value: 'isometric' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
             .setName('background')
             .setDescription('Image background (optional; defaults to auto)')
             .addChoices(
@@ -87,13 +121,13 @@ const imageCommand: Command = {
         )
         .addStringOption(option => option
             .setName('model')
-            .setDescription('The model to use for prompt adjustment (optional; defaults to gpt-4o-mini)')
+            .setDescription(`The model to use for prompt adjustment (optional; defaults to ${DEFAULT_MODEL})`)
             .addChoices(
-                { name: 'gpt-4o', value: 'gpt-4o' },
-                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' },
                 { name: 'gpt-4.1', value: 'gpt-4.1' },
                 { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
-                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' }
+                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
+                { name: 'gpt-4o', value: 'gpt-4o' },
+                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }
             )
             .setRequired(false)
         )
@@ -153,8 +187,9 @@ const imageCommand: Command = {
             logger.warn(`User ${interaction.user.id} attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
         }
 
-        const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? 'gpt-4o-mini';
+        const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? DEFAULT_MODEL;
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
+        const style = (interaction.options.getString('style') as ImageStylePreset | null) ?? 'unspecified';
         const adjustPrompt = interaction.options.getBoolean('adjust_prompt') ?? true;
         let followUpResponseId = interaction.options.getString('follow_up_response_id');
         const promptExceedsDisplayLimit = prompt.length > PROMPT_DISPLAY_LIMIT;
@@ -167,23 +202,42 @@ const imageCommand: Command = {
         const embed = new EmbedBuilder()
             .setTitle('🎨 Image Generation')
             .setColor(0x5865F2)
-            .setTimestamp();
-
-        setOrAddEmbedField(embed, 'Prompt', prompt, { includeTruncationNote: promptExceedsDisplayLimit });
-        setEmbedFooterText(embed, 'Generating…');
-
-        if (adjustPrompt) {
-            setOrAddEmbedField(embed, 'Adjusted Prompt', '…');
-        } else {
-            setOrAddEmbedField(embed, 'Adjusted Prompt', 'Prompt adjustment disabled');
-        }
-
-        setOrAddEmbedField(embed, 'Size', dimensions !== 'auto' ? `${aspectRatio ?? 'custom'} (${dimensions})` : 'auto', { inline: true });
-        setOrAddEmbedField(embed, 'Quality', qualityRestricted ? `${quality} (restricted)` : quality, { inline: true });
-        setOrAddEmbedField(embed, 'Background', background, { inline: true });
-        setOrAddEmbedField(embed, 'Model', model, { inline: true });
-        setOrAddEmbedField(embed, 'Input Response ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
-        setOrAddEmbedField(embed, 'Output Response ID', '…', { inline: true });
+            .setTimestamp()
+            .setDescription(truncateForEmbed(prompt, 500))
+            .setFooter({ text: 'Generating…' })
+            .addFields([
+                {
+                    name: 'Size',
+                    value: dimensions !== 'auto' ? `${aspectRatio?.replace(/\b\w/g, l => l.toUpperCase()) ?? 'Custom'} (${dimensions})` : 'Auto',
+                    inline: true
+                },
+                {
+                    name: 'Quality',
+                    value: qualityRestricted ? `${quality.replace(/\b\w/g, l => l.toUpperCase())} (Restricted)` : quality.replace(/\b\w/g, l => l.toUpperCase()),
+                    inline: true
+                },
+                {
+                    name: 'Input ID',
+                    value: followUpResponseId ? `\`${followUpResponseId}\`` : 'None',
+                    inline: true
+                },
+                {
+                    name: 'Style',
+                    value: style.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()), // replacing _ with spaces, capitalize first letter(s)
+                    inline: true
+                },
+                {
+                    name: 'Background',
+                    value: background.replace(/\b\w/g, l => l.toUpperCase()), // capitalize first letter
+                    inline: true
+                },
+                {
+                    name: 'Output ID',
+                    value: '…',
+                    inline: true
+                }
+            ]);
+        
 
         await interaction.editReply({ embeds: [embed] });
 
@@ -209,13 +263,17 @@ const imageCommand: Command = {
                 quality,
                 size: dimensions,
                 background,
+                style,
                 allowPromptAdjustment: adjustPrompt,
                 followUpResponseId,
+                username: interaction.user.username,
+                nickname: interaction.user.displayName,
+                guildName: interaction.guild?.name ?? `No guild for ${interaction.type} interaction`,
                 onPartialImage: payload => queueEmbedUpdate(async () => {
                     const previewName = `image-preview-${payload.index + 1}.png`;
                     const attachment = new AttachmentBuilder(Buffer.from(payload.base64, 'base64'), { name: previewName });
                     setEmbedFooterText(embed, `Rendering preview ${payload.index + 1}/${PARTIAL_IMAGE_LIMIT}…`);
-                    embed.setImage(`attachment://${previewName}`);
+                    embed.setThumbnail(`attachment://${previewName}`); // Thumnail places a small image to the side while we wait for it to finish generating, rather than full-size image under
                     await interaction.editReply({ embeds: [embed], files: [attachment] });
                 })
             });
@@ -232,6 +290,7 @@ const imageCommand: Command = {
                 (output): output is ImageGenerationCallWithPrompt => output.type === 'image_generation_call' && Boolean(output.result)
             );
             const successfulImageCount = imageCallOutputs.length || 1;
+            const finalStyle = imageCall.style_preset ?? style;
 
             const textCostEstimate = estimateTextCost(model as TextModelPricingKey, inputTokens, outputTokens);
             const imageCostEstimate = estimateImageGenerationCost({
@@ -245,9 +304,9 @@ const imageCommand: Command = {
                 `Image generation usage - inputTokens: ${inputTokens}, outputTokens: ${outputTokens}, images: ${successfulImageCount}, estimatedCost: ${formatUsd(totalCost)}`
             );
 
-            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
+            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output ID');
             if (outputResponseIdField) {
-                setOrAddEmbedField(embed, 'Output Response ID', response.id ? `\`${response.id}\`` : 'n/a', { inline: true });
+                setOrAddEmbedField(embed, 'Output ID', response.id ? `\`${response.id}\`` : 'n/a', { inline: true });
             }
 
             const progressIndex = embed.data.fields?.findIndex(field => field.name === 'Progress') ?? -1;
@@ -280,6 +339,7 @@ const imageCommand: Command = {
                         quality,
                         size: dimensions,
                         background,
+                        style: finalStyle,
                         startTime: start,
                         usage: {
                             inputTokens,
@@ -309,35 +369,38 @@ const imageCommand: Command = {
                 embed.setImage(`attachment://${attachment.name}`);
             }
 
-            const promptFieldValue = buildPromptFieldValue(prompt, {
-                label: 'prompt',
-                fullContentUrl: imageUrl ?? undefined
-            });
-            setOrAddEmbedField(embed, 'Prompt', promptFieldValue);
+            const descriptionParts = [
+                `**Prompt:** ${truncateForEmbed(prompt, 500)}`,
+                adjustPrompt 
+                    ? `**Adjusted (${model}):** ${truncateForEmbed(revisedPrompt ?? 'Model reused the original prompt.', 500)}`
+                    : '*Prompt adjustment disabled.*'
+            ];
+            embed.setDescription(descriptionParts.join('\n'));
 
-            if (adjustPrompt) {
-                const adjustedPromptValue = buildPromptFieldValue(revisedPrompt ?? 'Model reused the original prompt.', {
-                    label: 'adjusted prompt',
-                    fullContentUrl: imageUrl ?? undefined,
-                    whenMissing: 'Model reused the original prompt.'
-                });
-                setOrAddEmbedField(embed, 'Adjusted Prompt', adjustedPromptValue);
-            }
+            setOrAddEmbedField(embed, 'Style', finalStyle, { inline: true });
 
-            const generationTimeSeconds = ((Date.now() - start) / 1000).toFixed(0);
+            const generationTimeInSeconds = (Date.now() - start) / 1000;
+            const generationTime = generationTimeInSeconds >= 60
+                ? `${(generationTimeInSeconds / 60).toFixed(1)}m` // If > 60 seconds, x.x minutes,
+                : `${generationTimeInSeconds.toFixed(0)}s`; // otherwise x seconds
+            const imgPercent = parseInt(((imageCostEstimate.totalCost / totalCost) * 100).toFixed(0));
+            const txtPercent = parseInt((100 - imgPercent).toFixed(0)); // Ensure they add up to 100% (may not be exact, but its good enough)
             setEmbedFooterText(
                 embed,
-                `Finished in ${generationTimeSeconds}s • Cost ≈ ${formatUsd(totalCost, 4)} (${((imageCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% image / ${((textCostEstimate.totalCost / totalCost) * 100).toFixed(0)}% text)`
+                `⏱️ ${generationTime} • ${formatUsd(totalCost, 4)} • 🖼️${imgPercent}% 📝${txtPercent}%`
             );
 
-            await interaction.editReply({ embeds: [embed], files: attachment ? [attachment] : [] });
+            // Process reflection message if it exists
+            const reflectionMessage = reflection.reflection 
+                ? truncateForEmbed(reflection.reflection, REFLECTION_MESSAGE_LIMIT, { includeTruncationNote: true })
+                : '';
 
-            if (reflection.reflection) {
-                const followUpMessage = truncateForEmbed(reflection.reflection, 2000, { includeTruncationNote: true });
-                if (followUpMessage.trim().length > 0) {
-                    await interaction.followUp({ content: followUpMessage });
-                }
-            }
+            // Update the message with or without reflection
+            await interaction.editReply({ 
+                content: reflectionMessage.trim() || undefined, 
+                embeds: [embed], 
+                files: attachment ? [attachment] : [] 
+            });
         } catch (error) {
             await editChain;
             logger.error('Error in image command:', error);
@@ -345,9 +408,9 @@ const imageCommand: Command = {
             const errorMessage = resolveImageCommandError(error);
             embed.setColor(0xFF0000);
 
-            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output Response ID');
+            const outputResponseIdField = embed.data.fields?.find(field => field.name === 'Output ID');
             if (outputResponseIdField && outputResponseIdField.value === '…') {
-                setOrAddEmbedField(embed, 'Output Response ID', 'n/a', { inline: true });
+                setOrAddEmbedField(embed, 'Output ID', 'n/a', { inline: true });
             }
 
             try {

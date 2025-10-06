@@ -69,6 +69,7 @@ export async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMe
             quality: metadata.quality,
             size: metadata.size,
             background: metadata.background,
+            style_preset: metadata.style,
             generated_at: nowIso,
             generation_time: `${(Date.now() - metadata.startTime) / 1000}s`,
             text_input_tokens: metadata.usage.inputTokens.toString(),
@@ -102,7 +103,7 @@ export async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMe
             resource_type: 'image',
             public_id: `ai-image-${Date.now()}`,
             context,
-            tags: ['ai-generated', 'discord-bot', metadata.model, metadata.quality]
+            tags: ['ai-generated', 'discord-bot', metadata.model, metadata.quality, metadata.style]
         });
 
         logger.debug(`Image uploaded to Cloudinary: ${uploadResult.secure_url}`);
