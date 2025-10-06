@@ -8,10 +8,11 @@ const PLAN_SYSTEM_PROMPT = `You are a planning LLM that generates structured res
 Do not omit any required field.
 Only return a function call to "generate-plan", formatted according to its JSON schema.
 Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
-If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.`;
+If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.
+Set action to 'image' when generating a new image is the best next step. When you choose 'image', you must populate imageRequest.prompt and may set optional fields to guide the generation.`;
 
 export interface Plan {
-  action: 'message' | 'react' | 'ignore';
+  action: 'message' | 'react' | 'ignore' | 'image';
   modality: 'text' | 'tts';
   reaction?: string;
   openaiOptions: OpenAIOptions;
@@ -21,8 +22,18 @@ export interface Plan {
     shardId?: number | null;
     afk?: boolean;
   }
+  imageRequest?: ImagePlanRequest;
   //repoQuery?: string;
 }
+
+type ImagePlanRequest = {
+  prompt: string;
+  aspectRatio?: 'auto' | 'square' | 'portrait' | 'landscape';
+  background?: string;
+  style?: string;
+  allowPromptAdjustment?: boolean;
+  followUpResponseId?: string;
+};
 
 const defaultPlan: Plan = {
   action: 'ignore',
@@ -47,19 +58,49 @@ const planFunction = {
   parameters: {
     type: "object",
     properties: {
-      action: { 
-        type: "string", 
-        enum: ["message", "react", "ignore"],
-      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, and 'ignore' does nothing. Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
+      action: {
+        type: "string",
+        enum: ["message", "react", "ignore", "image"],
+      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 'image' generates an image using the dedicated pipeline (and posts a summary plus buttons). Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
       },
       modality: { 
         type: "string",
         enum: ["text", "tts"],
         description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
       },
-      reaction: { 
+      reaction: {
         type: "string",
         description: "A string containing only emoji characters (no text). Required when action is 'react'. Example: 🤖👍",
+      },
+      imageRequest: {
+        type: "object",
+        description: "Details for image generation when action is 'image'.",
+        properties: {
+          prompt: { type: "string", description: "Detailed description of the image to generate." },
+          aspect_ratio: {
+            type: "string",
+            enum: ["auto", "square", "portrait", "landscape"],
+            description: "Preferred aspect ratio for the generated image."
+          },
+          background: {
+            type: "string",
+            enum: ["auto", "transparent", "opaque"],
+            description: "Background mode for the generated image."
+          },
+          style: {
+            type: "string",
+            description: "Optional style preset (e.g., natural, photorealistic, watercolor)."
+          },
+          allowPromptAdjustment: {
+            type: "boolean",
+            description: "Whether the model may adjust the prompt before rendering."
+          },
+          followUpResponseId: {
+            type: "string",
+            description: "Existing response ID when requesting a variation."
+          }
+        },
+        required: ["prompt"]
       },
       openaiOptions: {
         type: "object",
@@ -246,7 +287,33 @@ export class Planner {
       openaiOptions: validatedPlan.openaiOptions,
       //repoQuery: (plan.repoQuery ?? validatedPlan.repoQuery ?? '') as string
     };
-  
+
+    if (plan.imageRequest) {
+      mergedPlan.imageRequest = this.normalizeImageRequest(plan.imageRequest);
+    }
+
     return mergedPlan;
-  } 
+  }
+
+  private normalizeImageRequest(request: Partial<ImagePlanRequest>): ImagePlanRequest {
+    const aspectRatio = this.isValidAspectRatio(request.aspectRatio) ? request.aspectRatio : 'auto';
+    const background = typeof request.background === 'string' ? request.background : 'auto';
+    const style = typeof request.style === 'string' ? request.style : 'unspecified';
+    const followUpResponseId = typeof request.followUpResponseId === 'string' && request.followUpResponseId.trim()
+      ? request.followUpResponseId.trim()
+      : undefined;
+
+    return {
+      prompt: (request.prompt ?? '').toString(),
+      aspectRatio,
+      background,
+      style,
+      allowPromptAdjustment: request.allowPromptAdjustment !== undefined ? Boolean(request.allowPromptAdjustment) : true,
+      followUpResponseId
+    };
+  }
+
+  private isValidAspectRatio(value: unknown): value is ImagePlanRequest['aspectRatio'] {
+    return value === 'auto' || value === 'square' || value === 'portrait' || value === 'landscape';
+  }
 }

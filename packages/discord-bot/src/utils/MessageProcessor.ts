@@ -4,12 +4,21 @@ import { Message } from 'discord.js';
 import { OpenAIService, SupportedModel, TTSOptions } from './openaiService.js';
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
-import { RateLimiter } from './RateLimiter.js';
+import { RateLimiter, imageCommandRateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
+import { DEFAULT_MODEL } from '../commands/image/constants.js';
+import {
+  buildImageResultPresentation,
+  createRetryButtonRow,
+  executeImageGeneration,
+  formatRetryCountdown
+} from '../commands/image/sessionHelpers.js';
+import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
+import type { ImageBackgroundType, ImageQualityType, ImageSizeType, ImageStylePreset } from '../commands/image/types.js';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
@@ -20,6 +29,35 @@ type MessageProcessorOptions = {
 const MAIN_MODEL: SupportedModel = 'gpt-5-mini';
 const PLAN_CONTEXT_SIZE = 8;
 const RESPONSE_CONTEXT_SIZE = 24;
+const VALID_IMAGE_BACKGROUNDS: ImageBackgroundType[] = ['auto', 'transparent', 'opaque'];
+const VALID_IMAGE_STYLES = new Set<ImageStylePreset>([
+  'natural',
+  'vivid',
+  'photorealistic',
+  'cinematic',
+  'oil_painting',
+  'watercolor',
+  'digital_painting',
+  'line_art',
+  'sketch',
+  'cartoon',
+  'anime',
+  'comic',
+  'pixel_art',
+  'cyberpunk',
+  'fantasy_art',
+  'surrealist',
+  'minimalist',
+  'vintage',
+  'noir',
+  '3d_render',
+  'steampunk',
+  'abstract',
+  'pop_art',
+  'dreamcore',
+  'isometric',
+  'unspecified'
+]);
 
 export class MessageProcessor {
   private readonly openaiService: OpenAIService;
@@ -125,6 +163,132 @@ export class MessageProcessor {
       //
       // Regular message response
       //
+      case 'image': {
+        logger.debug(`Planner requested automated image generation for message: ${message.content.slice(0, 100)}...`);
+
+        const request = plan.imageRequest;
+        if (!request?.prompt?.trim()) {
+          logger.warn('Image plan was missing a prompt; falling back to ignoring the request.');
+          return;
+        }
+
+        const trimmedPrompt = request.prompt.trim();
+        const requestedAspect = (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio'];
+
+        // Translate the planner's aspect ratio preference into concrete size settings.
+        let size: ImageSizeType = 'auto';
+        let aspectRatio: ImageGenerationContext['aspectRatio'] = 'auto';
+        let aspectRatioLabel: ImageGenerationContext['aspectRatioLabel'] = 'Auto';
+
+        switch (requestedAspect) {
+          case 'square':
+            size = '1024x1024';
+            aspectRatio = 'square';
+            aspectRatioLabel = 'Square';
+            break;
+          case 'portrait':
+            size = '1024x1536';
+            aspectRatio = 'portrait';
+            aspectRatioLabel = 'Portrait';
+            break;
+          case 'landscape':
+            size = '1536x1024';
+            aspectRatio = 'landscape';
+            aspectRatioLabel = 'Landscape';
+            break;
+          default:
+            aspectRatio = 'auto';
+            aspectRatioLabel = 'Auto';
+        }
+
+        const requestedBackground = request.background?.toLowerCase() ?? 'auto';
+        const background = VALID_IMAGE_BACKGROUNDS.includes(requestedBackground as ImageBackgroundType)
+          ? requestedBackground as ImageBackgroundType
+          : 'auto';
+
+        const normalizedStyle = request.style
+          ? request.style.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+          : 'unspecified';
+        const style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
+          ? normalizedStyle as ImageStylePreset
+          : 'unspecified';
+
+        // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
+        const context: ImageGenerationContext = {
+          prompt: trimmedPrompt,
+          model: DEFAULT_MODEL,
+          size,
+          aspectRatio,
+          aspectRatioLabel,
+          quality: 'low' as ImageQualityType,
+          qualityRestricted: false,
+          background,
+          style,
+          allowPromptAdjustment: request.allowPromptAdjustment ?? true
+        };
+
+        const isDeveloper = message.author.id === process.env.DEVELOPER_USER_ID;
+        if (!isDeveloper) {
+          // Respect the existing image cooldown before starting work. If the user is on cooldown, stash the
+          // context so the retry button can pick up exactly where we left off once the timer expires.
+          const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(message.author.id);
+          if (!allowed) {
+            const countdown = formatRetryCountdown(retryAfter ?? 0);
+            const retryKey = `retry:${message.id}`;
+            saveFollowUpContext(retryKey, context);
+            const retryRow = createRetryButtonRow(retryKey, countdown);
+            await responseHandler.sendMessage(
+              `⚠️ ${error ?? 'I need a moment before I can create another image.'} Try again in ${countdown}.`,
+              [],
+              directReply,
+              false,
+              [retryRow]
+            );
+            return;
+          }
+        }
+
+        await responseHandler.startTyping();
+
+        try {
+          // Reuse the shared generation helper so we get identical cost calculations and Cloudinary uploads.
+          const artifacts = await executeImageGeneration(context, {
+            user: {
+              username: message.author.username,
+              nickname: message.member?.displayName ?? message.author.username,
+              guildName: message.guild?.name ?? 'Direct message channel'
+            }
+          });
+
+          const presentation = buildImageResultPresentation(context, artifacts);
+
+          if (artifacts.responseId) {
+            saveFollowUpContext(artifacts.responseId, presentation.followUpContext);
+          }
+
+          const files = presentation.attachments.map(attachment => ({
+            filename: attachment.name ?? 'daneel-attachment.dat',
+            data: attachment.attachment as Buffer
+          }));
+
+          await responseHandler.sendEmbedMessage(presentation.embed, {
+            content: presentation.content,
+            files,
+            directReply,
+            components: presentation.components
+          });
+          logger.debug(`Automated image response sent for message: ${message.id}`);
+        } catch (error) {
+          logger.error('Automated image generation failed:', error);
+          await responseHandler.sendMessage('⚠️ I tried to create an image but something went wrong.', [], directReply);
+        } finally {
+          // Always stop the typing indicator so the channel UI doesn't get stuck.
+          responseHandler.stopTyping();
+        }
+
+        return;
+      }
+
       case 'message':
         logger.debug(`Generating response for message: ${message.content.slice(0, 100)}...`);
 
