@@ -121,16 +121,13 @@ const imageCommand: Command = {
         )
         .addStringOption(option => option
             .setName('model')
-            .setDescription('The model to use for prompt adjustment (optional; defaults to gpt-4o-mini)')
+            .setDescription(`The model to use for prompt adjustment (optional; defaults to ${DEFAULT_MODEL})`)
             .addChoices(
-                { name: 'gpt-5', value: 'gpt-5' },
-                { name: 'gpt-5-mini', value: 'gpt-5-mini' },
-                { name: 'gpt-5-nano', value: 'gpt-5-nano' },
-                { name: 'gpt-4o', value: 'gpt-4o' },
-                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' },
                 { name: 'gpt-4.1', value: 'gpt-4.1' },
                 { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
-                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' }
+                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
+                { name: 'gpt-4o', value: 'gpt-4o' },
+                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }
             )
             .setRequired(false)
         )
