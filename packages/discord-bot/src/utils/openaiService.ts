@@ -235,7 +235,19 @@ export class OpenAIService {
         ...(tools.length > 0 && { tools })
       };
 
-      logger.debug(`Generating AI response with payload: ${JSON.stringify(requestPayload)}`); // TODO: Remove
+      const toolNames = tools
+        .filter(tool => tool?.type === 'function' && typeof tool?.name === 'string')
+        .map(tool => tool.name as string);
+      const toolTypes = Array.from(new Set(tools.map(tool => tool?.type).filter(Boolean)));
+      const requestMetadata = {
+        model,
+        messageCount: validMessages.length,
+        toolCount: tools.length,
+        toolTypes,
+        ...(toolNames.length > 0 && { toolNames })
+      };
+
+      logger.debug('Generating AI response', requestMetadata);
 
       // Generate response
       const response = await this.openai.responses.create(requestPayload);
