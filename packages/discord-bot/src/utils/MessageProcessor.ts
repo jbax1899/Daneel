@@ -226,8 +226,7 @@ export class MessageProcessor {
                 }],
                 true // Make it a reply
               );
-              // delete the tts file
-              fs.unlinkSync(ttsPath);
+              await cleanupTTSFile(ttsPath);
             } else {
               // Not tts, send regular response
               await responseHandler.sendMessage(responseText, [], directReply);
@@ -266,5 +265,20 @@ export class MessageProcessor {
     if (this.rateLimiters.guild && message.guild) results.push(await this.rateLimiters.guild.check(message.author.id, message.channel.id, message.guild.id));
 
     return results.find(r => !r.allowed) ?? { allowed: true };
+  }
+}
+
+export async function cleanupTTSFile(ttsPath: string): Promise<void> {
+  if (!ttsPath) return;
+
+  try {
+    await fs.promises.unlink(ttsPath);
+  } catch (error) {
+    const err = error as NodeJS.ErrnoException;
+    if (err?.code === 'ENOENT') {
+      return;
+    }
+
+    logger.debug(`Failed to delete TTS file ${ttsPath}: ${err?.message ?? err}`);
   }
 }
