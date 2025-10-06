@@ -53,7 +53,6 @@ export async function runImageGenerationSession(
         size,
         aspectRatioLabel,
         quality,
-        qualityRestricted,
         background,
         style
     } = context;
@@ -78,7 +77,7 @@ export async function runImageGenerationSession(
             },
             {
                 name: 'Quality',
-                value: qualityRestricted ? `${toTitleCase(quality)} (Restricted)` : toTitleCase(quality),
+                value: toTitleCase(quality),
                 inline: true
             },
             {
@@ -309,10 +308,8 @@ const imageCommand: Command = {
         const isSuperUser = interaction.user.id === process.env.DEVELOPER_USER_ID;
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
         let quality: ImageQualityType = requestedQuality ?? 'low';
-        let qualityRestricted = false;
         if ((quality === 'medium' || quality === 'high') && !isSuperUser) {
             quality = 'low';
-            qualityRestricted = true;
             logger.warn(`User ${interaction.user.id} attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
         }
 
@@ -329,12 +326,13 @@ const imageCommand: Command = {
 
         const context: ImageGenerationContext = {
             prompt,
+            originalPrompt: prompt,
+            refinedPrompt: null,
             model,
             size,
             aspectRatio,
             aspectRatioLabel,
             quality,
-            qualityRestricted,
             background,
             style,
             allowPromptAdjustment: adjustPrompt

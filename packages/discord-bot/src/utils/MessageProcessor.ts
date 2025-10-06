@@ -193,12 +193,13 @@ export class MessageProcessor {
         // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
         const context: ImageGenerationContext = {
           prompt: trimmedPrompt,
+          originalPrompt: trimmedPrompt,
+          refinedPrompt: null,
           model: DEFAULT_MODEL,
           size,
           aspectRatio,
           aspectRatioLabel,
           quality: 'low' as ImageQualityType,
-          qualityRestricted: false,
           background,
           style,
           allowPromptAdjustment: request.allowPromptAdjustment ?? true

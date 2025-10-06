@@ -12,23 +12,15 @@ import {
     EMBED_MAX_FIELDS,
     EMBED_TOTAL_FIELD_CHAR_LIMIT,
     EMBED_TITLE_LIMIT,
-    IMAGE_CONTEXT_ATTACHMENT_NAME,
     IMAGE_RETRY_CUSTOM_ID_PREFIX,
     IMAGE_VARIATION_CUSTOM_ID_PREFIX,
-    PROMPT_SEGMENT_FIELD_PREFIX,
     REFLECTION_MESSAGE_LIMIT
 } from './constants.js';
 import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
 import { generateImageWithReflection } from './openai.js';
 import type { ImageGenerationCallWithPrompt, ImageStylePreset, PartialImagePayload, ReflectionFields } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
-import {
-    buildPromptFieldValue,
-    chunkString,
-    setEmbedDescription,
-    setEmbedFooterText,
-    truncateForEmbed
-} from './embed.js';
+import { chunkString, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
 
 /**
  * Provides structured metadata about a generated image so that different
@@ -128,7 +120,7 @@ export async function executeImageGeneration(
     if (isCloudinaryConfigured) {
         try {
             imageUrl = await uploadToCloudinary(finalImageBuffer, {
-                originalPrompt: context.prompt,
+                originalPrompt: context.originalPrompt ?? context.prompt,
                 revisedPrompt: reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null,
                 title: reflection.title,
                 description: reflection.description,
@@ -208,35 +200,9 @@ export interface ImageResultPresentation {
 }
 
 /**
- * Serialises the generation context so it can be persisted alongside the
- * resulting embed. The JSON attachment allows us to rebuild follow-up
- * requests even after an application restart when the in-memory cache has
- * been cleared.
- */
-function encodeContextForAttachment(context: ImageGenerationContext): Buffer {
-    const payload = {
-        version: 1,
-        context
-    };
-
-    return Buffer.from(JSON.stringify(payload, null, 2), 'utf8');
-}
-
-/**
- * Creates a small attachment containing the full image generation context so
- * that later variation requests can reload every option without relying on
- * volatile process memory.
- */
-export function createContextAttachment(context: ImageGenerationContext): AttachmentBuilder {
-    return new AttachmentBuilder(encodeContextForAttachment(context), {
-        name: IMAGE_CONTEXT_ATTACHMENT_NAME
-    });
-}
-
-/**
  * Builds the embed, attachments, and follow-up controls that should be sent
  * when an image generation task finishes. The resulting embed always embeds
- * machine-readable fields (model, prompt segments, etc.) to make reboot
+ * machine-readable fields (model, prompt sections, etc.) to make reboot
  * recovery possible via Discord's native message history.
  */
 export function buildImageResultPresentation(
@@ -246,8 +212,15 @@ export function buildImageResultPresentation(
         followUpResponseId
     }: { followUpResponseId?: string | null } = {}
 ): ImageResultPresentation {
+    const originalPrompt = context.originalPrompt ?? context.prompt;
+    const refinedPrompt = artifacts.revisedPrompt ?? context.refinedPrompt ?? null;
+    const activePrompt = refinedPrompt ?? context.prompt;
+
     const followUpContext: ImageGenerationContext = {
         ...context,
+        prompt: activePrompt,
+        originalPrompt,
+        refinedPrompt,
         style: artifacts.finalStyle
     };
 
@@ -271,7 +244,6 @@ export function buildImageResultPresentation(
     // fail, which would strand users without a usable follow-up button.
     const fields: APIEmbedField[] = [];
     let fieldCharacterBudget = 0;
-    let promptSegmentsTruncated = false;
     let metadataTruncated = false;
 
     const tryAddField = (
@@ -308,35 +280,46 @@ export function buildImageResultPresentation(
     };
 
     assertField('Model', followUpContext.model, { inline: true });
-    assertField('Quality', followUpContext.quality, { inline: true });
-    assertField('Quality Restricted', followUpContext.qualityRestricted ? 'true' : 'false', { inline: true });
-    assertField('Size', followUpContext.size, { inline: true });
-    assertField('Aspect Ratio', followUpContext.aspectRatio, { inline: true });
-    assertField('Background', followUpContext.background, { inline: true });
-    assertField('Style', followUpContext.style, { inline: true });
-    assertField('Allow Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'true' : 'false', { inline: true });
+    assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
+    assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
+    assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
+    assertField('Background', toTitleCase(followUpContext.background), { inline: true });
+    assertField('Style', toTitleCase(followUpContext.style), { inline: true });
     assertField('Input ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
     assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
-    const promptPreview = buildPromptFieldValue(followUpContext.prompt, { label: 'prompt' });
-    if (!tryAddField('Prompt Preview', promptPreview)) {
-        promptSegmentsTruncated = true;
-        logger.warn('Prompt preview was truncated due to Discord embed limits.');
-    }
-
-    const promptSegments = chunkString(followUpContext.prompt, EMBED_FIELD_VALUE_LIMIT);
-    for (const [index, segment] of promptSegments.entries()) {
-        const added = tryAddField(`${PROMPT_SEGMENT_FIELD_PREFIX} ${index + 1}`, segment);
-        if (!added) {
-            promptSegmentsTruncated = true;
-            break;
+    const recordPrompt = (label: string, value: string | null | undefined): boolean => {
+        if (!value) {
+            return false;
         }
-    }
 
-    if (promptSegmentsTruncated) {
-        // Let future recovery callers know that the embed alone is insufficient.
-        assertField('Prompt Segments Truncated', 'true', { inline: true }, { trackAsMetadata: false });
-    }
+        const segments = chunkString(value, EMBED_FIELD_VALUE_LIMIT);
+        if (segments.length === 0) {
+            return false;
+        }
+
+        let truncated = false;
+        for (const [index, segment] of segments.entries()) {
+            const fieldName = index === 0 ? label : `${label} (cont. ${index})`;
+            const added = tryAddField(fieldName, segment);
+            if (!added) {
+                truncated = true;
+                break;
+            }
+        }
+
+        if (truncated) {
+            assertField(`${label} Truncated`, 'true', { inline: true }, { trackAsMetadata: false });
+        }
+
+        return truncated;
+    };
+
+    const originalTruncated = recordPrompt('Original Prompt', originalPrompt);
+    const refinedTruncated = refinedPrompt && refinedPrompt !== originalPrompt
+        ? recordPrompt('Refined Prompt', refinedPrompt)
+        : false;
+    const activeTruncated = recordPrompt('Prompt for Variations', activePrompt);
 
     embed.addFields(fields);
 
@@ -349,13 +332,13 @@ export function buildImageResultPresentation(
 
     const footerParts = [
         `⏱️ ${formattedDuration}`,
-        `💰${formatUsd(artifacts.costs.total, 4)}`,
-        `🖼️${formatUsd(artifacts.costs.image, 4)}`,
-        `📝${formatUsd(artifacts.costs.text, 4)}`
+        `💰${formatCostForFooter(artifacts.costs.total)}`,
+        `🖼️${formatCostForFooter(artifacts.costs.image)}`,
+        `📝${formatCostForFooter(artifacts.costs.text)}`
     ];
 
-    if (promptSegmentsTruncated) {
-        footerParts.push('Prompt truncated – see attachment');
+    if (originalTruncated || refinedTruncated || activeTruncated) {
+        footerParts.push('Prompt truncated');
     }
 
     if (metadataTruncated) {
@@ -368,7 +351,6 @@ export function buildImageResultPresentation(
     if (!artifacts.imageUrl) {
         attachments.push(createImageAttachment(artifacts));
     }
-    attachments.push(createContextAttachment(followUpContext));
 
     const components = artifacts.responseId ? [createVariationButtonRow(artifacts.responseId)] : [];
 
@@ -385,6 +367,15 @@ export function buildImageResultPresentation(
  * Formats a short human-readable countdown string (e.g., "2m30s") for rate
  * limit messaging and button labels.
  */
+function formatCostForFooter(amount: number): string {
+    if (amount > 0 && amount < 1) {
+        const cents = Math.max(1, Math.round(amount * 100));
+        return `${cents}¢`;
+    }
+
+    return formatUsd(amount, 2);
+}
+
 export function formatRetryCountdown(seconds: number): string {
     if (seconds <= 0) {
         return 'now';

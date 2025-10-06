@@ -6,13 +6,29 @@ import type { ImageBackgroundType, ImageQualityType, ImageResponseModel, ImageSi
  * manually re-enter every option.
  */
 export interface ImageGenerationContext {
+    /**
+     * The prompt that should be sent to the model the next time this context is
+     * used. When a refinement is available we promote it to the active prompt
+     * so variations inherit the latest wording by default.
+     */
     prompt: string;
+    /**
+     * The initial user-authored prompt. We keep this alongside the potentially
+     * refined prompt so that embeds can present both versions and the recovery
+     * logic always has the original source of truth to fall back to.
+     */
+    originalPrompt: string;
+    /**
+     * The most recent refined prompt returned by the model, if any. This is
+     * optional because prompt adjustment may be disabled or the model may
+     * choose not to alter the prompt.
+     */
+    refinedPrompt?: string | null;
     model: ImageResponseModel;
     size: ImageSizeType;
     aspectRatio: 'auto' | 'square' | 'portrait' | 'landscape';
     aspectRatioLabel: string;
     quality: ImageQualityType;
-    qualityRestricted: boolean;
     background: ImageBackgroundType;
     style: ImageStylePreset;
     allowPromptAdjustment: boolean;

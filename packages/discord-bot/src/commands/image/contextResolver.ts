@@ -1,7 +1,6 @@
 import type { Message } from 'discord.js';
-import fetch from 'node-fetch';
 import { logger } from '../../utils/logger.js';
-import { DEFAULT_MODEL, IMAGE_CONTEXT_ATTACHMENT_NAME, PROMPT_SEGMENT_FIELD_PREFIX } from './constants.js';
+import { DEFAULT_MODEL } from './constants.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -54,16 +53,6 @@ const STYLE_SET = new Set<ImageStylePreset>(STYLE_VALUES);
 const SIZE_VALUES: ImageSizeType[] = ['auto', '1024x1024', '1024x1536', '1536x1024'];
 const ASPECT_VALUES: ImageGenerationContext['aspectRatio'][] = ['auto', 'square', 'portrait', 'landscape'];
 
-const BOOLEAN_TRUE = new Set(['true', 'yes', '1']);
-
-function parseBoolean(value: string | null | undefined): boolean {
-    if (!value) {
-        return false;
-    }
-
-    return BOOLEAN_TRUE.has(value.trim().toLowerCase());
-}
-
 function parseQuality(value: string | null | undefined): ImageQualityType {
     const normalised = value?.trim().toLowerCase() ?? '';
     return QUALITY_VALUES.includes(normalised as ImageQualityType) ? (normalised as ImageQualityType) : 'low';
@@ -100,35 +89,36 @@ function parseModel(value: string | null | undefined): ImageResponseModel {
     return normalised ?? DEFAULT_MODEL;
 }
 
-function extractPromptFromEmbed(message: Message): string | null {
-    const embed = message.embeds?.[0];
-    if (!embed) {
-        return null;
-    }
-
-    const segments = (embed.fields ?? []).filter(field =>
-        field.name.toLowerCase().startsWith(PROMPT_SEGMENT_FIELD_PREFIX.toLowerCase())
-    );
-
-    if (segments.length === 0) {
-        return null;
-    }
-
-    const ordered = segments
-        .map(field => {
-            const match = field.name.match(/(\d+)/);
-            const index = match ? Number.parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
-            return { index, value: field.value ?? '' };
-        })
-        .sort((a, b) => a.index - b.index);
-
-    return ordered.map(segment => segment.value).join('');
+interface PromptExtractionResult {
+    prompt: string | null;
+    truncated: boolean;
 }
 
-function buildContextFromEmbed(
-    message: Message,
-    options: { allowPreviewFallback?: boolean } = {}
-): { context: ImageGenerationContext; promptLikelyTruncated: boolean } | null {
+function collectPromptSections(
+    fieldMap: Map<string, string>,
+    label: string
+): PromptExtractionResult {
+    const baseField = fieldMap.get(label);
+    if (!baseField) {
+        return { prompt: null, truncated: false };
+    }
+
+    const sections: string[] = [baseField];
+    let sectionIndex = 1;
+    while (true) {
+        const continuation = fieldMap.get(`${label} (cont. ${sectionIndex})`);
+        if (!continuation) {
+            break;
+        }
+        sections.push(continuation);
+        sectionIndex += 1;
+    }
+
+    const truncatedFlag = fieldMap.get(`${label} Truncated`)?.toLowerCase() === 'true';
+    return { prompt: sections.join(''), truncated: truncatedFlag };
+}
+
+function buildContextFromEmbed(message: Message): ImageGenerationContext | null {
     const embed = message.embeds?.[0];
     if (!embed) {
         return null;
@@ -139,117 +129,52 @@ function buildContextFromEmbed(
         fieldMap.set(field.name, field.value ?? '');
     }
 
-    const promptFromSegments = extractPromptFromEmbed(message);
-    const segmentsTruncatedFlag = fieldMap.get('Prompt Segments Truncated')?.toLowerCase() === 'true';
-
-    let prompt = promptFromSegments ?? null;
-    let promptLikelyTruncated = segmentsTruncatedFlag;
-
-    if (!prompt && options.allowPreviewFallback) {
-        prompt = fieldMap.get('Prompt Preview') ?? null;
-        promptLikelyTruncated = true;
-    }
-
-    if (!prompt) {
+    const originalPromptResult = collectPromptSections(fieldMap, 'Original Prompt');
+    if (!originalPromptResult.prompt) {
+        logger.warn('Unable to recover original prompt from embed fields.');
         return null;
     }
+
+    const refinedPromptResult = collectPromptSections(fieldMap, 'Refined Prompt');
+    const activePromptField = collectPromptSections(fieldMap, 'Prompt for Variations');
+    const prompt = activePromptField.prompt ?? refinedPromptResult.prompt ?? originalPromptResult.prompt;
 
     const aspectRatio = parseAspectRatio(fieldMap.get('Aspect Ratio'));
     const size = parseSize(fieldMap.get('Size'));
 
+    const allowAdjustmentRaw = fieldMap.get('Allow Prompt Adjustment');
+    const allowPromptAdjustment = allowAdjustmentRaw
+        ? allowAdjustmentRaw.trim().toLowerCase() !== 'false'
+        : true;
+
+    const refinedPrompt = refinedPromptResult.prompt;
+    const refinedPromptTruncated = refinedPromptResult.truncated;
+    const originalPromptTruncated = originalPromptResult.truncated;
+
+    if (originalPromptTruncated || refinedPromptTruncated) {
+        logger.warn('Recovered prompt may be truncated due to embed limits.');
+    }
+
     return {
-        context: {
-            prompt,
-            model: parseModel(fieldMap.get('Model')),
-            size,
-            aspectRatio,
-            aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
-            quality: parseQuality(fieldMap.get('Quality')),
-            qualityRestricted: parseBoolean(fieldMap.get('Quality Restricted')),
-            background: parseBackground(fieldMap.get('Background')),
-            style: parseStyle(fieldMap.get('Style')),
-            allowPromptAdjustment: parseBoolean(fieldMap.get('Allow Prompt Adjustment'))
-        },
-        promptLikelyTruncated
+        prompt,
+        originalPrompt: originalPromptResult.prompt,
+        refinedPrompt,
+        model: parseModel(fieldMap.get('Model')),
+        size,
+        aspectRatio,
+        aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
+        quality: parseQuality(fieldMap.get('Quality')),
+        background: parseBackground(fieldMap.get('Background')),
+        style: parseStyle(fieldMap.get('Style')),
+        allowPromptAdjustment
     };
 }
 
-async function buildContextFromAttachment(message: Message): Promise<ImageGenerationContext | null> {
-    const attachment = message.attachments.find(file => file.name === IMAGE_CONTEXT_ATTACHMENT_NAME);
-    if (!attachment) {
-        return null;
-    }
-
-    try {
-        const response = await fetch(attachment.url);
-        if (!response.ok) {
-            logger.warn(`Failed to fetch image context attachment: HTTP ${response.status}`);
-            return null;
-        }
-
-        const data = await response.json();
-        if (!data || typeof data !== 'object') {
-            return null;
-        }
-
-        const rawContext = (data as { context?: ImageGenerationContext }).context;
-        if (!rawContext) {
-            return null;
-        }
-
-        const aspectRatio = parseAspectRatio(rawContext.aspectRatio);
-
-        return {
-            prompt: rawContext.prompt,
-            model: parseModel(rawContext.model),
-            size: parseSize(rawContext.size),
-            aspectRatio,
-            aspectRatioLabel: rawContext.aspectRatioLabel ?? ASPECT_RATIO_LABELS[aspectRatio],
-            quality: parseQuality(rawContext.quality),
-            qualityRestricted: Boolean(rawContext.qualityRestricted),
-            background: parseBackground(rawContext.background),
-            style: parseStyle(rawContext.style),
-            allowPromptAdjustment: Boolean(rawContext.allowPromptAdjustment)
-        };
-    } catch (error) {
-        logger.error('Failed to download cached image context attachment:', error);
-        return null;
-    }
-}
-
 /**
- * Attempts to reconstruct an image generation context from the Discord message
- * that announced the image. Embeds are preferred because they keep metadata
- * indexable via Discord's search, while the attachment serves as a precise
- * fallback if the embed was modified or trimmed.
+ * Rebuilds the image generation context from the embed that announced the
+ * image. We intentionally keep this synchronous so callers can reuse the logic
+ * during interaction handling without awaiting network I/O.
  */
 export async function recoverContextFromMessage(message: Message): Promise<ImageGenerationContext | null> {
-    const embedResult = buildContextFromEmbed(message);
-    if (embedResult && !embedResult.promptLikelyTruncated) {
-        return embedResult.context;
-    }
-
-    // The JSON attachment carries the full fidelity payload and is resilient to
-    // embed trimming, so prefer it whenever possible.
-    const fromAttachment = await buildContextFromAttachment(message);
-    if (fromAttachment) {
-        return fromAttachment;
-    }
-
-    if (embedResult) {
-        if (embedResult.promptLikelyTruncated) {
-            logger.warn('Recovered truncated prompt from embed; image context attachment was unavailable.');
-        }
-        return embedResult.context;
-    }
-
-    const fallbackEmbed = buildContextFromEmbed(message, { allowPreviewFallback: true });
-    if (fallbackEmbed) {
-        if (fallbackEmbed.promptLikelyTruncated) {
-            logger.warn('Recovered prompt from preview field; prompt may be truncated.');
-        }
-        return fallbackEmbed.context;
-    }
-
-    return null;
+    return buildContextFromEmbed(message);
 }

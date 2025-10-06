@@ -1,0 +1,429 @@
+import {
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle,
+    EmbedBuilder,
+    ModalBuilder,
+    StringSelectMenuBuilder,
+    StringSelectMenuOptionBuilder,
+    TextInputBuilder,
+    TextInputStyle,
+    type InteractionUpdateOptions,
+    type MessageActionRowComponentBuilder
+} from 'discord.js';
+import { buildPromptFieldValue, truncateForEmbed } from './embed.js';
+import {
+    IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX,
+    IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX,
+    IMAGE_VARIATION_ASPECT_SELECT_PREFIX,
+    IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX,
+    IMAGE_VARIATION_PROMPT_INPUT_ID,
+    IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX,
+    IMAGE_VARIATION_QUALITY_SELECT_PREFIX,
+    IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
+    IMAGE_VARIATION_STYLE_SELECT_PREFIX
+} from './constants.js';
+import { formatRetryCountdown, toTitleCase } from './sessionHelpers.js';
+import type { ImageGenerationContext } from './followUpCache.js';
+import type {
+    ImageBackgroundType,
+    ImageQualityType,
+    ImageResponseModel,
+    ImageSizeType,
+    ImageStylePreset
+} from './types.js';
+
+/**
+ * Represents the per-user configuration state for a variation session. We keep
+ * this information in memory while the user is interacting with the ephemeral
+ * configurator so that select/menu events can update the preview without
+ * losing the in-progress choices.
+ */
+export interface VariationSessionState {
+    key: string;
+    userId: string;
+    responseId: string;
+    prompt: string;
+    originalPrompt: string;
+    refinedPrompt: string | null;
+    model: ImageResponseModel;
+    size: ImageSizeType;
+    aspectRatio: ImageGenerationContext['aspectRatio'];
+    aspectRatioLabel: string;
+    quality: ImageQualityType;
+    background: ImageBackgroundType;
+    style: ImageStylePreset;
+    allowPromptAdjustment: boolean;
+    timeout: NodeJS.Timeout;
+    cooldownUntil: number | null;
+    cooldownTimer?: NodeJS.Timeout;
+    messageUpdater?: (options: InteractionUpdateOptions) => Promise<unknown>;
+}
+
+type VariationConfiguratorView = {
+    content?: string;
+    embeds: EmbedBuilder[];
+    components: ActionRowBuilder<MessageActionRowComponentBuilder>[];
+};
+
+const VARIATION_SESSION_TTL_MS = 10 * 60 * 1000;
+const sessions = new Map<string, VariationSessionState>();
+
+const QUALITY_OPTIONS: Array<{ value: ImageQualityType; label: string }> = [
+    { value: 'low', label: 'Low' },
+    { value: 'medium', label: 'Medium' },
+    { value: 'high', label: 'High' }
+];
+
+const ASPECT_OPTIONS: Array<{ value: ImageGenerationContext['aspectRatio']; label: string }> = [
+    { value: 'auto', label: 'Auto' },
+    { value: 'square', label: 'Square' },
+    { value: 'portrait', label: 'Portrait' },
+    { value: 'landscape', label: 'Landscape' }
+];
+
+const BACKGROUND_OPTIONS: Array<{ value: ImageBackgroundType; label: string }> = [
+    { value: 'auto', label: 'Auto' },
+    { value: 'transparent', label: 'Transparent' },
+    { value: 'opaque', label: 'Opaque' }
+];
+
+const STYLE_OPTIONS: Array<{ value: ImageStylePreset; label: string }> = [
+    { value: 'natural', label: 'Natural' },
+    { value: 'vivid', label: 'Vivid' },
+    { value: 'photorealistic', label: 'Photorealistic' },
+    { value: 'cinematic', label: 'Cinematic' },
+    { value: 'oil_painting', label: 'Oil Painting' },
+    { value: 'watercolor', label: 'Watercolor' },
+    { value: 'digital_painting', label: 'Digital Painting' },
+    { value: 'line_art', label: 'Line Art' },
+    { value: 'sketch', label: 'Sketch' },
+    { value: 'cartoon', label: 'Cartoon' },
+    { value: 'anime', label: 'Anime' },
+    { value: 'comic', label: 'Comic Book' },
+    { value: 'pixel_art', label: 'Pixel Art' },
+    { value: 'cyberpunk', label: 'Cyberpunk' },
+    { value: 'fantasy_art', label: 'Fantasy Art' },
+    { value: 'surrealist', label: 'Surrealist' },
+    { value: 'minimalist', label: 'Minimalist' },
+    { value: 'vintage', label: 'Vintage' },
+    { value: 'noir', label: 'Noir' },
+    { value: '3d_render', label: '3D Render' },
+    { value: 'steampunk', label: 'Steampunk' },
+    { value: 'abstract', label: 'Abstract' },
+    { value: 'pop_art', label: 'Pop Art' },
+    { value: 'dreamcore', label: 'Dreamcore' },
+    { value: 'isometric', label: 'Isometric' }
+];
+
+function makeSessionKey(userId: string, responseId: string): string {
+    return `${userId}:${responseId}`;
+}
+
+function scheduleExpiry(session: VariationSessionState): void {
+    clearTimeout(session.timeout);
+    session.timeout = setTimeout(() => {
+        disposeVariationSession(session.key);
+    }, VARIATION_SESSION_TTL_MS);
+}
+
+function clearCooldown(session: VariationSessionState): void {
+    if (session.cooldownTimer) {
+        clearTimeout(session.cooldownTimer);
+        session.cooldownTimer = undefined;
+    }
+    session.cooldownUntil = null;
+}
+
+export function initialiseVariationSession(
+    userId: string,
+    responseId: string,
+    context: ImageGenerationContext
+): VariationSessionState {
+    const key = makeSessionKey(userId, responseId);
+    disposeVariationSession(key);
+
+    const initialPrompt = context.refinedPrompt ?? context.prompt;
+
+    const session: VariationSessionState = {
+        key,
+        userId,
+        responseId,
+        prompt: initialPrompt,
+        originalPrompt: context.originalPrompt ?? context.prompt,
+        refinedPrompt: context.refinedPrompt ?? null,
+        model: context.model,
+        size: context.size,
+        aspectRatio: context.aspectRatio,
+        aspectRatioLabel: context.aspectRatioLabel,
+        quality: context.quality,
+        background: context.background,
+        style: context.style,
+        allowPromptAdjustment: context.allowPromptAdjustment ?? true,
+        timeout: setTimeout(() => {
+            disposeVariationSession(key);
+        }, VARIATION_SESSION_TTL_MS),
+        cooldownUntil: null
+    };
+
+    sessions.set(key, session);
+    return session;
+}
+
+export function getVariationSession(userId: string, responseId: string): VariationSessionState | null {
+    return sessions.get(makeSessionKey(userId, responseId)) ?? null;
+}
+
+export function updateVariationSession(
+    userId: string,
+    responseId: string,
+    updater: (session: VariationSessionState) => void
+): VariationSessionState | null {
+    const session = getVariationSession(userId, responseId);
+    if (!session) {
+        return null;
+    }
+
+    updater(session);
+    scheduleExpiry(session);
+    return session;
+}
+
+export function setVariationSessionUpdater(
+    userId: string,
+    responseId: string,
+    updater: (options: InteractionUpdateOptions) => Promise<unknown>
+): VariationSessionState | null {
+    const session = getVariationSession(userId, responseId);
+    if (!session) {
+        return null;
+    }
+
+    session.messageUpdater = updater;
+    scheduleExpiry(session);
+    return session;
+}
+
+export function disposeVariationSession(key: string): void {
+    const session = sessions.get(key);
+    if (!session) {
+        return;
+    }
+
+    clearTimeout(session.timeout);
+    clearCooldown(session);
+    sessions.delete(key);
+}
+
+export function applyVariationCooldown(
+    userId: string,
+    responseId: string,
+    seconds: number
+): VariationSessionState | null {
+    const session = getVariationSession(userId, responseId);
+    if (!session) {
+        return null;
+    }
+
+    clearCooldown(session);
+    if (seconds > 0) {
+        session.cooldownUntil = Date.now() + seconds * 1000;
+        if (session.messageUpdater) {
+            session.cooldownTimer = setTimeout(async () => {
+                session.cooldownTimer = undefined;
+                session.cooldownUntil = null;
+                try {
+                    if (session.messageUpdater) {
+                        await session.messageUpdater(buildVariationConfiguratorView(session));
+                    }
+                } catch {
+                    // Ignore refresh errors; the user may have closed the configurator.
+                }
+            }, seconds * 1000);
+        }
+    }
+
+    scheduleExpiry(session);
+    return session;
+}
+
+export function resetVariationCooldown(userId: string, responseId: string): VariationSessionState | null {
+    const session = getVariationSession(userId, responseId);
+    if (!session) {
+        return null;
+    }
+
+    clearCooldown(session);
+    scheduleExpiry(session);
+    return session;
+}
+
+function buildSelectRow(
+    customId: string,
+    options: Array<{ value: string; label: string }>,
+    selectedValue: string,
+    placeholder: string
+): ActionRowBuilder<MessageActionRowComponentBuilder> {
+    const menu = new StringSelectMenuBuilder()
+        .setCustomId(customId)
+        .setMinValues(1)
+        .setMaxValues(1)
+        .setPlaceholder(placeholder)
+        .addOptions(
+            options.map(option =>
+                new StringSelectMenuOptionBuilder()
+                    .setLabel(option.label)
+                    .setValue(option.value)
+                    .setDefault(option.value === selectedValue)
+            )
+        );
+
+    return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu);
+}
+
+export function buildVariationConfiguratorView(
+    session: VariationSessionState,
+    options: { statusMessage?: string } = {}
+): VariationConfiguratorView {
+    const embed = new EmbedBuilder()
+        .setTitle('🎨 Configure image variation')
+        .setDescription(
+            truncateForEmbed(
+                options.statusMessage
+                    ? options.statusMessage
+                    : 'Tweak the settings below and press **Generate variation** when you are ready.',
+                2048
+            )
+        );
+
+    embed.addFields({
+        name: 'Current prompt',
+        value: buildPromptFieldValue(session.prompt, { label: 'variation prompt' })
+    });
+
+    if (session.originalPrompt && session.originalPrompt !== session.prompt) {
+        embed.addFields({
+            name: 'Original prompt',
+            value: buildPromptFieldValue(session.originalPrompt, { label: 'original prompt' })
+        });
+    }
+
+    if (session.refinedPrompt && session.refinedPrompt !== session.prompt && session.refinedPrompt !== session.originalPrompt) {
+        embed.addFields({
+            name: 'Last refined prompt',
+            value: buildPromptFieldValue(session.refinedPrompt, { label: 'refined prompt' })
+        });
+    }
+
+    embed.addFields(
+        {
+            name: 'Quality',
+            value: toTitleCase(session.quality),
+            inline: true
+        },
+        {
+            name: 'Aspect ratio',
+            value: session.aspectRatioLabel,
+            inline: true
+        },
+        {
+            name: 'Resolution',
+            value: session.size === 'auto' ? 'Auto' : session.size,
+            inline: true
+        },
+        {
+            name: 'Background',
+            value: toTitleCase(session.background),
+            inline: true
+        },
+        {
+            name: 'Style',
+            value: toTitleCase(session.style),
+            inline: true
+        },
+        {
+            name: 'Model',
+            value: session.model,
+            inline: true
+        }
+    );
+
+    const rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [
+        buildSelectRow(
+            `${IMAGE_VARIATION_QUALITY_SELECT_PREFIX}${session.responseId}`,
+            QUALITY_OPTIONS,
+            session.quality,
+            'Select quality'
+        ),
+        buildSelectRow(
+            `${IMAGE_VARIATION_ASPECT_SELECT_PREFIX}${session.responseId}`,
+            ASPECT_OPTIONS,
+            session.aspectRatio,
+            'Select aspect ratio'
+        ),
+        buildSelectRow(
+            `${IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX}${session.responseId}`,
+            BACKGROUND_OPTIONS,
+            session.background,
+            'Select background'
+        ),
+        buildSelectRow(
+            `${IMAGE_VARIATION_STYLE_SELECT_PREFIX}${session.responseId}`,
+            STYLE_OPTIONS,
+            session.style,
+            'Select style'
+        )
+    ];
+
+    const promptButtons = new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(
+        new ButtonBuilder()
+            .setCustomId(`${IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX}${session.responseId}`)
+            .setLabel('Edit prompt')
+            .setStyle(ButtonStyle.Secondary),
+        new ButtonBuilder()
+            .setCustomId(`${IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX}${session.responseId}`)
+            .setLabel('Reset to original prompt')
+            .setStyle(ButtonStyle.Secondary)
+            .setDisabled(session.prompt === session.originalPrompt),
+        new ButtonBuilder()
+            .setCustomId(`${IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX}${session.responseId}`)
+            .setLabel('Cancel')
+            .setStyle(ButtonStyle.Danger)
+    );
+
+    rows.push(promptButtons);
+
+    const now = Date.now();
+    const onCooldown = Boolean(session.cooldownUntil && session.cooldownUntil > now);
+    const countdown = onCooldown && session.cooldownUntil
+        ? formatRetryCountdown(Math.max(0, Math.ceil((session.cooldownUntil - now) / 1000)))
+        : null;
+
+    const actionButton = new ButtonBuilder()
+        .setCustomId(`${IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX}${session.responseId}`)
+        .setStyle(onCooldown ? ButtonStyle.Secondary : ButtonStyle.Primary)
+        .setDisabled(Boolean(onCooldown))
+        .setLabel(onCooldown && countdown ? `Retry image generation (${countdown})` : 'Generate variation');
+
+    promptButtons.addComponents(actionButton);
+
+    return {
+        embeds: [embed],
+        components: rows
+    };
+}
+
+export function buildPromptModal(responseId: string, currentPrompt: string): ModalBuilder {
+    const modal = new ModalBuilder()
+        .setCustomId(`${IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX}${responseId}`)
+        .setTitle('Update variation prompt');
+
+    const promptInput = new TextInputBuilder()
+        .setCustomId(IMAGE_VARIATION_PROMPT_INPUT_ID)
+        .setLabel('Prompt to send to the model')
+        .setStyle(TextInputStyle.Paragraph)
+        .setRequired(true)
+        .setValue(truncateForEmbed(currentPrompt, 1900));
+
+    return modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(promptInput));
+}
