@@ -9,7 +9,6 @@ import { OpenAI } from 'openai';
 import { logger } from '../utils/logger.js';
 import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import {
-    describeTokenUsage,
     estimateImageGenerationCost,
     estimateTextCost,
     formatUsd,
