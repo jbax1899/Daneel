@@ -9,3 +9,5 @@ export const REFLECTION_TITLE_LIMIT = EMBED_TITLE_LIMIT;
 export const REFLECTION_DESCRIPTION_LIMIT = EMBED_DESCRIPTION_LIMIT;
 export const REFLECTION_MESSAGE_LIMIT = 2000; // Discord's max is 2000
 export const DEFAULT_MODEL = 'gpt-4.1-mini';
+export const IMAGE_VARIATION_CUSTOM_ID_PREFIX = 'image:variation:';
+export const IMAGE_RETRY_CUSTOM_ID_PREFIX = 'image:retry:';
