@@ -85,14 +85,19 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         }
     ];
 
-    const imageTool = {
+    // NOTE: The current Responses API rejects `style_preset` when provided as a
+    // default tool parameter (400 Unknown parameter). Instead, we rely on the
+    // developer prompt to instruct the model to include the preset when it
+    // invokes the tool. Keeping the tool definition limited to the officially
+    // supported fields avoids the transport error while still honoring the
+    // user's selection.
+    const imageTool: Tool.ImageGeneration = {
         type: 'image_generation',
         size,
         quality,
         background,
-        style_preset: style,
         partial_images: PARTIAL_IMAGE_LIMIT
-    } satisfies Tool.ImageGeneration & { style_preset: ImageStylePreset };
+    };
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
 
