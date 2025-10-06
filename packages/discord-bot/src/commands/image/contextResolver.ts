@@ -128,7 +128,7 @@ function extractPromptFromEmbed(message: Message): string | null {
 function buildContextFromEmbed(
     message: Message,
     options: { allowPreviewFallback?: boolean } = {}
-): ImageGenerationContext | null {
+): { context: ImageGenerationContext; promptLikelyTruncated: boolean } | null {
     const embed = message.embeds?.[0];
     if (!embed) {
         return null;
@@ -140,7 +140,16 @@ function buildContextFromEmbed(
     }
 
     const promptFromSegments = extractPromptFromEmbed(message);
-    const prompt = promptFromSegments ?? (options.allowPreviewFallback ? fieldMap.get('Prompt Preview') ?? null : null);
+    const segmentsTruncatedFlag = fieldMap.get('Prompt Segments Truncated')?.toLowerCase() === 'true';
+
+    let prompt = promptFromSegments ?? null;
+    let promptLikelyTruncated = segmentsTruncatedFlag;
+
+    if (!prompt && options.allowPreviewFallback) {
+        prompt = fieldMap.get('Prompt Preview') ?? null;
+        promptLikelyTruncated = true;
+    }
+
     if (!prompt) {
         return null;
     }
@@ -149,16 +158,19 @@ function buildContextFromEmbed(
     const size = parseSize(fieldMap.get('Size'));
 
     return {
-        prompt,
-        model: parseModel(fieldMap.get('Model')),
-        size,
-        aspectRatio,
-        aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
-        quality: parseQuality(fieldMap.get('Quality')),
-        qualityRestricted: parseBoolean(fieldMap.get('Quality Restricted')),
-        background: parseBackground(fieldMap.get('Background')),
-        style: parseStyle(fieldMap.get('Style')),
-        allowPromptAdjustment: parseBoolean(fieldMap.get('Allow Prompt Adjustment'))
+        context: {
+            prompt,
+            model: parseModel(fieldMap.get('Model')),
+            size,
+            aspectRatio,
+            aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
+            quality: parseQuality(fieldMap.get('Quality')),
+            qualityRestricted: parseBoolean(fieldMap.get('Quality Restricted')),
+            background: parseBackground(fieldMap.get('Background')),
+            style: parseStyle(fieldMap.get('Style')),
+            allowPromptAdjustment: parseBoolean(fieldMap.get('Allow Prompt Adjustment'))
+        },
+        promptLikelyTruncated
     };
 }
 
@@ -212,15 +224,32 @@ async function buildContextFromAttachment(message: Message): Promise<ImageGenera
  * fallback if the embed was modified or trimmed.
  */
 export async function recoverContextFromMessage(message: Message): Promise<ImageGenerationContext | null> {
-    const fromEmbed = buildContextFromEmbed(message);
-    if (fromEmbed) {
-        return fromEmbed;
+    const embedResult = buildContextFromEmbed(message);
+    if (embedResult && !embedResult.promptLikelyTruncated) {
+        return embedResult.context;
     }
 
+    // The JSON attachment carries the full fidelity payload and is resilient to
+    // embed trimming, so prefer it whenever possible.
     const fromAttachment = await buildContextFromAttachment(message);
     if (fromAttachment) {
         return fromAttachment;
     }
 
-    return buildContextFromEmbed(message, { allowPreviewFallback: true });
+    if (embedResult) {
+        if (embedResult.promptLikelyTruncated) {
+            logger.warn('Recovered truncated prompt from embed; image context attachment was unavailable.');
+        }
+        return embedResult.context;
+    }
+
+    const fallbackEmbed = buildContextFromEmbed(message, { allowPreviewFallback: true });
+    if (fallbackEmbed) {
+        if (fallbackEmbed.promptLikelyTruncated) {
+            logger.warn('Recovered prompt from preview field; prompt may be truncated.');
+        }
+        return fallbackEmbed.context;
+    }
+
+    return null;
 }

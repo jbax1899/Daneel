@@ -11,6 +11,7 @@ import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
 import { DEFAULT_MODEL } from '../commands/image/constants.js';
+import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
   createRetryButtonRow,
@@ -173,33 +174,9 @@ export class MessageProcessor {
         }
 
         const trimmedPrompt = request.prompt.trim();
-        const requestedAspect = (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio'];
-
-        // Translate the planner's aspect ratio preference into concrete size settings.
-        let size: ImageSizeType = 'auto';
-        let aspectRatio: ImageGenerationContext['aspectRatio'] = 'auto';
-        let aspectRatioLabel: ImageGenerationContext['aspectRatioLabel'] = 'Auto';
-
-        switch (requestedAspect) {
-          case 'square':
-            size = '1024x1024';
-            aspectRatio = 'square';
-            aspectRatioLabel = 'Square';
-            break;
-          case 'portrait':
-            size = '1024x1536';
-            aspectRatio = 'portrait';
-            aspectRatioLabel = 'Portrait';
-            break;
-          case 'landscape':
-            size = '1536x1024';
-            aspectRatio = 'landscape';
-            aspectRatioLabel = 'Landscape';
-            break;
-          default:
-            aspectRatio = 'auto';
-            aspectRatioLabel = 'Auto';
-        }
+        const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(
+          (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio']
+        );
 
         const requestedBackground = request.background?.toLowerCase() ?? 'auto';
         const background = VALID_IMAGE_BACKGROUNDS.includes(requestedBackground as ImageBackgroundType)

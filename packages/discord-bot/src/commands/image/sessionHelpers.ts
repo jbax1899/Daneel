@@ -1,4 +1,4 @@
-import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from 'discord.js';
+import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type APIEmbedField } from 'discord.js';
 import { OpenAI } from 'openai';
 import { logger } from '../../utils/logger.js';
 import {
@@ -9,6 +9,8 @@ import {
 } from '../../utils/pricing.js';
 import {
     EMBED_FIELD_VALUE_LIMIT,
+    EMBED_MAX_FIELDS,
+    EMBED_TOTAL_FIELD_CHAR_LIMIT,
     EMBED_TITLE_LIMIT,
     IMAGE_CONTEXT_ATTACHMENT_NAME,
     IMAGE_RETRY_CUSTOM_ID_PREFIX,
@@ -25,7 +27,6 @@ import {
     chunkString,
     setEmbedDescription,
     setEmbedFooterText,
-    setOrAddEmbedField,
     truncateForEmbed
 } from './embed.js';
 
@@ -265,31 +266,79 @@ export function buildImageResultPresentation(
         embed.setImage(artifacts.imageUrl);
     }
 
-    const promptPreview = buildPromptFieldValue(followUpContext.prompt, {
-        label: 'prompt'
-    });
-    setOrAddEmbedField(embed, 'Prompt Preview', promptPreview);
+    // We build the field list manually so we can enforce Discord's 25-field and
+    // 6,000-character limits. Exceeding these limits causes message edits to
+    // fail, which would strand users without a usable follow-up button.
+    const fields: APIEmbedField[] = [];
+    let fieldCharacterBudget = 0;
+    let promptSegmentsTruncated = false;
+    let metadataTruncated = false;
+
+    const tryAddField = (
+        name: string,
+        rawValue: string,
+        options: { inline?: boolean; includeTruncationNote?: boolean; maxLength?: number } = {}
+    ): boolean => {
+        const formattedValue = truncateForEmbed(rawValue, options.maxLength ?? EMBED_FIELD_VALUE_LIMIT, {
+            includeTruncationNote: options.includeTruncationNote ?? false
+        });
+        const charCost = name.length + formattedValue.length;
+
+        if (fields.length >= EMBED_MAX_FIELDS || fieldCharacterBudget + charCost > EMBED_TOTAL_FIELD_CHAR_LIMIT) {
+            return false;
+        }
+
+        fields.push({ name, value: formattedValue, inline: options.inline ?? false });
+        fieldCharacterBudget += charCost;
+        return true;
+    };
+
+    const assertField = (
+        name: string,
+        value: string,
+        options?: { inline?: boolean; includeTruncationNote?: boolean; maxLength?: number },
+        { trackAsMetadata = true }: { trackAsMetadata?: boolean } = {}
+    ) => {
+        if (!tryAddField(name, value, options)) {
+            if (trackAsMetadata) {
+                metadataTruncated = true;
+            }
+            logger.warn(`Image embed field "${name}" could not be added due to Discord limits.`);
+        }
+    };
+
+    assertField('Model', followUpContext.model, { inline: true });
+    assertField('Quality', followUpContext.quality, { inline: true });
+    assertField('Quality Restricted', followUpContext.qualityRestricted ? 'true' : 'false', { inline: true });
+    assertField('Size', followUpContext.size, { inline: true });
+    assertField('Aspect Ratio', followUpContext.aspectRatio, { inline: true });
+    assertField('Background', followUpContext.background, { inline: true });
+    assertField('Style', followUpContext.style, { inline: true });
+    assertField('Allow Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'true' : 'false', { inline: true });
+    assertField('Input ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
+    assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
+
+    const promptPreview = buildPromptFieldValue(followUpContext.prompt, { label: 'prompt' });
+    if (!tryAddField('Prompt Preview', promptPreview)) {
+        promptSegmentsTruncated = true;
+        logger.warn('Prompt preview was truncated due to Discord embed limits.');
+    }
 
     const promptSegments = chunkString(followUpContext.prompt, EMBED_FIELD_VALUE_LIMIT);
-    promptSegments.forEach((segment, index) => {
-        embed.addFields({
-            name: `${PROMPT_SEGMENT_FIELD_PREFIX} ${index + 1}`,
-            value: truncateForEmbed(segment, EMBED_FIELD_VALUE_LIMIT)
-        });
-    });
+    for (const [index, segment] of promptSegments.entries()) {
+        const added = tryAddField(`${PROMPT_SEGMENT_FIELD_PREFIX} ${index + 1}`, segment);
+        if (!added) {
+            promptSegmentsTruncated = true;
+            break;
+        }
+    }
 
-    setOrAddEmbedField(embed, 'Model', followUpContext.model, { inline: true });
-    setOrAddEmbedField(embed, 'Quality', followUpContext.quality, { inline: true });
-    setOrAddEmbedField(embed, 'Quality Restricted', followUpContext.qualityRestricted ? 'true' : 'false', { inline: true });
-    setOrAddEmbedField(embed, 'Size', followUpContext.size, { inline: true });
-    setOrAddEmbedField(embed, 'Aspect Ratio', followUpContext.aspectRatio, { inline: true });
-    setOrAddEmbedField(embed, 'Background', followUpContext.background, { inline: true });
-    setOrAddEmbedField(embed, 'Style', followUpContext.style, { inline: true });
-    setOrAddEmbedField(embed, 'Allow Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'true' : 'false', {
-        inline: true
-    });
-    setOrAddEmbedField(embed, 'Input ID', followUpResponseId ? `\`${followUpResponseId}\`` : 'None', { inline: true });
-    setOrAddEmbedField(embed, 'Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
+    if (promptSegmentsTruncated) {
+        // Let future recovery callers know that the embed alone is insufficient.
+        assertField('Prompt Segments Truncated', 'true', { inline: true }, { trackAsMetadata: false });
+    }
+
+    embed.addFields(fields);
 
     const generationSeconds = Math.max(1, Math.round(artifacts.generationTimeMs / 1000));
     const minutes = Math.floor(generationSeconds / 60);
@@ -298,10 +347,22 @@ export function buildImageResultPresentation(
         ? `${minutes}m${seconds.toString().padStart(2, '0')}s`
         : `${seconds}s`;
 
-    setEmbedFooterText(
-        embed,
-        `⏱️ ${formattedDuration} • ${formatUsd(artifacts.costs.total, 4)} • 🖼️${formatUsd(artifacts.costs.image, 4)} 📝${formatUsd(artifacts.costs.text, 4)}`
-    );
+    const footerParts = [
+        `⏱️ ${formattedDuration}`,
+        `💰${formatUsd(artifacts.costs.total, 4)}`,
+        `🖼️${formatUsd(artifacts.costs.image, 4)}`,
+        `📝${formatUsd(artifacts.costs.text, 4)}`
+    ];
+
+    if (promptSegmentsTruncated) {
+        footerParts.push('Prompt truncated – see attachment');
+    }
+
+    if (metadataTruncated) {
+        footerParts.push('Metadata truncated');
+    }
+
+    setEmbedFooterText(embed, footerParts.join(' • '));
 
     const attachments: AttachmentBuilder[] = [];
     if (!artifacts.imageUrl) {

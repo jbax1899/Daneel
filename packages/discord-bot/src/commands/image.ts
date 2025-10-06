@@ -5,6 +5,7 @@ import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import { formatUsd } from '../utils/pricing.js';
 import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
 import { DEFAULT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
+import { resolveAspectRatioSettings } from './image/aspect.js';
 import { buildImageResultPresentation, executeImageGeneration, toTitleCase } from './image/sessionHelpers.js';
 import { resolveImageCommandError } from './image/errors.js';
 import type {
@@ -137,7 +138,9 @@ export async function runImageGenerationSession(
                 const attachment = new AttachmentBuilder(Buffer.from(payload.base64, 'base64'), { name: previewName });
                 setEmbedFooterText(embed, `Rendering preview ${payload.index + 1}/${PARTIAL_IMAGE_LIMIT}…`);
                 embed.setThumbnail(`attachment://${previewName}`);
-                await interaction.editReply({ embeds: [embed], files: [attachment] });
+                // Always clear previous attachments so Discord does not retain a
+                // growing list of previews on the interaction response.
+                await interaction.editReply({ embeds: [embed], files: [attachment], attachments: [] });
             })
         });
 
@@ -184,8 +187,6 @@ export async function runImageGenerationSession(
         return { success: false, responseId: null };
     }
 }
-
-type AspectRatioOption = 'square' | 'portrait' | 'landscape';
 
 const imageCommand: Command = {
     data: new SlashCommandBuilder()
@@ -302,28 +303,8 @@ const imageCommand: Command = {
         }
         logger.debug(`Received image generation request with prompt: ${prompt}`);
 
-        const aspectRatioOption = interaction.options.getString('aspect_ratio') as AspectRatioOption | null;
-        let size: ImageSizeType = 'auto';
-        let aspectRatio: ImageGenerationContext['aspectRatio'] = 'auto';
-        let aspectRatioLabel = 'Auto';
-
-        if (aspectRatioOption) {
-            aspectRatio = aspectRatioOption;
-            switch (aspectRatioOption) {
-                case 'square':
-                    size = '1024x1024';
-                    aspectRatioLabel = 'Square';
-                    break;
-                case 'portrait':
-                    size = '1024x1536';
-                    aspectRatioLabel = 'Portrait';
-                    break;
-                case 'landscape':
-                    size = '1536x1024';
-                    aspectRatioLabel = 'Landscape';
-                    break;
-            }
-        }
+        const aspectRatioOption = interaction.options.getString('aspect_ratio') as ImageGenerationContext['aspectRatio'] | null;
+        const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(aspectRatioOption);
 
         const isSuperUser = interaction.user.id === process.env.DEVELOPER_USER_ID;
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
