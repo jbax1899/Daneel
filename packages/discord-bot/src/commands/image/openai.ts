@@ -34,6 +34,9 @@ interface GenerateImageOptions {
     size: ImageSizeType;
     background: ImageBackgroundType;
     style: ImageStylePreset;
+    username: string;
+    nickname: string;
+    guildName: string;
     allowPromptAdjustment: boolean;
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
@@ -58,6 +61,9 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         style,
         allowPromptAdjustment,
         followUpResponseId,
+        username,
+        nickname,
+        guildName,
         onPartialImage
     } = options;
 
@@ -75,7 +81,10 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
                 size,
                 quality,
                 background,
-                style
+                style,
+                username,
+                nickname,
+                guildName
             }) }]
         },
         {

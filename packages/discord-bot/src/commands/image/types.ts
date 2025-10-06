@@ -1,11 +1,12 @@
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
 import type { ImageGenerationQuality, ImageGenerationSize } from '../../utils/pricing.js';
 
-export type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
+export type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano'; // gpt-5 is not supported for image generation (yet)
 export type ImageQualityType = ImageGenerationQuality;
 export type ImageSizeType = ImageGenerationSize;
 export type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
-export type ImageStylePreset = 'natural' | 'vivid' | 'anime' | 'line_art';
+export type ImageStylePreset = 'natural' | 'vivid' | 'photorealistic' | 'cinematic' | 'oil_painting' | 'watercolor' | 'digital_painting' | 'line_art' | 'sketch' | 'cartoon' | 'anime' | 'comic' | 'pixel_art' | 'cyberpunk' | 'fantasy_art' | 'surrealist' | 'minimalist' | 'vintage' | 'noir' | '3d_render' | 'steampunk' | 'abstract' | 'pop_art' | 'dreamcore' | 'isometric' 
+                                | 'unspecified'; // "unspecified" is used when no style preset is specified
 
 export type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCall & {
     revised_prompt?: string | null;
