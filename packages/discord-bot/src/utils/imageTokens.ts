@@ -195,14 +195,10 @@ export function buildQualityTokenDescription(quality: ImageQualityType): string 
     return `Uses ${cost} token${cost === 1 ? '' : 's'}`;
 }
 
-export function buildTokenSummaryLine(userId: string, { includeLegend = true }: { includeLegend?: boolean } = {}): string {
+export function buildTokenSummaryLine(userId: string): string {
     const snapshot = inspectImageTokens(userId);
     const countdown = formatCountdown(snapshot.refreshInSeconds);
-    const legend = includeLegend ? 'Low=1 • Medium=3 • High=5 tokens' : '';
     const parts = [`Tokens remaining: ${snapshot.tokens}`, `Refreshes in: ${countdown}`];
-    if (legend) {
-        parts.push(legend);
-    }
     return parts.join(' • ');
 }
 

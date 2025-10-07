@@ -85,8 +85,8 @@ export async function runImageGenerationSession(
 
     const statusFields = [
         {
-            name: 'Size',
-            value: sizeFieldValue,
+            name: 'Prompt Adjustment',
+            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
             inline: true
         },
         {
@@ -95,8 +95,13 @@ export async function runImageGenerationSession(
             inline: true
         },
         {
-            name: 'Style',
-            value: formatStylePreset(style),
+            name: 'Size',
+            value: sizeFieldValue,
+            inline: true
+        },
+        {
+            name: 'Aspect Ratio',
+            value: aspectRatioLabel,
             inline: true
         },
         {
@@ -105,8 +110,8 @@ export async function runImageGenerationSession(
             inline: true
         },
         {
-            name: 'Prompt Adjustment',
-            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
+            name: 'Style',
+            value: formatStylePreset(style),
             inline: true
         },
         {
@@ -117,7 +122,7 @@ export async function runImageGenerationSession(
     ];
 
     if (followUpResponseId) {
-        statusFields.splice(2, 0, {
+        statusFields.splice(statusFields.length - 1, 0, {
             name: 'Input ID',
             value: `\`${followUpResponseId}\``,
             inline: true
@@ -324,7 +329,6 @@ const imageCommand: Command = {
         const aspectRatioOption = interaction.options.getString('aspect_ratio') as ImageGenerationContext['aspectRatio'] | null;
         const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(aspectRatioOption);
 
-        const isSuperUser = interaction.user.id === process.env.DEVELOPER_USER_ID;
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
         const quality: ImageQualityType = requestedQuality ?? 'low';
 

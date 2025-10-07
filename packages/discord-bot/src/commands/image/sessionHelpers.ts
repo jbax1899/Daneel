@@ -290,13 +290,12 @@ export function buildImageResultPresentation(
         }
     };
 
-    assertField('Model', followUpContext.model, { inline: true });
+    assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
     assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
     assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
     assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
-    assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
     if (followUpResponseId) {
         assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
     }
@@ -313,10 +312,20 @@ export function buildImageResultPresentation(
         return truncated;
     };
 
-    const originalTruncated = recordPrompt('Original Prompt', originalPrompt);
+    // Surface the active model directly within the prompt label so we do not
+    // need a dedicated metadata field while still retaining recovery context
+    // after restarts.
+    const refinedLabel = followUpContext.model && refinedPrompt
+        ? `Refined Prompt (${followUpContext.model})`
+        : 'Refined Prompt';
+    const originalLabel = !refinedPrompt && followUpContext.model
+        ? `Original Prompt (${followUpContext.model})`
+        : 'Original Prompt';
+
+    const originalTruncated = recordPrompt(originalLabel, originalPrompt);
     let refinedTruncated = false;
     if (refinedPrompt) {
-        refinedTruncated = recordPrompt('Refined Prompt', refinedPrompt);
+        refinedTruncated = recordPrompt(refinedLabel, refinedPrompt);
     }
 
     const activeTruncated = refinedPrompt ? refinedTruncated : originalTruncated;

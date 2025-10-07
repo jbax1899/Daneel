@@ -111,21 +111,46 @@ function parsePromptAdjustment(value: string | null | undefined): boolean {
 interface PromptExtractionResult {
     prompt: string | null;
     truncated: boolean;
+    fieldName: string | null;
+}
+
+// Prompt labels are now dynamic (e.g., "Refined Prompt (gpt-4.1-mini)") so we
+// need to locate entries by prefix rather than assuming a fixed field name.
+function findPromptBaseField(fieldMap: Map<string, string>, label: string): string | null {
+    if (fieldMap.has(label)) {
+        return label;
+    }
+
+    for (const key of fieldMap.keys()) {
+        if (key === label) {
+            return key;
+        }
+        if (key.startsWith(`${label} (`)) {
+            return key;
+        }
+    }
+
+    return null;
 }
 
 function collectPromptSections(
     fieldMap: Map<string, string>,
     label: string
 ): PromptExtractionResult {
-    const baseField = fieldMap.get(label);
-    if (!baseField) {
-        return { prompt: null, truncated: false };
+    const baseFieldName = findPromptBaseField(fieldMap, label);
+    if (!baseFieldName) {
+        return { prompt: null, truncated: false, fieldName: null };
+    }
+
+    const baseField = fieldMap.get(baseFieldName);
+    if (typeof baseField !== 'string') {
+        return { prompt: null, truncated: false, fieldName: baseFieldName };
     }
 
     const sections: string[] = [baseField];
     let sectionIndex = 1;
     while (true) {
-        const continuation = fieldMap.get(`${label} (cont. ${sectionIndex})`);
+        const continuation = fieldMap.get(`${label} (cont. ${sectionIndex})`) ?? fieldMap.get(`${baseFieldName} (cont. ${sectionIndex})`);
         if (!continuation) {
             break;
         }
@@ -144,7 +169,19 @@ function collectPromptSections(
     const legacyTruncation = fieldMap.get(`${label} Truncated`)?.toLowerCase() === 'true';
     truncatedFlag = truncatedFlag || legacyTruncation;
 
-    return { prompt: combined, truncated: truncatedFlag };
+    return { prompt: combined, truncated: truncatedFlag, fieldName: baseFieldName };
+}
+
+// Extracts the model hint that we embed within prompt labels. This keeps
+// historical embeds backwards compatible while giving reboot recovery a single
+// place to pull the active model when caching is unavailable.
+function extractModelFromPromptLabel(label: string | null | undefined): string | null {
+    if (!label) {
+        return null;
+    }
+
+    const match = /^\s*(?:Original|Refined) Prompt\s*\(([^)]+)\)\s*$/i.exec(label);
+    return match ? match[1].trim() : null;
 }
 
 function buildContextFromEmbed(message: Message): ImageGenerationContext | null {
@@ -191,11 +228,15 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
         ? normalizedRefinedCandidate
         : null;
 
+    const modelFromLabel = extractModelFromPromptLabel(refinedPromptResult.fieldName)
+        ?? extractModelFromPromptLabel(originalPromptResult.fieldName)
+        ?? fieldMap.get('Model');
+
     return {
         prompt: normalizedPrompt,
         originalPrompt: normalizedOriginal,
         refinedPrompt: normalizedRefined,
-        model: parseModel(fieldMap.get('Model')),
+        model: parseModel(modelFromLabel),
         size,
         aspectRatio,
         aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
