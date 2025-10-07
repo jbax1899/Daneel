@@ -230,6 +230,8 @@ const imageCommand: Command = {
         .addStringOption(option => option
             .setName('style')
             .setDescription('Image style preset (optional; defaults to unspecified)')
+            // Keep the list to 24 presets so the variation select menu can include
+            // an "Auto" entry and still satisfy Discord's 25-option limit.
             .addChoices(
                 { name: 'Natural', value: 'natural' },
                 { name: 'Vivid', value: 'vivid' },
@@ -254,7 +256,6 @@ const imageCommand: Command = {
                 { name: 'Steampunk', value: 'steampunk' },
                 { name: 'Abstract', value: 'abstract' },
                 { name: 'Pop Art', value: 'pop_art' },
-                { name: 'Dreamcore', value: 'dreamcore' },
                 { name: 'Isometric', value: 'isometric' }
             )
             .setRequired(false)

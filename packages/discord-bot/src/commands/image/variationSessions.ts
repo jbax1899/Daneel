@@ -88,6 +88,11 @@ const BACKGROUND_OPTIONS: Array<{ value: ImageBackgroundType; label: string }> =
     { value: 'opaque', label: 'Opaque' }
 ];
 
+// Discord select menus can only host 25 options, so we include the "Auto" entry
+// plus 24 curated presets that give good coverage of popular styles. Less
+// common presets such as "Dreamcore" remain supported by the parser so older
+// embeds still round-trip, but they are omitted from the selector to stay under
+// the platform-imposed limit.
 const STYLE_OPTIONS: Array<{ value: ImageStylePreset; label: string }> = [
     { value: 'unspecified', label: 'Auto' },
     { value: 'natural', label: 'Natural' },
@@ -113,7 +118,6 @@ const STYLE_OPTIONS: Array<{ value: ImageStylePreset; label: string }> = [
     { value: 'steampunk', label: 'Steampunk' },
     { value: 'abstract', label: 'Abstract' },
     { value: 'pop_art', label: 'Pop Art' },
-    { value: 'dreamcore', label: 'Dreamcore' },
     { value: 'isometric', label: 'Isometric' }
 ];
 
@@ -262,17 +266,20 @@ export function resetVariationCooldown(userId: string, responseId: string): Vari
 function buildSelectRow(
     customId: string,
     options: Array<{ value: string; label: string }>,
-    selectedValue: string,
-    placeholder: string
+    {
+        selectedValue,
+        placeholder,
+        currentLabel
+    }: { selectedValue: string; placeholder: string; currentLabel?: string }
 ): ActionRowBuilder<MessageActionRowComponentBuilder> {
     const selectedOption = options.find(option => option.value === selectedValue);
-    const currentLabel = selectedOption?.label ?? 'previous setting';
+    const placeholderLabel = currentLabel ?? selectedOption?.label ?? 'previous setting';
 
     const menu = new StringSelectMenuBuilder()
         .setCustomId(customId)
         .setMinValues(0)
         .setMaxValues(1)
-        .setPlaceholder(`${placeholder} (current: ${currentLabel})`)
+        .setPlaceholder(`${placeholder} (current: ${placeholderLabel})`)
         .addOptions(options.map(option =>
             new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
@@ -353,26 +360,38 @@ export function buildVariationConfiguratorView(
         buildSelectRow(
             `${IMAGE_VARIATION_QUALITY_SELECT_PREFIX}${session.responseId}`,
             QUALITY_OPTIONS,
-            session.quality,
-            'Select quality'
+            {
+                selectedValue: session.quality,
+                placeholder: 'Select quality',
+                currentLabel: toTitleCase(session.quality)
+            }
         ),
         buildSelectRow(
             `${IMAGE_VARIATION_ASPECT_SELECT_PREFIX}${session.responseId}`,
             ASPECT_OPTIONS,
-            session.aspectRatio,
-            'Select aspect ratio'
+            {
+                selectedValue: session.aspectRatio,
+                placeholder: 'Select aspect ratio',
+                currentLabel: session.aspectRatioLabel
+            }
         ),
         buildSelectRow(
             `${IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX}${session.responseId}`,
             BACKGROUND_OPTIONS,
-            session.background,
-            'Select background'
+            {
+                selectedValue: session.background,
+                placeholder: 'Select background',
+                currentLabel: toTitleCase(session.background)
+            }
         ),
         buildSelectRow(
             `${IMAGE_VARIATION_STYLE_SELECT_PREFIX}${session.responseId}`,
             STYLE_OPTIONS,
-            session.style,
-            'Select style'
+            {
+                selectedValue: session.style,
+                placeholder: 'Select style',
+                currentLabel: formatStylePreset(session.style)
+            }
         )
     ];
 
