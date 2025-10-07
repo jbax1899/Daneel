@@ -10,6 +10,16 @@ import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
+import { DEFAULT_MODEL } from '../commands/image/constants.js';
+import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
+import {
+  buildImageResultPresentation,
+  clampPromptForContext,
+  executeImageGeneration
+} from '../commands/image/sessionHelpers.js';
+import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
+import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
+import type { ImageBackgroundType, ImageQualityType, ImageSizeType, ImageStylePreset } from '../commands/image/types.js';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
@@ -20,6 +30,35 @@ type MessageProcessorOptions = {
 const MAIN_MODEL: SupportedModel = 'gpt-5-mini';
 const PLAN_CONTEXT_SIZE = 8;
 const RESPONSE_CONTEXT_SIZE = 24;
+const VALID_IMAGE_BACKGROUNDS: ImageBackgroundType[] = ['auto', 'transparent', 'opaque'];
+const VALID_IMAGE_STYLES = new Set<ImageStylePreset>([
+  'natural',
+  'vivid',
+  'photorealistic',
+  'cinematic',
+  'oil_painting',
+  'watercolor',
+  'digital_painting',
+  'line_art',
+  'sketch',
+  'cartoon',
+  'anime',
+  'comic',
+  'pixel_art',
+  'cyberpunk',
+  'fantasy_art',
+  'surrealist',
+  'minimalist',
+  'vintage',
+  'noir',
+  '3d_render',
+  'steampunk',
+  'abstract',
+  'pop_art',
+  'dreamcore',
+  'isometric',
+  'unspecified'
+]);
 
 export class MessageProcessor {
   private readonly openaiService: OpenAIService;
@@ -125,6 +164,146 @@ export class MessageProcessor {
       //
       // Regular message response
       //
+      case 'image': {
+        logger.debug(`Planner requested automated image generation for message: ${message.content.slice(0, 100)}...`);
+
+        const request = plan.imageRequest;
+        if (!request?.prompt?.trim()) {
+          logger.warn('Image plan was missing a prompt; falling back to ignoring the request.');
+          return;
+        }
+
+        const trimmedPrompt = request.prompt.trim();
+        const normalizedPrompt = clampPromptForContext(trimmedPrompt);
+        let { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(
+          (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio']
+        );
+
+        const requestedBackground = request.background?.toLowerCase() ?? 'auto';
+        let background = VALID_IMAGE_BACKGROUNDS.includes(requestedBackground as ImageBackgroundType)
+          ? requestedBackground as ImageBackgroundType
+          : 'auto';
+
+        const normalizedStyle = request.style
+          ? request.style.toLowerCase().replace(/[^a-z0-9]+/g, '_')
+          : 'unspecified';
+        let style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
+          ? normalizedStyle as ImageStylePreset
+          : 'unspecified';
+
+        let referencedContext: ImageGenerationContext | null = null;
+        let followUpResponseId: string | null = null;
+
+        if (message.reference?.messageId) {
+          try {
+            // Fetch and parse the replied-to message so we can honour its
+            // generation settings instead of relying on the planner to guess.
+            const referencedMessage = await message.fetchReference();
+            const recovered = await recoverContextDetailsFromMessage(referencedMessage);
+
+            if (recovered) {
+              referencedContext = recovered.context;
+              followUpResponseId = recovered.responseId ?? recovered.inputId ?? null;
+
+              if (!followUpResponseId) {
+                logger.warn('Recovered image context lacked response identifiers; running without follow-up linkage.');
+              }
+
+              // When the user is replying to a previous image, prefer that
+              // message's settings unless the planner explicitly overrode
+              // them. This keeps variations predictable and avoids mixing in
+              // unrelated historical embeds.
+              if ((request.aspectRatio ?? 'auto').toLowerCase() === 'auto') {
+                size = referencedContext.size;
+                aspectRatio = referencedContext.aspectRatio;
+                aspectRatioLabel = referencedContext.aspectRatioLabel;
+              }
+
+              if (!request.background || requestedBackground === 'auto') {
+                background = referencedContext.background;
+              }
+
+              if (!request.style || normalizedStyle === 'unspecified') {
+                style = referencedContext.style;
+              }
+            }
+          } catch (error) {
+            // We intentionally log at debug level: if we cannot recover the
+            // reference we still want to proceed with a best-effort response
+            // rather than failing the entire interaction.
+            logger.debug('Unable to recover referenced image context for reply-driven image request:', error);
+          }
+        }
+
+        // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
+        if (trimmedPrompt.length > normalizedPrompt.length) {
+          logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
+        }
+
+        // Planner-driven image generations already flow through the LLM once, so
+        // re-enabling prompt adjustments rarely adds value. Defaulting to false
+        // keeps the resulting embeds compact unless the user explicitly opted in
+        // or the referenced context demanded otherwise.
+        const allowPromptAdjustment = request.allowPromptAdjustment
+          ?? referencedContext?.allowPromptAdjustment
+          ?? false;
+
+        const context: ImageGenerationContext = {
+          prompt: normalizedPrompt,
+          originalPrompt: normalizedPrompt,
+          refinedPrompt: null,
+          model: referencedContext?.model ?? DEFAULT_MODEL,
+          size,
+          aspectRatio,
+          aspectRatioLabel,
+          quality: referencedContext?.quality ?? ('low' as ImageQualityType),
+          background,
+          style,
+          allowPromptAdjustment
+        };
+
+        await responseHandler.startTyping();
+
+        try {
+          // Reuse the shared generation helper so we get identical cost calculations and Cloudinary uploads.
+          const artifacts = await executeImageGeneration(context, {
+            user: {
+              username: message.author.username,
+              nickname: message.member?.displayName ?? message.author.username,
+              guildName: message.guild?.name ?? 'Direct message channel'
+            },
+            followUpResponseId
+          });
+
+          const presentation = buildImageResultPresentation(context, artifacts);
+
+          if (artifacts.responseId) {
+            saveFollowUpContext(artifacts.responseId, presentation.followUpContext);
+          }
+
+          const files = presentation.attachments.map(attachment => ({
+            filename: attachment.name ?? 'daneel-attachment.dat',
+            data: attachment.attachment as Buffer
+          }));
+
+          await responseHandler.sendEmbedMessage(presentation.embed, {
+            content: presentation.content,
+            files,
+            directReply,
+            components: presentation.components
+          });
+          logger.debug(`Automated image response sent for message: ${message.id}`);
+        } catch (error) {
+          logger.error('Automated image generation failed:', error);
+          await responseHandler.sendMessage('⚠️ I tried to create an image but something went wrong.', [], directReply);
+        } finally {
+          // Always stop the typing indicator so the channel UI doesn't get stuck.
+          responseHandler.stopTyping();
+        }
+
+        return;
+      }
+
       case 'message':
         logger.debug(`Generating response for message: ${message.content.slice(0, 100)}...`);
 
