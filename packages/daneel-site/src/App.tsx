@@ -13,11 +13,11 @@ const App = (): JSX.Element => (
     <main>
       <Hero />
       <MeetDaneel />
-      <Invite />
       <Services />
-      <Arete />
       <OpenAccountable />
       <EthicsNote />
+      <Invite />
+      <Arete />
       <Footer />
     </main>
   </div>
