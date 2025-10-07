@@ -20,7 +20,7 @@ import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
 import { generateImageWithReflection } from './openai.js';
 import type { ImageGenerationCallWithPrompt, ImageStylePreset, PartialImagePayload, ReflectionFields } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
-import { chunkString, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
+import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
 
 /**
  * Provides structured metadata about a generated image so that different
@@ -219,12 +219,20 @@ export function buildImageResultPresentation(
         : null;
     const activePrompt = refinedPrompt ?? context.prompt;
 
+    const normalizedOriginalPrompt = clampPromptForContext(originalPrompt);
+    const normalizedRefinedCandidate = refinedPrompt ? clampPromptForContext(refinedPrompt) : null;
+    const normalizedActivePrompt = clampPromptForContext(activePrompt);
+    const normalizedRefinedPrompt = normalizedRefinedCandidate && normalizedRefinedCandidate !== normalizedOriginalPrompt
+        ? normalizedRefinedCandidate
+        : null;
+
     const followUpContext: ImageGenerationContext = {
         ...context,
-        prompt: activePrompt,
-        originalPrompt,
-        refinedPrompt,
-        style: artifacts.finalStyle
+        prompt: normalizedActivePrompt,
+        originalPrompt: normalizedOriginalPrompt,
+        refinedPrompt: normalizedRefinedPrompt,
+        style: artifacts.finalStyle,
+        allowPromptAdjustment: context.allowPromptAdjustment ?? true
     };
 
     const embed = new EmbedBuilder()
@@ -288,6 +296,7 @@ export function buildImageResultPresentation(
     assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
     assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
+    assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
     if (followUpResponseId) {
         assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
     }
@@ -298,25 +307,9 @@ export function buildImageResultPresentation(
             return false;
         }
 
-        const segments = chunkString(value, EMBED_FIELD_VALUE_LIMIT);
-        if (segments.length === 0) {
-            return false;
-        }
-
-        let truncated = false;
-        for (const [index, segment] of segments.entries()) {
-            const fieldName = index === 0 ? label : `${label} (cont. ${index})`;
-            const added = tryAddField(fieldName, segment);
-            if (!added) {
-                truncated = true;
-                break;
-            }
-        }
-
-        if (truncated) {
-            assertField(`${label} Truncated`, 'true', { inline: true }, { trackAsMetadata: false });
-        }
-
+        const sanitized = sanitizeForEmbed(value);
+        const truncated = sanitized.length > EMBED_FIELD_VALUE_LIMIT;
+        assertField(label, sanitized, { includeTruncationNote: truncated });
         return truncated;
     };
 
@@ -373,6 +366,22 @@ export function buildImageResultPresentation(
         components,
         followUpContext
     };
+}
+
+/**
+ * Clamps prompts so they always fit within a single embed field. This keeps the
+ * presentation compact while ensuring reboot recovery keeps working because the
+ * embed never spills into continuation fields that might get pruned.
+ */
+export function clampPromptForContext(rawPrompt: string): string {
+    const sanitized = sanitizeForEmbed(rawPrompt).trim();
+
+    if (sanitized.length <= EMBED_FIELD_VALUE_LIMIT) {
+        return sanitized;
+    }
+
+    logger.warn(`Prompt exceeded embed field limit; truncating to ${EMBED_FIELD_VALUE_LIMIT} characters to preserve layout.`);
+    return sanitized.slice(0, EMBED_FIELD_VALUE_LIMIT);
 }
 
 /**

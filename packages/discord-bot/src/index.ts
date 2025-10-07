@@ -19,11 +19,12 @@ import {
   IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX,
   IMAGE_VARIATION_QUALITY_SELECT_PREFIX,
   IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
-  IMAGE_VARIATION_STYLE_SELECT_PREFIX,
+  IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX,
   IMAGE_VARIATION_CUSTOM_ID_PREFIX
 } from './commands/image/constants.js';
 import {
   buildImageResultPresentation,
+  clampPromptForContext,
   createRetryButtonRow,
   executeImageGeneration,
   formatRetryCountdown
@@ -214,10 +215,10 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-    if (customId.startsWith(IMAGE_VARIATION_STYLE_SELECT_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_STYLE_SELECT_PREFIX.length);
+    if (customId.startsWith(IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX.length);
       const session = updateVariationSession(interaction.user.id, responseId, current => {
-        current.style = selected as any;
+        current.allowPromptAdjustment = selected === 'allow';
       });
 
       if (!session) {
@@ -245,8 +246,9 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const session = updateVariationSession(interaction.user.id, responseId, current => {
-        current.prompt = trimmedPrompt;
-        current.refinedPrompt = trimmedPrompt;
+        const normalized = clampPromptForContext(trimmedPrompt);
+        current.prompt = normalized;
+        current.refinedPrompt = normalized;
       });
 
       if (!session) {

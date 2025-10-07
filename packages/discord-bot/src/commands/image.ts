@@ -6,7 +6,7 @@ import { formatUsd } from '../utils/pricing.js';
 import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
 import { DEFAULT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
-import { buildImageResultPresentation, executeImageGeneration, formatStylePreset, toTitleCase } from './image/sessionHelpers.js';
+import { buildImageResultPresentation, clampPromptForContext, executeImageGeneration, formatStylePreset, toTitleCase } from './image/sessionHelpers.js';
 import { resolveImageCommandError } from './image/errors.js';
 import type {
     ImageBackgroundType,
@@ -89,6 +89,11 @@ export async function runImageGenerationSession(
         {
             name: 'Background',
             value: toTitleCase(background),
+            inline: true
+        },
+        {
+            name: 'Prompt Adjustment',
+            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
             inline: true
         },
         {
@@ -299,7 +304,7 @@ const imageCommand: Command = {
             }
         }
 
-        const prompt = interaction.options.getString('prompt');
+        const prompt = interaction.options.getString('prompt')?.trim();
         if (!prompt) {
             await interaction.reply({
                 content: '⚠️ No prompt provided.',
@@ -307,7 +312,11 @@ const imageCommand: Command = {
             });
             return;
         }
-        logger.debug(`Received image generation request with prompt: ${prompt}`);
+        const normalizedPrompt = clampPromptForContext(prompt);
+        if (prompt.length > normalizedPrompt.length) {
+            logger.warn('Slash command prompt exceeded embed limits; truncating to preserve follow-up usability.');
+        }
+        logger.debug(`Received image generation request with prompt: ${normalizedPrompt}`);
 
         const aspectRatioOption = interaction.options.getString('aspect_ratio') as ImageGenerationContext['aspectRatio'] | null;
         const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(aspectRatioOption);
@@ -332,8 +341,8 @@ const imageCommand: Command = {
         }
 
         const context: ImageGenerationContext = {
-            prompt,
-            originalPrompt: prompt,
+            prompt: normalizedPrompt,
+            originalPrompt: normalizedPrompt,
             refinedPrompt: null,
             model,
             size,

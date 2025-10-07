@@ -1,6 +1,7 @@
 import type { Message } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 import { DEFAULT_MODEL } from './constants.js';
+import { clampPromptForContext } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -94,6 +95,19 @@ function parseModel(value: string | null | undefined): ImageResponseModel {
     return normalised ?? DEFAULT_MODEL;
 }
 
+function parsePromptAdjustment(value: string | null | undefined): boolean {
+    const normalised = value?.trim().toLowerCase();
+    if (!normalised) {
+        return true;
+    }
+
+    if (normalised === 'disabled' || normalised === 'false' || normalised === 'no') {
+        return false;
+    }
+
+    return true;
+}
+
 interface PromptExtractionResult {
     prompt: string | null;
     truncated: boolean;
@@ -119,8 +133,18 @@ function collectPromptSections(
         sectionIndex += 1;
     }
 
-    const truncatedFlag = fieldMap.get(`${label} Truncated`)?.toLowerCase() === 'true';
-    return { prompt: sections.join(''), truncated: truncatedFlag };
+    let combined = sections.join('');
+    let truncatedFlag = false;
+
+    if (combined.endsWith('\n*(truncated)*')) {
+        combined = combined.slice(0, combined.length - '\n*(truncated)*'.length);
+        truncatedFlag = true;
+    }
+
+    const legacyTruncation = fieldMap.get(`${label} Truncated`)?.toLowerCase() === 'true';
+    truncatedFlag = truncatedFlag || legacyTruncation;
+
+    return { prompt: combined, truncated: truncatedFlag };
 }
 
 function buildContextFromEmbed(message: Message): ImageGenerationContext | null {
@@ -160,10 +184,17 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
         logger.warn('Recovered prompt may be truncated due to embed limits.');
     }
 
+    const normalizedPrompt = clampPromptForContext(prompt);
+    const normalizedOriginal = clampPromptForContext(originalPromptResult.prompt ?? prompt);
+    const normalizedRefinedCandidate = refinedPrompt ? clampPromptForContext(refinedPrompt) : null;
+    const normalizedRefined = normalizedRefinedCandidate && normalizedRefinedCandidate !== normalizedPrompt
+        ? normalizedRefinedCandidate
+        : null;
+
     return {
-        prompt,
-        originalPrompt: originalPromptResult.prompt ?? prompt,
-        refinedPrompt,
+        prompt: normalizedPrompt,
+        originalPrompt: normalizedOriginal,
+        refinedPrompt: normalizedRefined,
         model: parseModel(fieldMap.get('Model')),
         size,
         aspectRatio,
@@ -171,7 +202,7 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
         quality: parseQuality(fieldMap.get('Quality')),
         background: parseBackground(fieldMap.get('Background')),
         style: parseStyle(fieldMap.get('Style')),
-        allowPromptAdjustment: true
+        allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt Adjustment'))
     };
 }
 

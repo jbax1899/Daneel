@@ -21,9 +21,10 @@ import {
     IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX,
     IMAGE_VARIATION_QUALITY_SELECT_PREFIX,
     IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
-    IMAGE_VARIATION_STYLE_SELECT_PREFIX
+    IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX,
+    EMBED_FIELD_VALUE_LIMIT
 } from './constants.js';
-import { formatRetryCountdown, formatStylePreset, toTitleCase } from './sessionHelpers.js';
+import { clampPromptForContext, formatRetryCountdown, formatStylePreset, toTitleCase } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -88,37 +89,20 @@ const BACKGROUND_OPTIONS: Array<{ value: ImageBackgroundType; label: string }> =
     { value: 'opaque', label: 'Opaque' }
 ];
 
-// Discord select menus can only host 25 options, so we include the "Auto" entry
-// plus 24 curated presets that give good coverage of popular styles. Less
-// common presets such as "Dreamcore" remain supported by the parser so older
-// embeds still round-trip, but they are omitted from the selector to stay under
-// the platform-imposed limit.
-const STYLE_OPTIONS: Array<{ value: ImageStylePreset; label: string }> = [
-    { value: 'unspecified', label: 'Auto' },
-    { value: 'natural', label: 'Natural' },
-    { value: 'vivid', label: 'Vivid' },
-    { value: 'photorealistic', label: 'Photorealistic' },
-    { value: 'cinematic', label: 'Cinematic' },
-    { value: 'oil_painting', label: 'Oil Painting' },
-    { value: 'watercolor', label: 'Watercolor' },
-    { value: 'digital_painting', label: 'Digital Painting' },
-    { value: 'line_art', label: 'Line Art' },
-    { value: 'sketch', label: 'Sketch' },
-    { value: 'cartoon', label: 'Cartoon' },
-    { value: 'anime', label: 'Anime' },
-    { value: 'comic', label: 'Comic Book' },
-    { value: 'pixel_art', label: 'Pixel Art' },
-    { value: 'cyberpunk', label: 'Cyberpunk' },
-    { value: 'fantasy_art', label: 'Fantasy Art' },
-    { value: 'surrealist', label: 'Surrealist' },
-    { value: 'minimalist', label: 'Minimalist' },
-    { value: 'vintage', label: 'Vintage' },
-    { value: 'noir', label: 'Noir' },
-    { value: '3d_render', label: '3D Render' },
-    { value: 'steampunk', label: 'Steampunk' },
-    { value: 'abstract', label: 'Abstract' },
-    { value: 'pop_art', label: 'Pop Art' },
-    { value: 'isometric', label: 'Isometric' }
+// Select menus are limited to four rows, so the "style" selector now doubles as a
+// toggle for whether the AI may refine the prompt. Providing a description keeps
+// the intent crystal-clear when users revisit the configurator.
+const PROMPT_ADJUSTMENT_OPTIONS: Array<{ value: 'allow' | 'deny'; label: string; description: string }> = [
+    {
+        value: 'allow',
+        label: 'Let Daneel improve the prompt',
+        description: 'Refine wording for better results'
+    },
+    {
+        value: 'deny',
+        label: 'Use exactly what I wrote',
+        description: 'Skip all prompt adjustments'
+    }
 ];
 
 function makeSessionKey(userId: string, responseId: string): string {
@@ -148,15 +132,17 @@ export function initialiseVariationSession(
     const key = makeSessionKey(userId, responseId);
     disposeVariationSession(key);
 
-    const initialPrompt = context.refinedPrompt ?? context.prompt;
+    const normalizedOriginal = clampPromptForContext(context.originalPrompt ?? context.prompt);
+    const normalizedRefined = context.refinedPrompt ? clampPromptForContext(context.refinedPrompt) : null;
+    const initialPrompt = clampPromptForContext(context.refinedPrompt ?? context.prompt);
 
     const session: VariationSessionState = {
         key,
         userId,
         responseId,
         prompt: initialPrompt,
-        originalPrompt: context.originalPrompt ?? context.prompt,
-        refinedPrompt: context.refinedPrompt ?? null,
+        originalPrompt: normalizedOriginal,
+        refinedPrompt: normalizedRefined,
         model: context.model,
         size: context.size,
         aspectRatio: context.aspectRatio,
@@ -265,7 +251,7 @@ export function resetVariationCooldown(userId: string, responseId: string): Vari
 
 function buildSelectRow(
     customId: string,
-    options: Array<{ value: string; label: string }>,
+    options: Array<{ value: string; label: string; description?: string }>,
     {
         selectedValue,
         placeholder,
@@ -280,11 +266,17 @@ function buildSelectRow(
         .setMinValues(0)
         .setMaxValues(1)
         .setPlaceholder(`${placeholder} (current: ${placeholderLabel})`)
-        .addOptions(options.map(option =>
-            new StringSelectMenuOptionBuilder()
+        .addOptions(options.map(option => {
+            const optionBuilder = new StringSelectMenuOptionBuilder()
                 .setLabel(option.label)
-                .setValue(option.value)
-        ));
+                .setValue(option.value);
+
+            if (option.description) {
+                optionBuilder.setDescription(option.description);
+            }
+
+            return optionBuilder;
+        }));
 
     return new ActionRowBuilder<MessageActionRowComponentBuilder>().addComponents(menu);
 }
@@ -350,6 +342,11 @@ export function buildVariationConfiguratorView(
             inline: true
         },
         {
+            name: 'Prompt adjustment',
+            value: session.allowPromptAdjustment ? 'Enabled' : 'Disabled',
+            inline: true
+        },
+        {
             name: 'Model',
             value: session.model,
             inline: true
@@ -385,12 +382,12 @@ export function buildVariationConfiguratorView(
             }
         ),
         buildSelectRow(
-            `${IMAGE_VARIATION_STYLE_SELECT_PREFIX}${session.responseId}`,
-            STYLE_OPTIONS,
+            `${IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX}${session.responseId}`,
+            PROMPT_ADJUSTMENT_OPTIONS,
             {
-                selectedValue: session.style,
-                placeholder: 'Select style',
-                currentLabel: formatStylePreset(session.style)
+                selectedValue: session.allowPromptAdjustment ? 'allow' : 'deny',
+                placeholder: 'Select if AI improves prompt',
+                currentLabel: session.allowPromptAdjustment ? 'Enabled' : 'Disabled'
             }
         )
     ];
@@ -448,7 +445,8 @@ export function buildPromptModal(responseId: string, currentPrompt: string): Mod
         .setLabel('Prompt to send to the model')
         .setStyle(TextInputStyle.Paragraph)
         .setRequired(true)
-        .setValue(truncateForEmbed(currentPrompt, 1900));
+        .setMaxLength(EMBED_FIELD_VALUE_LIMIT)
+        .setValue(clampPromptForContext(currentPrompt));
 
     return modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(promptInput));
 }

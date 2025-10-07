@@ -14,6 +14,7 @@ import { DEFAULT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
+  clampPromptForContext,
   createRetryButtonRow,
   executeImageGeneration,
   formatRetryCountdown
@@ -174,6 +175,7 @@ export class MessageProcessor {
         }
 
         const trimmedPrompt = request.prompt.trim();
+        const normalizedPrompt = clampPromptForContext(trimmedPrompt);
         const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(
           (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio']
         );
@@ -191,9 +193,13 @@ export class MessageProcessor {
           : 'unspecified';
 
         // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
+        if (trimmedPrompt.length > normalizedPrompt.length) {
+          logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
+        }
+
         const context: ImageGenerationContext = {
-          prompt: trimmedPrompt,
-          originalPrompt: trimmedPrompt,
+          prompt: normalizedPrompt,
+          originalPrompt: normalizedPrompt,
           refinedPrompt: null,
           model: DEFAULT_MODEL,
           size,
