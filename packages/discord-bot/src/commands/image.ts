@@ -1,12 +1,19 @@
 import { AttachmentBuilder, ChatInputCommandInteraction, EmbedBuilder, RepliableInteraction, SlashCommandBuilder } from 'discord.js';
 import { Command } from './BaseCommand.js';
 import { logger } from '../utils/logger.js';
-import { imageCommandRateLimiter } from '../utils/RateLimiter.js';
 import { formatUsd } from '../utils/pricing.js';
 import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
 import { DEFAULT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
-import { buildImageResultPresentation, clampPromptForContext, executeImageGeneration, formatStylePreset, toTitleCase } from './image/sessionHelpers.js';
+import {
+    buildImageResultPresentation,
+    clampPromptForContext,
+    createRetryButtonRow,
+    executeImageGeneration,
+    formatRetryCountdown,
+    formatStylePreset,
+    toTitleCase
+} from './image/sessionHelpers.js';
 import { resolveImageCommandError } from './image/errors.js';
 import type {
     ImageBackgroundType,
@@ -20,6 +27,12 @@ import {
     saveFollowUpContext,
     type ImageGenerationContext
 } from './image/followUpCache.js';
+import {
+    buildTokenSummaryLine,
+    consumeImageTokens,
+    describeTokenAvailability,
+    refundImageTokens
+} from '../utils/imageTokens.js';
 
 /**
  * Ensures that the interaction has been deferred before we begin streaming
@@ -224,7 +237,7 @@ const imageCommand: Command = {
         )
         .addStringOption(option => option
             .setName('quality')
-            .setDescription('Image quality (optional; defaults to low)')
+            .setDescription('Image quality (Low=1 token, Medium=3, High=5; defaults to low)')
             .addChoices(
                 { name: 'Low', value: 'low' },
                 { name: 'Medium', value: 'medium' },
@@ -294,16 +307,6 @@ const imageCommand: Command = {
         ),
 
     async execute(interaction: ChatInputCommandInteraction) {
-        if (interaction.user.id !== process.env.DEVELOPER_USER_ID) {
-            const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(interaction.user.id);
-            if (!allowed) {
-                const seconds = retryAfter ?? 0;
-                const minutes = Math.floor(seconds / 60);
-                await interaction.reply({ content: `⚠️ ${error} Try again in ${minutes}m${seconds % 60}s`, flags: [1 << 6] });
-                return;
-            }
-        }
-
         const prompt = interaction.options.getString('prompt')?.trim();
         if (!prompt) {
             await interaction.reply({
@@ -323,11 +326,7 @@ const imageCommand: Command = {
 
         const isSuperUser = interaction.user.id === process.env.DEVELOPER_USER_ID;
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
-        let quality: ImageQualityType = requestedQuality ?? 'low';
-        if ((quality === 'medium' || quality === 'high') && !isSuperUser) {
-            quality = 'low';
-            logger.warn(`User ${interaction.user.id} attempted to use restricted quality setting '${requestedQuality}'. Falling back to 'low'.`);
-        }
+        const quality: ImageQualityType = requestedQuality ?? 'low';
 
         const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? DEFAULT_MODEL;
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
@@ -354,7 +353,34 @@ const imageCommand: Command = {
             allowPromptAdjustment: adjustPrompt
         };
 
-        await runImageGenerationSession(interaction, context, followUpResponseId ?? undefined);
+        const developerBypass = interaction.user.id === process.env.DEVELOPER_USER_ID;
+
+        // Spend image tokens up-front so that the command provides immediate feedback
+        // when a user exceeds their allowance. On failure we refund below.
+        let tokenSpend = null as ReturnType<typeof consumeImageTokens> | null;
+
+        if (!developerBypass) {
+            const spendResult = consumeImageTokens(interaction.user.id, quality);
+            if (!spendResult.allowed) {
+                const retryKey = `retry:${interaction.id}`;
+                saveFollowUpContext(retryKey, context);
+                const summary = buildTokenSummaryLine(interaction.user.id);
+                const message = `${describeTokenAvailability(quality, spendResult)}\n\n${summary}`;
+                const countdown = spendResult.refreshInSeconds;
+                const components = countdown > 0
+                    ? [createRetryButtonRow(retryKey, formatRetryCountdown(countdown))]
+                    : [];
+                await interaction.reply({ content: message, components, flags: [1 << 6] });
+                return;
+            }
+            tokenSpend = spendResult;
+        }
+
+        const result = await runImageGenerationSession(interaction, context, followUpResponseId ?? undefined);
+
+        if (!result.success && tokenSpend) {
+            refundImageTokens(interaction.user.id, tokenSpend.cost);
+        }
     }
 };
 

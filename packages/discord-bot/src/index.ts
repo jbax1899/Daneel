@@ -6,7 +6,6 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
-import { imageCommandRateLimiter } from './utils/RateLimiter.js';
 import { evictFollowUpContext, readFollowUpContext, saveFollowUpContext } from './commands/image/followUpCache.js';
 import { runImageGenerationSession } from './commands/image.js';
 import {
@@ -42,6 +41,12 @@ import {
   updateVariationSession
 } from './commands/image/variationSessions.js';
 import { resolveAspectRatioSettings } from './commands/image/aspect.js';
+import {
+  buildTokenSummaryLine,
+  consumeImageTokens,
+  describeTokenAvailability,
+  refundImageTokens
+} from './utils/imageTokens.js';
 //import express from 'express'; // For webhook
 //import bodyParser from "body-parser"; // For webhook
 
@@ -72,9 +77,9 @@ const client = new Client({
 // Initialize Managers
 // ====================
 const commandHandler = new CommandHandler();
-const eventManager = new EventManager(client, { 
+const eventManager = new EventManager(client, {
   openai: { apiKey: config.openaiApiKey },
-  openaiService 
+  openaiService
 });
 
 // Initialize client handlers
@@ -130,6 +135,23 @@ client.once(Events.ClientReady, () => {
   logger.info(`Logged in as ${client.user?.tag}`);
 });
 
+/**
+ * Builds the status message that appears at the top of the variation
+ * configurator. We always surface the caller's remaining tokens so they can
+ * immediately see how many high-quality attempts remain before the next refill.
+ */
+function buildVariationStatusMessage(userId: string, base?: string): string {
+  const isDeveloper = userId === process.env.DEVELOPER_USER_ID;
+  if (isDeveloper) {
+    return base
+      ? `${base}\n\nDeveloper bypass active—image tokens are not required.`
+      : 'Developer bypass active—image tokens are not required.';
+  }
+
+  const summary = buildTokenSummaryLine(userId);
+  return base ? `${base}\n\n${summary}` : summary;
+}
+
 // Slash commands handler
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
@@ -176,7 +198,11 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
+      await interaction.update(
+        buildVariationConfiguratorView(refreshed, {
+          statusMessage: buildVariationStatusMessage(interaction.user.id)
+        })
+      );
       return;
     }
 
@@ -195,7 +221,11 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
+      await interaction.update(
+        buildVariationConfiguratorView(refreshed, {
+          statusMessage: buildVariationStatusMessage(interaction.user.id)
+        })
+      );
       return;
     }
 
@@ -211,7 +241,11 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
+      await interaction.update(
+        buildVariationConfiguratorView(refreshed, {
+          statusMessage: buildVariationStatusMessage(interaction.user.id)
+        })
+      );
       return;
     }
 
@@ -227,7 +261,11 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
+      await interaction.update(
+        buildVariationConfiguratorView(refreshed, {
+          statusMessage: buildVariationStatusMessage(interaction.user.id)
+        })
+      );
       return;
     }
   }
@@ -259,7 +297,11 @@ client.on(Events.InteractionCreate, async interaction => {
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
       try {
         if (refreshed.messageUpdater) {
-          await refreshed.messageUpdater(buildVariationConfiguratorView(refreshed));
+          await refreshed.messageUpdater(
+            buildVariationConfiguratorView(refreshed, {
+              statusMessage: buildVariationStatusMessage(interaction.user.id)
+            })
+          );
         }
       } catch (error) {
         logger.warn('Failed to refresh variation configurator after prompt update:', error);
@@ -292,6 +334,40 @@ client.on(Events.InteractionCreate, async interaction => {
         return;
       }
 
+      const developerBypass = interaction.user.id === process.env.DEVELOPER_USER_ID;
+      let tokenSpend = null as ReturnType<typeof consumeImageTokens> | null;
+
+      // Spend tokens only when the user is not in developer bypass mode. This keeps
+      // chained variations consistent with the slash-command flow.
+      if (!developerBypass) {
+        const spendResult = consumeImageTokens(interaction.user.id, session.quality);
+        if (!spendResult.allowed) {
+          const statusMessage = buildVariationStatusMessage(
+            interaction.user.id,
+            describeTokenAvailability(session.quality, spendResult)
+          );
+
+          const updatedSession = spendResult.remainingTokens === 0 && spendResult.refreshInSeconds > 0
+            ? applyVariationCooldown(interaction.user.id, responseId, spendResult.refreshInSeconds) ?? session
+            : resetVariationCooldown(interaction.user.id, responseId) ?? session;
+
+          if (session.messageUpdater) {
+            try {
+              await session.messageUpdater(
+                buildVariationConfiguratorView(updatedSession, { statusMessage })
+              );
+            } catch (error) {
+              logger.warn('Failed to refresh variation configurator after token denial:', error);
+            }
+          }
+
+          await interaction.reply({ content: statusMessage, ephemeral: true });
+          return;
+        }
+
+        tokenSpend = spendResult;
+      }
+
       try {
         if (session.messageUpdater) {
           await session.messageUpdater({ content: '⏳ Generating variation…', embeds: [], components: [] });
@@ -317,9 +393,16 @@ client.on(Events.InteractionCreate, async interaction => {
           allowPromptAdjustment: session.allowPromptAdjustment
         };
 
-        await runImageGenerationSession(interaction, runContext, responseId);
+        const result = await runImageGenerationSession(interaction, runContext, responseId);
+
+        if (!result.success && tokenSpend) {
+          refundImageTokens(interaction.user.id, tokenSpend.cost);
+        }
       } catch (error) {
         logger.error('Unexpected error while generating variation:', error);
+        if (tokenSpend) {
+          refundImageTokens(interaction.user.id, tokenSpend.cost);
+        }
         if (!interaction.replied && !interaction.deferred) {
           await interaction.reply({ content: '⚠️ Something went wrong while generating that variation.', ephemeral: true });
         }
@@ -343,7 +426,11 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
+      await interaction.update(
+        buildVariationConfiguratorView(refreshed, {
+          statusMessage: buildVariationStatusMessage(interaction.user.id)
+        })
+      );
       return;
     }
 
@@ -399,7 +486,9 @@ client.on(Events.InteractionCreate, async interaction => {
       const session = initialiseVariationSession(interaction.user.id, followUpResponseId, cachedContext);
 
       await interaction.deferReply({ ephemeral: true });
-      const view = buildVariationConfiguratorView(session);
+      const view = buildVariationConfiguratorView(session, {
+        statusMessage: buildVariationStatusMessage(interaction.user.id)
+      });
       await interaction.editReply(view);
       const storedSession = setVariationSessionUpdater(interaction.user.id, followUpResponseId, options => interaction.editReply(options));
       if (!storedSession) {
@@ -424,18 +513,22 @@ client.on(Events.InteractionCreate, async interaction => {
       }
 
       const isDeveloper = interaction.user.id === process.env.DEVELOPER_USER_ID;
+      let retrySpend = null as ReturnType<typeof consumeImageTokens> | null;
       if (!isDeveloper) {
-        const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(interaction.user.id);
-        if (!allowed) {
-          const countdown = formatRetryCountdown(retryAfter ?? 0);
-          const retryRow = createRetryButtonRow(retryKey, countdown);
+        const spendResult = consumeImageTokens(interaction.user.id, cachedContext.quality);
+        if (!spendResult.allowed) {
+          const message = `${describeTokenAvailability(cachedContext.quality, spendResult)}\n\n${buildTokenSummaryLine(interaction.user.id)}`;
+          const countdown = spendResult.refreshInSeconds;
+          const retryRow = countdown > 0 ? createRetryButtonRow(retryKey, formatRetryCountdown(countdown)) : undefined;
           try {
-            await interaction.update({ content: `⚠️ ${error} Try again in ${countdown}.`, components: [retryRow] });
+            await interaction.update({ content: message, components: retryRow ? [retryRow] : [] });
           } catch {
-            await interaction.reply({ content: `⚠️ ${error} Try again in ${countdown}.`, ephemeral: true });
+            await interaction.reply({ content: message, ephemeral: true, components: retryRow ? [retryRow] : [] });
           }
           return;
         }
+
+        retrySpend = spendResult;
       }
 
       await interaction.deferReply();
@@ -466,6 +559,9 @@ client.on(Events.InteractionCreate, async interaction => {
           components: presentation.components
         });
       } catch (error) {
+        if (retrySpend) {
+          refundImageTokens(interaction.user.id, retrySpend.cost);
+        }
         logger.error('Unexpected error while handling image retry button:', error);
         try {
           await interaction.editReply({ content: '⚠️ I was unable to generate that image. Please try again later.', components: [] });

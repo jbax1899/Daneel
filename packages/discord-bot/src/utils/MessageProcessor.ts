@@ -4,7 +4,7 @@ import { Message } from 'discord.js';
 import { OpenAIService, SupportedModel, TTSOptions } from './openaiService.js';
 import { logger } from './logger.js';
 import { ResponseHandler } from './response/ResponseHandler.js';
-import { RateLimiter, imageCommandRateLimiter } from './RateLimiter.js';
+import { RateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
@@ -15,9 +15,7 @@ import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
   clampPromptForContext,
-  createRetryButtonRow,
-  executeImageGeneration,
-  formatRetryCountdown
+  executeImageGeneration
 } from '../commands/image/sessionHelpers.js';
 import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
 import type { ImageBackgroundType, ImageQualityType, ImageSizeType, ImageStylePreset } from '../commands/image/types.js';
@@ -210,27 +208,6 @@ export class MessageProcessor {
           style,
           allowPromptAdjustment: request.allowPromptAdjustment ?? true
         };
-
-        const isDeveloper = message.author.id === process.env.DEVELOPER_USER_ID;
-        if (!isDeveloper) {
-          // Respect the existing image cooldown before starting work. If the user is on cooldown, stash the
-          // context so the retry button can pick up exactly where we left off once the timer expires.
-          const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(message.author.id);
-          if (!allowed) {
-            const countdown = formatRetryCountdown(retryAfter ?? 0);
-            const retryKey = `retry:${message.id}`;
-            saveFollowUpContext(retryKey, context);
-            const retryRow = createRetryButtonRow(retryKey, countdown);
-            await responseHandler.sendMessage(
-              `⚠️ ${error ?? 'I need a moment before I can create another image.'} Try again in ${countdown}.`,
-              [],
-              directReply,
-              false,
-              [retryRow]
-            );
-            return;
-          }
-        }
 
         await responseHandler.startTyping();
 

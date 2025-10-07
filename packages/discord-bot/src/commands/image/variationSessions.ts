@@ -25,6 +25,7 @@ import {
     EMBED_FIELD_VALUE_LIMIT
 } from './constants.js';
 import { clampPromptForContext, formatRetryCountdown, formatStylePreset, toTitleCase } from './sessionHelpers.js';
+import { buildQualityTokenDescription } from '../../utils/imageTokens.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -59,6 +60,7 @@ export interface VariationSessionState {
     cooldownUntil: number | null;
     cooldownTimer?: NodeJS.Timeout;
     messageUpdater?: (options: InteractionUpdateOptions) => Promise<unknown>;
+    statusMessage: string | null;
 }
 
 type VariationConfiguratorView = {
@@ -70,10 +72,10 @@ type VariationConfiguratorView = {
 const VARIATION_SESSION_TTL_MS = 10 * 60 * 1000;
 const sessions = new Map<string, VariationSessionState>();
 
-const QUALITY_OPTIONS: Array<{ value: ImageQualityType; label: string }> = [
-    { value: 'low', label: 'Low' },
-    { value: 'medium', label: 'Medium' },
-    { value: 'high', label: 'High' }
+const QUALITY_OPTIONS: Array<{ value: ImageQualityType; label: string; description: string }> = [
+    { value: 'low', label: 'Low', description: buildQualityTokenDescription('low') },
+    { value: 'medium', label: 'Medium', description: buildQualityTokenDescription('medium') },
+    { value: 'high', label: 'High', description: buildQualityTokenDescription('high') }
 ];
 
 const ASPECT_OPTIONS: Array<{ value: ImageGenerationContext['aspectRatio']; label: string }> = [
@@ -154,7 +156,9 @@ export function initialiseVariationSession(
         timeout: setTimeout(() => {
             disposeVariationSession(key);
         }, VARIATION_SESSION_TTL_MS),
-        cooldownUntil: null
+        cooldownUntil: null,
+        messageUpdater: undefined,
+        statusMessage: null
     };
 
     sessions.set(key, session);
@@ -285,13 +289,16 @@ export function buildVariationConfiguratorView(
     session: VariationSessionState,
     options: { statusMessage?: string } = {}
 ): VariationConfiguratorView {
+    if (options.statusMessage !== undefined) {
+        session.statusMessage = options.statusMessage;
+    }
+
+    const statusText = options.statusMessage ?? session.statusMessage ?? 'Tweak the settings below and press **Generate variation** when you are ready.';
     const embed = new EmbedBuilder()
         .setTitle('🎨 Configure image variation')
         .setDescription(
             truncateForEmbed(
-                options.statusMessage
-                    ? options.statusMessage
-                    : 'Tweak the settings below and press **Generate variation** when you are ready.',
+                statusText,
                 2048
             )
         );
