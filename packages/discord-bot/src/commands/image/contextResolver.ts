@@ -114,6 +114,22 @@ interface PromptExtractionResult {
     fieldName: string | null;
 }
 
+interface RecoveredContextDetails {
+    context: ImageGenerationContext;
+    /**
+     * The response identifier associated with the embed. This is required when
+     * we want to request true variations from the API rather than starting a
+     * fresh generation.
+     */
+    responseId: string | null;
+    /**
+     * The input identifier, if available. This allows callers to chain
+     * multiple variations by falling back to the previous response when an
+     * embed predates the field update that surfaces output IDs.
+     */
+    inputId: string | null;
+}
+
 // Prompt labels are now dynamic (e.g., "Refined Prompt (gpt-4.1-mini)") so we
 // need to locate entries by prefix rather than assuming a fixed field name.
 function findPromptBaseField(fieldMap: Map<string, string>, label: string): string | null {
@@ -172,6 +188,19 @@ function collectPromptSections(
     return { prompt: combined, truncated: truncatedFlag, fieldName: baseFieldName };
 }
 
+function parseIdentifier(raw: string | undefined): string | null {
+    if (!raw) {
+        return null;
+    }
+
+    const normalised = raw.replace(/`/g, '').trim();
+    if (!normalised || normalised.toLowerCase() === 'n/a') {
+        return null;
+    }
+
+    return normalised;
+}
+
 // Extracts the model hint that we embed within prompt labels. This keeps
 // historical embeds backwards compatible while giving reboot recovery a single
 // place to pull the active model when caching is unavailable.
@@ -184,7 +213,7 @@ function extractModelFromPromptLabel(label: string | null | undefined): string |
     return match ? match[1].trim() : null;
 }
 
-function buildContextFromEmbed(message: Message): ImageGenerationContext | null {
+function buildContextFromEmbed(message: Message): RecoveredContextDetails | null {
     const embed = message.embeds?.[0];
     if (!embed) {
         return null;
@@ -233,17 +262,21 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
         ?? fieldMap.get('Model');
 
     return {
-        prompt: normalizedPrompt,
-        originalPrompt: normalizedOriginal,
-        refinedPrompt: normalizedRefined,
-        model: parseModel(modelFromLabel),
-        size,
-        aspectRatio,
-        aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
-        quality: parseQuality(fieldMap.get('Quality')),
-        background: parseBackground(fieldMap.get('Background')),
-        style: parseStyle(fieldMap.get('Style')),
-        allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt Adjustment'))
+        context: {
+            prompt: normalizedPrompt,
+            originalPrompt: normalizedOriginal,
+            refinedPrompt: normalizedRefined,
+            model: parseModel(modelFromLabel),
+            size,
+            aspectRatio,
+            aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
+            quality: parseQuality(fieldMap.get('Quality')),
+            background: parseBackground(fieldMap.get('Background')),
+            style: parseStyle(fieldMap.get('Style')),
+            allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt Adjustment'))
+        },
+        responseId: parseIdentifier(fieldMap.get('Output ID')),
+        inputId: parseIdentifier(fieldMap.get('Input ID'))
     };
 }
 
@@ -252,6 +285,13 @@ function buildContextFromEmbed(message: Message): ImageGenerationContext | null 
  * image. We intentionally keep this synchronous so callers can reuse the logic
  * during interaction handling without awaiting network I/O.
  */
+export interface RecoveredImageContext extends RecoveredContextDetails {}
+
 export async function recoverContextFromMessage(message: Message): Promise<ImageGenerationContext | null> {
+    const recovered = buildContextFromEmbed(message);
+    return recovered ? recovered.context : null;
+}
+
+export async function recoverContextDetailsFromMessage(message: Message): Promise<RecoveredImageContext | null> {
     return buildContextFromEmbed(message);
 }

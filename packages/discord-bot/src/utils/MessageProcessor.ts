@@ -18,6 +18,7 @@ import {
   executeImageGeneration
 } from '../commands/image/sessionHelpers.js';
 import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
+import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
 import type { ImageBackgroundType, ImageQualityType, ImageSizeType, ImageStylePreset } from '../commands/image/types.js';
 
 type MessageProcessorOptions = {
@@ -174,21 +175,65 @@ export class MessageProcessor {
 
         const trimmedPrompt = request.prompt.trim();
         const normalizedPrompt = clampPromptForContext(trimmedPrompt);
-        const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(
+        let { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(
           (request.aspectRatio ?? 'auto').toLowerCase() as ImageGenerationContext['aspectRatio']
         );
 
         const requestedBackground = request.background?.toLowerCase() ?? 'auto';
-        const background = VALID_IMAGE_BACKGROUNDS.includes(requestedBackground as ImageBackgroundType)
+        let background = VALID_IMAGE_BACKGROUNDS.includes(requestedBackground as ImageBackgroundType)
           ? requestedBackground as ImageBackgroundType
           : 'auto';
 
         const normalizedStyle = request.style
           ? request.style.toLowerCase().replace(/[^a-z0-9]+/g, '_')
           : 'unspecified';
-        const style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
+        let style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
           ? normalizedStyle as ImageStylePreset
           : 'unspecified';
+
+        let referencedContext: ImageGenerationContext | null = null;
+        let followUpResponseId: string | null = null;
+
+        if (message.reference?.messageId) {
+          try {
+            // Fetch and parse the replied-to message so we can honour its
+            // generation settings instead of relying on the planner to guess.
+            const referencedMessage = await message.fetchReference();
+            const recovered = await recoverContextDetailsFromMessage(referencedMessage);
+
+            if (recovered) {
+              referencedContext = recovered.context;
+              followUpResponseId = recovered.responseId ?? recovered.inputId ?? null;
+
+              if (!followUpResponseId) {
+                logger.warn('Recovered image context lacked response identifiers; running without follow-up linkage.');
+              }
+
+              // When the user is replying to a previous image, prefer that
+              // message's settings unless the planner explicitly overrode
+              // them. This keeps variations predictable and avoids mixing in
+              // unrelated historical embeds.
+              if ((request.aspectRatio ?? 'auto').toLowerCase() === 'auto') {
+                size = referencedContext.size;
+                aspectRatio = referencedContext.aspectRatio;
+                aspectRatioLabel = referencedContext.aspectRatioLabel;
+              }
+
+              if (!request.background || requestedBackground === 'auto') {
+                background = referencedContext.background;
+              }
+
+              if (!request.style || normalizedStyle === 'unspecified') {
+                style = referencedContext.style;
+              }
+            }
+          } catch (error) {
+            // We intentionally log at debug level: if we cannot recover the
+            // reference we still want to proceed with a best-effort response
+            // rather than failing the entire interaction.
+            logger.debug('Unable to recover referenced image context for reply-driven image request:', error);
+          }
+        }
 
         // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
         if (trimmedPrompt.length > normalizedPrompt.length) {
@@ -199,14 +244,14 @@ export class MessageProcessor {
           prompt: normalizedPrompt,
           originalPrompt: normalizedPrompt,
           refinedPrompt: null,
-          model: DEFAULT_MODEL,
+          model: referencedContext?.model ?? DEFAULT_MODEL,
           size,
           aspectRatio,
           aspectRatioLabel,
-          quality: 'low' as ImageQualityType,
+          quality: referencedContext?.quality ?? ('low' as ImageQualityType),
           background,
           style,
-          allowPromptAdjustment: request.allowPromptAdjustment ?? true
+          allowPromptAdjustment: request.allowPromptAdjustment ?? referencedContext?.allowPromptAdjustment ?? true
         };
 
         await responseHandler.startTyping();
@@ -218,7 +263,8 @@ export class MessageProcessor {
               username: message.author.username,
               nickname: message.member?.displayName ?? message.author.username,
               guildName: message.guild?.name ?? 'Direct message channel'
-            }
+            },
+            followUpResponseId
           });
 
           const presentation = buildImageResultPresentation(context, artifacts);
