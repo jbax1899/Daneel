@@ -26,17 +26,15 @@ const STORAGE_KEY = 'daneel-theme-preference';
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-// Determine the initial theme: stored preference wins, otherwise fall back to the OS preference.
+// Determine the initial theme: stored preference wins, otherwise we deliberately start in light mode.
+// Designers asked for the light palette to be the first impression regardless of OS preference so the
+// brand feels consistent on every new visit.
 const resolveInitialTheme = (): Theme => {
   if (supportsLocalStorage()) {
     const stored = window.localStorage.getItem(STORAGE_KEY) as Theme | null;
     if (stored === 'light' || stored === 'dark') {
       return stored;
     }
-  }
-
-  if (typeof window !== 'undefined' && window.matchMedia) {
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
   return 'light';

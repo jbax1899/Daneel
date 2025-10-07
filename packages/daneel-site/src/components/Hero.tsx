@@ -2,8 +2,8 @@ import ThemeToggle from './ThemeToggle';
 
 // Centralised configuration for hero call-to-action links so they are easy to update later.
 const CTA_LINKS = {
-  invite:
-    'https://discord.com/api/oauth2/authorize?client_id=YOUR_CLIENT_ID&permissions=274877991936&scope=bot%20applications.commands',
+  // The invite link intentionally routes to a temporary explainer while the public OAuth client is finalised.
+  invite: '/invite/',
   philosophy: 'https://github.com/daneel-ai/daneel/blob/main/PHILOSOPHY.md',
   source: 'https://github.com/daneel-ai/daneel',
 };
@@ -13,7 +13,7 @@ const Hero = (): JSX.Element => (
   <section className="hero" aria-labelledby="hero-title">
     <header className="site-header">
       <div className="site-title-group">
-        <p className="site-mark">Daneel</p>
+        <p className="site-mark">DANEEL</p>
         <p className="site-tagline">Ethical companion, open source, self-hosted</p>
       </div>
       <ThemeToggle />

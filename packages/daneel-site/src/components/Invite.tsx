@@ -35,8 +35,8 @@ const Invite = (): JSX.Element => (
         </article>
       ))}
     </div>
-    <a className="inline-cta" href="https://github.com/daneel-ai/daneel/wiki" target="_blank" rel="noreferrer">
-      🛠 Deployment guide &amp; technical overview (soon)
+    <a className="inline-cta" href="/deployment-guide/">
+      🛠 Deployment guide &amp; technical overview (preview)
     </a>
   </section>
 );

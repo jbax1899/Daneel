@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Invite Daneel</title>
+    <style>
+      body {
+        font-family: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", serif;
+        background: #fdfcf9;
+        color: #2b2a27;
+        margin: 0;
+        padding: 3rem 1.5rem 5rem;
+        display: flex;
+        justify-content: center;
+      }
+
+      main {
+        width: min(100%, 760px);
+      }
+
+      h1 {
+        font-size: clamp(1.85rem, 4vw, 2.6rem);
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin-bottom: 1rem;
+      }
+
+      p {
+        line-height: 1.65;
+      }
+
+      .step-list {
+        margin: 2.5rem 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      .step-list li {
+        border-left: 3px solid #4a7c59;
+        padding: 0.25rem 0 0.25rem 1rem;
+        background: rgba(74, 124, 89, 0.08);
+      }
+
+      .actions {
+        margin-top: 2.5rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .actions a {
+        font-family: "SFMono-Regular", "JetBrains Mono", "Courier New", monospace;
+        text-decoration: none;
+        color: #2b2a27;
+        border: 1px solid #e3ddd2;
+        padding: 0.85rem 1.4rem;
+        display: inline-flex;
+        width: fit-content;
+        background: #f7f2e9;
+      }
+
+      .actions a:hover,
+      .actions a:focus {
+        background: #e9ecdf;
+        border-color: #c1a057;
+      }
+
+      footer {
+        margin-top: 3rem;
+        font-family: "SFMono-Regular", "JetBrains Mono", "Courier New", monospace;
+        font-size: 0.9rem;
+        color: #5b574f;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Invite Daneel</h1>
+      <p>
+        The public invite link is being finalised with Discord. Until then, you can still experiment with Daneel by
+        running your own instance and connecting it to a development server.
+      </p>
+      <ol class="step-list">
+        <li><strong>Clone the repository</strong> and follow the environment instructions in the README.</li>
+        <li><strong>Create a Discord application</strong> with bot permissions and copy its client ID.</li>
+        <li><strong>Run the docker compose stack</strong> or the Node services directly to bring Daneel online.</li>
+        <li><strong>Authorise your bot</strong> using the OAuth URL builder with the scopes documented in the README.</li>
+      </ol>
+      <p>
+        Once the production invite is ready, this page will redirect you automatically. For now, it keeps curious
+        visitors from hitting a broken link.
+      </p>
+      <div class="actions">
+        <a href="https://discord.com/developers/applications">Open Discord Developer Portal</a>
+        <a href="https://github.com/daneel-ai/daneel#readme">Read the deployment notes</a>
+        <a href="/">Return to the landing page</a>
+      </div>
+      <footer>Last updated: preview guidance &mdash; July 2024</footer>
+    </main>
+  </body>
+</html>
