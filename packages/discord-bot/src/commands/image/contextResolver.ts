@@ -298,35 +298,94 @@ export async function recoverContextFromMessage(message: Message): Promise<Image
 }
 
 export async function recoverContextDetailsFromMessage(message: Message): Promise<RecoveredImageContext | null> {
-    const direct = buildContextFromEmbed(message);
-    if (direct) {
-        return direct;
+    // Track every message we inspect so we can both avoid infinite loops when
+    // walking reply chains and prefer those messages during nearby lookups if
+    // we still cannot find the embed payload.
+    const visitedMessages: Message[] = [];
+    const visitedIds = new Set<string>();
+    let current: Message | null = message;
+
+    while (current && !visitedIds.has(current.id)) {
+        visitedIds.add(current.id);
+        visitedMessages.push(current);
+
+        const direct = buildContextFromEmbed(current);
+        if (direct) {
+            return direct;
+        }
+
+        // Some conversational replies point at the bot's follow-up commentary
+        // instead of the original embed. If this message references another
+        // message, walk that chain before we fall back to broader history
+        // lookups.
+        const parentChannel: Message['channel'] | null = current.channel ?? null;
+        if (!parentChannel) {
+            break;
+        }
+
+        const referencedId: string | null = current.reference?.messageId ?? null;
+        if (!referencedId) {
+            break;
+        }
+
+        try {
+            current = await parentChannel.messages.fetch(referencedId);
+        } catch (error) {
+            logger.debug('Failed to fetch referenced message while rebuilding image context:', error);
+            break;
+        }
     }
 
-    const channel = message.channel;
-    const clientUserId = message.client.user?.id;
+    const anchorMessage = visitedMessages[visitedMessages.length - 1] ?? message;
+    const channel = anchorMessage.channel ?? message.channel;
+    const clientUserId = anchorMessage.client.user?.id ?? message.client.user?.id;
 
     if (!channel || !clientUserId) {
         return null;
     }
 
     try {
-        // Users frequently reply to the textual commentary that follows an embed.
-        // Walk the nearby history so we can locate the closest bot-authored image
-        // message and rebuild the context from there.
+        // Users frequently reply to the textual commentary that follows an embed
+        // or to nearby bot messages. Walk a small window around the anchor
+        // message (typically the original embed or the closest parent in the
+        // reply chain) so we can recover the intended context without scanning
+        // the entire channel history.
         const surrounding = await Promise.all([
-            channel.messages.fetch({ before: message.id, limit: NEARBY_SEARCH_LIMIT }),
-            channel.messages.fetch({ after: message.id, limit: Math.min(NEARBY_SEARCH_LIMIT, 5) })
+            channel.messages.fetch({ before: anchorMessage.id, limit: NEARBY_SEARCH_LIMIT }),
+            channel.messages.fetch({ after: anchorMessage.id, limit: Math.min(NEARBY_SEARCH_LIMIT, 5) })
         ]);
 
-        const candidates = [
-            ...surrounding[0].values(),
-            ...surrounding[1].values()
-        ].filter(candidate => candidate.author?.id === clientUserId);
+        const candidateMap = new Map<string, Message>();
+
+        for (const visited of visitedMessages) {
+            candidateMap.set(visited.id, visited);
+        }
+
+        for (const candidate of surrounding[0].values()) {
+            candidateMap.set(candidate.id, candidate);
+        }
+
+        for (const candidate of surrounding[1].values()) {
+            candidateMap.set(candidate.id, candidate);
+        }
+
+        const candidates = Array.from(candidateMap.values()).filter(candidate => candidate.author?.id === clientUserId);
 
         candidates.sort((a, b) => {
-            const distanceA = Math.abs(a.createdTimestamp - message.createdTimestamp);
-            const distanceB = Math.abs(b.createdTimestamp - message.createdTimestamp);
+            const anchorTimestamp = anchorMessage.createdTimestamp;
+            const aBeforeAnchor = a.createdTimestamp <= anchorTimestamp;
+            const bBeforeAnchor = b.createdTimestamp <= anchorTimestamp;
+
+            if (aBeforeAnchor && !bBeforeAnchor) {
+                return -1;
+            }
+
+            if (!aBeforeAnchor && bBeforeAnchor) {
+                return 1;
+            }
+
+            const distanceA = Math.abs(a.createdTimestamp - anchorTimestamp);
+            const distanceB = Math.abs(b.createdTimestamp - anchorTimestamp);
             if (distanceA === distanceB) {
                 return b.createdTimestamp - a.createdTimestamp;
             }
