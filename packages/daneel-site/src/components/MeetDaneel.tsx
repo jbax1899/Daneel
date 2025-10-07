@@ -114,21 +114,14 @@ const MeetDaneel = (): JSX.Element => {
           <div className="interaction">
             <p className="interaction-subtitle">Daneel runs here, too.</p>
             <strong className="interaction-heading">Offer a thoughtful question</strong>
-            <p className="interaction-guidance">
-              Offer a question about values, choices, or change — and I’ll return a short note. Not to decide for you,
-              but to reflect with you.
-            </p>
             <form className="interaction-form" onSubmit={onSubmit}>
-              <label htmlFor="question-input" className="interaction-label">
-                Ask a reflection
-              </label>
               <input
                 id="question-input"
                 className="interaction-input"
                 name="question"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                placeholder="How do we keep our space kind when topics grow tense?"
+                placeholder="How do I stay true to my values?"
                 autoComplete="off"
                 ref={inputRef}
               />
