@@ -268,8 +268,101 @@ client.on(Events.InteractionCreate, async interaction => {
     }
   }
 
+
+
   if (interaction.isButton()) {
     const { customId } = interaction;
+
+    // Variation buttons all share the same prefix, so handle the specific
+    // actions (generate, reset, cancel, prompt modal) before the generic
+    // configurator entry point to avoid mis-routing follow-up clicks.
+    if (customId.startsWith(IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX.length);
+      const session = getVariationSession(interaction.user.id, responseId);
+      if (!session) {
+        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        return;
+      }
+
+      const cooldownRemaining = session.cooldownUntil ? Math.max(0, Math.ceil((session.cooldownUntil - Date.now()) / 1000)) : 0;
+      if (cooldownRemaining > 0) {
+        await interaction.reply({ content: `⚠️ Please wait ${formatRetryCountdown(cooldownRemaining)} before generating another variation.`, ephemeral: true });
+        return;
+      }
+
+      try {
+        if (session.messageUpdater) {
+          await session.messageUpdater({ content: '⏳ Generating variation…', embeds: [], components: [] });
+        }
+      } catch (error) {
+        logger.warn('Failed to update variation configurator before generation:', error);
+      }
+
+      await interaction.deferReply();
+
+      try {
+        const runContext = {
+          prompt: session.prompt,
+          originalPrompt: session.originalPrompt,
+          refinedPrompt: session.refinedPrompt,
+          model: session.model,
+          size: session.size,
+          aspectRatio: session.aspectRatio,
+          aspectRatioLabel: session.aspectRatioLabel,
+          quality: session.quality,
+          background: session.background,
+          style: session.style,
+          allowPromptAdjustment: session.allowPromptAdjustment
+        };
+
+        await runImageGenerationSession(interaction, runContext, responseId);
+      } catch (error) {
+        logger.error('Unexpected error while generating variation:', error);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({ content: '⚠️ Something went wrong while generating that variation.', ephemeral: true });
+        }
+      } finally {
+        disposeVariationSession(`${interaction.user.id}:${responseId}`);
+      }
+
+      return;
+    }
+
+    if (customId.startsWith(IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX.length);
+      const session = updateVariationSession(interaction.user.id, responseId, current => {
+        current.prompt = current.originalPrompt;
+        current.refinedPrompt = current.originalPrompt;
+      });
+
+      if (!session) {
+        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        return;
+      }
+
+      const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
+      await interaction.update(buildVariationConfiguratorView(refreshed));
+      return;
+    }
+
+    if (customId.startsWith(IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX.length);
+      disposeVariationSession(`${interaction.user.id}:${responseId}`);
+      await interaction.update({ content: '❎ Variation cancelled.', embeds: [], components: [] });
+      return;
+    }
+
+    if (customId.startsWith(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX.length);
+      const session = getVariationSession(interaction.user.id, responseId);
+      if (!session) {
+        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        return;
+      }
+
+      await interaction.showModal(buildPromptModal(responseId, session.prompt));
+      return;
+    }
 
     if (customId.startsWith(IMAGE_VARIATION_CUSTOM_ID_PREFIX)) {
       const followUpResponseId = customId.slice(IMAGE_VARIATION_CUSTOM_ID_PREFIX.length);
@@ -314,99 +407,7 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-    if (customId.startsWith(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX.length);
-      const session = getVariationSession(interaction.user.id, responseId);
-      if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
-        return;
-      }
-
-      await interaction.showModal(buildPromptModal(responseId, session.prompt));
-      return;
-    }
-
-    if (customId.startsWith(IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX.length);
-      const session = updateVariationSession(interaction.user.id, responseId, current => {
-        current.prompt = current.originalPrompt;
-        current.refinedPrompt = current.originalPrompt;
-      });
-
-      if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
-        return;
-      }
-
-      const refreshed = resetVariationCooldown(interaction.user.id, responseId) ?? session;
-      await interaction.update(buildVariationConfiguratorView(refreshed));
-      return;
-    }
-
-    if (customId.startsWith(IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX.length);
-      disposeVariationSession(`${interaction.user.id}:${responseId}`);
-      await interaction.update({ content: '❎ Variation cancelled.', embeds: [], components: [] });
-      return;
-    }
-
-    if (customId.startsWith(IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX.length);
-      const session = getVariationSession(interaction.user.id, responseId);
-      if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
-        return;
-      }
-
-      const isDeveloper = interaction.user.id === process.env.DEVELOPER_USER_ID;
-      if (!isDeveloper) {
-        const { allowed, retryAfter, error } = imageCommandRateLimiter.checkRateLimitImageCommand(interaction.user.id);
-        if (!allowed) {
-          const countdown = formatRetryCountdown(retryAfter ?? 0);
-          const cooled = applyVariationCooldown(interaction.user.id, responseId, retryAfter ?? 0) ?? session;
-          await interaction.update(buildVariationConfiguratorView(cooled, { statusMessage: `⚠️ ${error} Try again in ${countdown}.` }));
-          return;
-        }
-      }
-
-      try {
-        if (session.messageUpdater) {
-          await session.messageUpdater({ content: '⏳ Generating variation…', embeds: [], components: [] });
-        }
-      } catch (error) {
-        logger.warn('Failed to update variation configurator before generation:', error);
-      }
-
-      await interaction.deferReply();
-
-      try {
-        const runContext = {
-          prompt: session.prompt,
-          originalPrompt: session.originalPrompt,
-          refinedPrompt: session.refinedPrompt,
-          model: session.model,
-          size: session.size,
-          aspectRatio: session.aspectRatio,
-          aspectRatioLabel: session.aspectRatioLabel,
-          quality: session.quality,
-          background: session.background,
-          style: session.style,
-          allowPromptAdjustment: session.allowPromptAdjustment
-        };
-
-        await runImageGenerationSession(interaction, runContext, responseId);
-      } catch (error) {
-        logger.error('Unexpected error while generating variation:', error);
-        if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: '⚠️ Something went wrong while generating that variation.', ephemeral: true });
-        }
-      } finally {
-        disposeVariationSession(`${interaction.user.id}:${responseId}`);
-      }
-
-      return;
-    }
-
+    // Other button handlers fall through to the retry logic below.
     if (customId.startsWith(IMAGE_RETRY_CUSTOM_ID_PREFIX)) {
       const retryKey = interaction.customId.slice(IMAGE_RETRY_CUSTOM_ID_PREFIX.length);
       if (!retryKey) {
