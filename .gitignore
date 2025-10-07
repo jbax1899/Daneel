@@ -20,3 +20,13 @@ reference
 
 # Discord Bot Output
 packages/discord-bot/src/output/
+
+# Frontend build artifacts
+packages/daneel-site/dist/
+packages/daneel-site/src/**/*.js
+packages/daneel-site/src/**/*.js.map
+packages/daneel-site/src/**/*.d.ts
+packages/daneel-site/tsconfig*.tsbuildinfo
+packages/daneel-site/vite.config.js
+packages/daneel-site/vite.config.js.map
+packages/daneel-site/vite.config.d.ts

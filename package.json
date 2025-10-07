@@ -5,7 +5,7 @@
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/frontend",
+        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/daneel-site",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {
