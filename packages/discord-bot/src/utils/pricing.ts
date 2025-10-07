@@ -110,7 +110,12 @@ export function estimateImageGenerationCost(options: ImageGenerationCostOptions)
     };
 }
 
-export function formatUsd(amount: number, fractionDigits = 6): string {
+export function formatUsd(amount: number | null | undefined, fractionDigits = 6): string {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+        logger.warn(`formatUsd received an invalid amount: ${amount}. Defaulting to $0.00.`);
+        return '$0.00';
+    }
+
     return `$${amount.toFixed(fractionDigits)}`;
 }
 
