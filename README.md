@@ -10,61 +10,16 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 
 The landing page now lives inside the `@ai-assistant/daneel-site` Vite workspace. To work on it locally:
 
-1. Install dependencies from the repository root:
+1. Install dependencies from the repository root: `npm install`
+2. Start the development server: `npm run dev -w @ai-assistant/daneel-site`
+3. Visit http://localhost:3000 to preview changes with hot reloads
 
-   ```bash
-   npm install
-   ```
+When you are ready to test the production bundle locally:
 
-2. Start the development server and preview live edits:
-
-   ```bash
-   npm run dev -w @ai-assistant/daneel-site
-   ```
-
-   The dev server runs on http://localhost:3000 with hot reloading enabled.
-
-3. Build and preview the production bundle exactly as Fly will serve it:
-
-   ```bash
-   npm run build -w @ai-assistant/daneel-site
-   npm run preview -w @ai-assistant/daneel-site
-   ```
-
-   The `preview` command launches Vite’s static preview server so you can sanity check the compiled output.
-
-4. (Optional) Exercise the same static server that runs inside Fly:
-
-   ```bash
-   node server.js
-   ```
-
-   The script serves `packages/daneel-site/dist` on port 3000, mirroring the runtime container. Hit <http://localhost:3000> to confirm the bundled assets load correctly.
+- Build the static assets: `npm run build -w @ai-assistant/daneel-site`
+- Preview the production output: `npm run preview -w @ai-assistant/daneel-site`
 
 These commands mirror the Fly.io build pipeline, so a successful preview means the Docker image will also have the compiled assets it needs.
-
-## Deploying to Fly.io
-
-Fly requires registry credentials before its remote builder can push the finished image. If you see a `401 Unauthorized` error while the deploy command pushes layers, log in first:
-
-```bash
-fly auth login          # Opens the browser flow if you have not authenticated recently
-fly auth docker         # Registers credentials for registry.fly.io
-```
-
-Afterwards you can deploy normally:
-
-```bash
-fly deploy              # Builds with the Dockerfile in this repo
-```
-
-If you prefer the build-only workflow, the following also works once authenticated:
-
-```bash
-fly deploy --build-only --push
-```
-
-Either command will publish the image tagged for the `daneel` app and make the static landing page available on port 3000 while the Discord bot runs alongside it.
 
 ## Features
 
