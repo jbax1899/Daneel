@@ -240,6 +240,14 @@ export class MessageProcessor {
           logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
         }
 
+        // Planner-driven image generations already flow through the LLM once, so
+        // re-enabling prompt adjustments rarely adds value. Defaulting to false
+        // keeps the resulting embeds compact unless the user explicitly opted in
+        // or the referenced context demanded otherwise.
+        const allowPromptAdjustment = request.allowPromptAdjustment
+          ?? referencedContext?.allowPromptAdjustment
+          ?? false;
+
         const context: ImageGenerationContext = {
           prompt: normalizedPrompt,
           originalPrompt: normalizedPrompt,
@@ -251,7 +259,7 @@ export class MessageProcessor {
           quality: referencedContext?.quality ?? ('low' as ImageQualityType),
           background,
           style,
-          allowPromptAdjustment: request.allowPromptAdjustment ?? referencedContext?.allowPromptAdjustment ?? true
+          allowPromptAdjustment
         };
 
         await responseHandler.startTyping();

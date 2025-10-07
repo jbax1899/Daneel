@@ -54,6 +54,11 @@ const STYLE_SET = new Set<ImageStylePreset>(STYLE_VALUES);
 const SIZE_VALUES: ImageSizeType[] = ['auto', '1024x1024', '1024x1536', '1536x1024'];
 const ASPECT_VALUES: ImageGenerationContext['aspectRatio'][] = ['auto', 'square', 'portrait', 'landscape'];
 
+// We only need a small look-back/look-ahead window when a user replies to a
+// follow-up message instead of the original embed. Keeping the search tight
+// avoids unnecessary API calls while still finding the intended image quickly.
+const NEARBY_SEARCH_LIMIT = 15;
+
 function parseQuality(value: string | null | undefined): ImageQualityType {
     const normalised = value?.trim().toLowerCase() ?? '';
     return QUALITY_VALUES.includes(normalised as ImageQualityType) ? (normalised as ImageQualityType) : 'low';
@@ -288,10 +293,56 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
 export interface RecoveredImageContext extends RecoveredContextDetails {}
 
 export async function recoverContextFromMessage(message: Message): Promise<ImageGenerationContext | null> {
-    const recovered = buildContextFromEmbed(message);
+    const recovered = await recoverContextDetailsFromMessage(message);
     return recovered ? recovered.context : null;
 }
 
 export async function recoverContextDetailsFromMessage(message: Message): Promise<RecoveredImageContext | null> {
-    return buildContextFromEmbed(message);
+    const direct = buildContextFromEmbed(message);
+    if (direct) {
+        return direct;
+    }
+
+    const channel = message.channel;
+    const clientUserId = message.client.user?.id;
+
+    if (!channel || !clientUserId) {
+        return null;
+    }
+
+    try {
+        // Users frequently reply to the textual commentary that follows an embed.
+        // Walk the nearby history so we can locate the closest bot-authored image
+        // message and rebuild the context from there.
+        const surrounding = await Promise.all([
+            channel.messages.fetch({ before: message.id, limit: NEARBY_SEARCH_LIMIT }),
+            channel.messages.fetch({ after: message.id, limit: Math.min(NEARBY_SEARCH_LIMIT, 5) })
+        ]);
+
+        const candidates = [
+            ...surrounding[0].values(),
+            ...surrounding[1].values()
+        ].filter(candidate => candidate.author?.id === clientUserId);
+
+        candidates.sort((a, b) => {
+            const distanceA = Math.abs(a.createdTimestamp - message.createdTimestamp);
+            const distanceB = Math.abs(b.createdTimestamp - message.createdTimestamp);
+            if (distanceA === distanceB) {
+                return b.createdTimestamp - a.createdTimestamp;
+            }
+            return distanceA - distanceB;
+        });
+
+        for (const candidate of candidates) {
+            const recovered = buildContextFromEmbed(candidate);
+            if (recovered) {
+                logger.debug(`Recovered image context from nearby bot message ${candidate.id}.`);
+                return recovered;
+            }
+        }
+    } catch (error) {
+        logger.debug('Failed to recover context from nearby messages:', error);
+    }
+
+    return null;
 }

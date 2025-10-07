@@ -9,7 +9,10 @@ Do not omit any required field.
 Only return a function call to "generate-plan", formatted according to its JSON schema.
 Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
 If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.
-Set action to 'image' when generating a new image is the best next step. When you choose 'image', you must populate imageRequest.prompt and may set optional fields to guide the generation.`;
+Prefer the 'message' action whenever the user is chatting, asking questions, or making indirect references. Only pick 'image' when the user explicitly requests an image/variation, directly asks you to create or refine visuals, or it is unmistakably the best response (e.g., "please draw", "make an image", "edit that picture").
+When selecting the 'image' action, default imageRequest.allowPromptAdjustment to false unless the user clearly asks for improvements or rewording.
+When the triggering message directly replies to one of Daneel's earlier messages, treat that replied-to content as the primary target—especially for image variations. Use its identifiers and details if you reference an existing image.
+When you choose 'image', you must populate imageRequest.prompt and may set optional fields to guide the generation.`;
 
 export interface Plan {
   action: 'message' | 'react' | 'ignore' | 'image';
@@ -93,7 +96,7 @@ const planFunction = {
           },
           allowPromptAdjustment: {
             type: "boolean",
-            description: "Whether the model may adjust the prompt before rendering."
+            description: "Whether the model may adjust the prompt before rendering. Leave false unless the user explicitly asks for prompt improvements."
           },
           followUpResponseId: {
             type: "string",
@@ -308,7 +311,12 @@ export class Planner {
       aspectRatio,
       background,
       style,
-      allowPromptAdjustment: request.allowPromptAdjustment !== undefined ? Boolean(request.allowPromptAdjustment) : true,
+      // Automated image requests should only opt into prompt adjustments when the
+      // planner is absolutely certain the user requested it. Leaving this false by
+      // default keeps follow-up embeds compact and faithful to the user's wording.
+      allowPromptAdjustment: request.allowPromptAdjustment !== undefined
+        ? Boolean(request.allowPromptAdjustment)
+        : false,
       followUpResponseId
     };
   }
