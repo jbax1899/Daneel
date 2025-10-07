@@ -1,17 +1,19 @@
-# Stage 1: Build the frontend
+# Stage 1: Build the Vite-powered landing page
 FROM node:22.14.0 AS frontend-builder
 WORKDIR /app
 
-# Copy package files
-COPY packages/frontend/web/package*.json ./
+# Provide the base tsconfig so the workspace's config extension resolves correctly.
+COPY tsconfig.json ./tsconfig.json
 
-# Install frontend dependencies
+# Copy only the package manifest first to leverage Docker layer caching for node_modules.
+COPY packages/daneel-site/package.json packages/daneel-site/package.json
+
+# Install frontend dependencies in isolation to keep the image lean.
+WORKDIR /app/packages/daneel-site
 RUN npm install
 
-# Copy frontend source
-COPY packages/frontend/web/ ./
-
-# Build the frontend
+# Bring in the remainder of the landing page source and produce the static dist bundle.
+COPY packages/daneel-site/ /app/packages/daneel-site/
 RUN npm run build
 
 
@@ -38,21 +40,20 @@ RUN cd packages/discord-bot && npm install --production
 FROM node:22.14.0-slim
 WORKDIR /app
 
-# Create necessary directories
-RUN mkdir -p ./.next/static
-
-# Copy built frontend
-COPY --from=frontend-builder /app/.next/standalone ./ 
-COPY --from=frontend-builder /app/.next/static ./.next/static
+# Copy built frontend assets from the Vite build stage
+COPY --from=frontend-builder /app/packages/daneel-site/dist ./packages/daneel-site/dist
 
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
 RUN cd packages/discord-bot && npm install --production
 
-# Simple startup script
+# Copy the lightweight Node server used to host the static site
+COPY server.js ./server.js
+
+# Simple startup script to run the bot alongside the static site host
 RUN echo '#!/bin/sh\n\
-cd /app/packages/discord-bot && node dist/index.js & \n\
+cd /app/packages/discord-bot && node dist/index.js &\n\
 cd /app && node server.js\n\
 ' > /app/start.sh && chmod +x /app/start.sh
 
