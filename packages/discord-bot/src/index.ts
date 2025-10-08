@@ -380,10 +380,17 @@ client.on(Events.InteractionCreate, async interaction => {
 
       try {
         const runContext = {
+          // Always mirror the latest prompt selections from the configurator so the
+          // variation honours whatever the user approved immediately before
+          // generation.
           prompt: session.prompt,
           originalPrompt: session.originalPrompt,
           refinedPrompt: session.refinedPrompt,
-          model: session.model,
+          // The session now tracks the text and image models separately. Passing both
+          // ensures the downstream pipeline can reconstruct the generation request
+          // exactly, including cost estimation and logging.
+          textModel: session.textModel,
+          imageModel: session.imageModel,
           size: session.size,
           aspectRatio: session.aspectRatio,
           aspectRatioLabel: session.aspectRatioLabel,
