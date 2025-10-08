@@ -402,7 +402,10 @@ export class OpenAIService {
           content: [
             {
               type: 'text',
-              text: `What's in this image?${context ? ` (Additional context: ${context})` : ''}`
+              text: `Describe the image in a structured, observant way.
+              Focus on recurring themes, subject types (people, animals, objects, symbols), and overall visual styles.
+              Be neutral, brief, and descriptive — do not interpret or advise.
+              ${context ? `Additional context: ${context}` : ''}`
             },
             {
               type: 'image_url',
