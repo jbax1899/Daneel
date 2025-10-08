@@ -199,6 +199,20 @@ function collectPromptSections(
     return { prompt: combined, truncated: truncatedFlag, fieldName: baseFieldName };
 }
 
+function collectPromptSectionsWithFallback(
+    fieldMap: Map<string, string>,
+    labels: string[]
+): PromptExtractionResult {
+    for (const label of labels) {
+        const result = collectPromptSections(fieldMap, label);
+        if (result.prompt) {
+            return result;
+        }
+    }
+
+    return { prompt: null, truncated: false, fieldName: null };
+}
+
 function parseIdentifier(raw: string | undefined): string | null {
     if (!raw) {
         return null;
@@ -220,7 +234,7 @@ function extractModelFromPromptLabel(label: string | null | undefined): string |
         return null;
     }
 
-    const match = /^\s*(?:Original|Refined) Prompt\s*\(([^)]+)\)\s*$/i.exec(label);
+    const match = /^\s*(?:Original|Refined|Current) Prompt\s*\(([^)]+)\)\s*$/i.exec(label);
     return match ? match[1].trim() : null;
 }
 
@@ -244,9 +258,10 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
         fieldMap.set(field.name, field.value ?? '');
     }
 
-    const originalPromptResult = collectPromptSections(fieldMap, 'Original Prompt');
-    const refinedPromptResult = collectPromptSections(fieldMap, 'Refined Prompt');
-    const prompt = refinedPromptResult.prompt ?? originalPromptResult.prompt;
+    const currentPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Current prompt', 'Refined Prompt']);
+    const originalPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Original prompt', 'Original Prompt']);
+    const legacyRefinedResult = collectPromptSections(fieldMap, 'Refined Prompt');
+    const prompt = currentPromptResult.prompt ?? legacyRefinedResult.prompt ?? originalPromptResult.prompt;
 
     if (!prompt) {
         logger.warn('Unable to recover any prompt from embed fields.');
@@ -257,13 +272,27 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
         logger.warn('Original prompt missing from embed; using recovered prompt as fallback.');
     }
 
-    const aspectRatio = parseAspectRatio(fieldMap.get('Aspect Ratio'));
-    const size = parseSize(fieldMap.get('Size'));
+    const aspectRatio = parseAspectRatio(fieldMap.get('Aspect ratio') ?? fieldMap.get('Aspect Ratio'));
+    const size = parseSize(fieldMap.get('Resolution') ?? fieldMap.get('Size'));
 
-    const refinedPrompt = refinedPromptResult.prompt && refinedPromptResult.prompt !== prompt
-        ? refinedPromptResult.prompt
-        : null;
-    const refinedPromptTruncated = refinedPrompt ? refinedPromptResult.truncated : false;
+    let refinedPrompt: string | null = null;
+    let refinedPromptField: string | null = null;
+    let refinedPromptTruncated = false;
+
+    if (legacyRefinedResult.prompt) {
+        refinedPrompt = legacyRefinedResult.prompt;
+        refinedPromptField = legacyRefinedResult.fieldName;
+        refinedPromptTruncated = legacyRefinedResult.truncated;
+    } else if (
+        currentPromptResult.prompt
+        && originalPromptResult.prompt
+        && currentPromptResult.prompt !== originalPromptResult.prompt
+    ) {
+        refinedPrompt = currentPromptResult.prompt;
+        refinedPromptField = currentPromptResult.fieldName;
+        refinedPromptTruncated = currentPromptResult.truncated;
+    }
+
     const originalPromptTruncated = originalPromptResult.truncated;
 
     if (originalPromptTruncated || refinedPromptTruncated) {
@@ -277,11 +306,14 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
         ? normalizedRefinedCandidate
         : null;
 
-    const textModelHint = extractModelFromPromptLabel(refinedPromptResult.fieldName)
+    const textModelHint = extractModelFromPromptLabel(currentPromptResult.fieldName)
+        ?? extractModelFromPromptLabel(refinedPromptField)
         ?? extractModelFromPromptLabel(originalPromptResult.fieldName)
+        ?? fieldMap.get('Text model')
         ?? fieldMap.get('Text Model')
         ?? fieldMap.get('Model');
-    const imageModelHint = fieldMap.get('Image Model')
+    const imageModelHint = fieldMap.get('Image model')
+        ?? fieldMap.get('Image Model')
         ?? extractModelFromQualityField(fieldMap.get('Quality'));
 
     return {
@@ -297,7 +329,7 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
             quality: parseQuality(fieldMap.get('Quality')),
             background: parseBackground(fieldMap.get('Background')),
             style: parseStyle(fieldMap.get('Style')),
-            allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt Adjustment'))
+            allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt adjustment') ?? fieldMap.get('Prompt Adjustment'))
         },
         responseId: parseIdentifier(fieldMap.get('Output ID')),
         inputId: parseIdentifier(fieldMap.get('Input ID'))

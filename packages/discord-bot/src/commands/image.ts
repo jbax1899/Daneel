@@ -2,7 +2,7 @@ import { AttachmentBuilder, ChatInputCommandInteraction, EmbedBuilder, Repliable
 import { Command } from './BaseCommand.js';
 import { logger } from '../utils/logger.js';
 import { formatUsd } from '../utils/pricing.js';
-import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
+import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './image/embed.js';
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import {
@@ -55,23 +55,31 @@ type StatusField = { name: string; value: string; inline: boolean };
  */
 function buildInitialStatusFields(
     context: ImageGenerationContext,
-    sizeFieldValue: string,
+    resolutionFieldValue: string,
     followUpResponseId?: string | null
 ): StatusField[] {
+    const activePrompt = context.refinedPrompt ?? context.prompt;
+    const originalPrompt = context.originalPrompt ?? context.prompt;
+
     const fields: StatusField[] = [
         {
-            name: 'Prompt Adjustment',
-            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
-            inline: true
+            name: 'Current prompt',
+            value: buildPromptFieldValue(activePrompt, { label: 'current prompt' }),
+            inline: false
         },
         {
-            name: 'Text Model',
-            value: context.textModel,
-            inline: true
+            name: 'Original prompt',
+            value: buildPromptFieldValue(originalPrompt, { label: 'original prompt' }),
+            inline: false
         },
         {
-            name: 'Image Model',
+            name: 'Image model',
             value: context.imageModel,
+            inline: true
+        },
+        {
+            name: 'Text model',
+            value: context.textModel,
             inline: true
         },
         {
@@ -80,18 +88,23 @@ function buildInitialStatusFields(
             inline: true
         },
         {
-            name: 'Size',
-            value: sizeFieldValue,
+            name: 'Aspect ratio',
+            value: context.aspectRatioLabel,
             inline: true
         },
         {
-            name: 'Aspect Ratio',
-            value: context.aspectRatioLabel,
+            name: 'Resolution',
+            value: resolutionFieldValue,
             inline: true
         },
         {
             name: 'Background',
             value: toTitleCase(context.background),
+            inline: true
+        },
+        {
+            name: 'Prompt adjustment',
+            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
             inline: true
         },
         {
@@ -148,9 +161,7 @@ export async function runImageGenerationSession(
         `Starting image generation session for user ${interaction.user.id} with text model ${textModel} and image model ${imageModel}.`
     );
 
-    const sizeFieldValue = size !== 'auto'
-        ? `${aspectRatioLabel} (${size})`
-        : aspectRatioLabel;
+    const resolutionFieldValue = size !== 'auto' ? size : 'Auto';
 
     const embed = new EmbedBuilder()
         .setTitle('🎨 Image Generation')
@@ -159,7 +170,7 @@ export async function runImageGenerationSession(
         .setDescription(truncateForEmbed(prompt, PROMPT_DISPLAY_LIMIT))
         .setFooter({ text: 'Generating…' });
 
-    const statusFields = buildInitialStatusFields(context, sizeFieldValue, followUpResponseId);
+    const statusFields = buildInitialStatusFields(context, resolutionFieldValue, followUpResponseId);
     embed.addFields(statusFields);
 
     await interaction.editReply({ embeds: [embed], components: [], files: [] });
@@ -265,26 +276,6 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
-            .setName('aspect_ratio')
-            .setDescription('The aspect ratio to use (optional; defaults to auto)')
-            .addChoices(
-                { name: 'Square', value: 'square' },
-                { name: 'Portrait', value: 'portrait' },
-                { name: 'Landscape', value: 'landscape' }
-            )
-            .setRequired(false)
-        )
-        .addStringOption(option => option
-            .setName('quality')
-            .setDescription('Image quality (Low=1 token, Medium=3, High=5; defaults to low)')
-            .addChoices(
-                { name: 'Low', value: 'low' },
-                { name: 'Medium', value: 'medium' },
-                { name: 'High', value: 'high' }
-            )
-            .setRequired(false)
-        )
-        .addStringOption(option => option
             .setName('style')
             .setDescription('Image style preset (optional; defaults to unspecified)')
             // Keep the list to 24 presets so the variation select menu can include
@@ -318,6 +309,16 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
+            .setName('aspect_ratio')
+            .setDescription('The aspect ratio to use (optional; defaults to auto)')
+            .addChoices(
+                { name: 'Square', value: 'square' },
+                { name: 'Portrait', value: 'portrait' },
+                { name: 'Landscape', value: 'landscape' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
             .setName('background')
             .setDescription('Image background (optional; defaults to auto)')
             .addChoices(
@@ -328,14 +329,12 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
-            .setName('model')
-            .setDescription(`The text model to use for prompt adjustment (optional; defaults to ${DEFAULT_TEXT_MODEL})`)
+            .setName('quality')
+            .setDescription('Image quality (Mini: 1/3/5 tokens • Full: 2/6/10; defaults to low)')
             .addChoices(
-                { name: 'gpt-4.1', value: 'gpt-4.1' },
-                { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
-                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
-                { name: 'gpt-4o', value: 'gpt-4o' },
-                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }
+                { name: 'Low', value: 'low' },
+                { name: 'Medium', value: 'medium' },
+                { name: 'High', value: 'high' }
             )
             .setRequired(false)
         )
@@ -345,6 +344,18 @@ const imageCommand: Command = {
             .addChoices(
                 { name: 'gpt-image-1', value: 'gpt-image-1' },
                 { name: 'gpt-image-1-mini', value: 'gpt-image-1-mini' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
+            .setName('text_model')
+            .setDescription(`The text model to use for prompt adjustment (optional; defaults to ${DEFAULT_TEXT_MODEL})`)
+            .addChoices(
+                { name: 'gpt-4.1', value: 'gpt-4.1' },
+                { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
+                { name: 'gpt-4.1-nano', value: 'gpt-4.1-nano' },
+                { name: 'gpt-4o', value: 'gpt-4o' },
+                { name: 'gpt-4o-mini', value: 'gpt-4o-mini' }
             )
             .setRequired(false)
         )
@@ -375,7 +386,7 @@ const imageCommand: Command = {
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
         const quality: ImageQualityType = requestedQuality ?? 'low';
 
-        const textModel = (interaction.options.getString('model') as ImageTextModel | null) ?? DEFAULT_TEXT_MODEL;
+        const textModel = (interaction.options.getString('text_model') as ImageTextModel | null) ?? DEFAULT_TEXT_MODEL;
         const imageModel = (interaction.options.getString('image_model') as ImageRenderModel | null) ?? DEFAULT_IMAGE_MODEL;
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
         const style = (interaction.options.getString('style') as ImageStylePreset | null) ?? 'unspecified';
@@ -409,12 +420,12 @@ const imageCommand: Command = {
         let tokenSpend = null as ReturnType<typeof consumeImageTokens> | null;
 
         if (!developerBypass) {
-            const spendResult = consumeImageTokens(interaction.user.id, quality);
+            const spendResult = consumeImageTokens(interaction.user.id, quality, imageModel);
             if (!spendResult.allowed) {
                 const retryKey = `retry:${interaction.id}`;
                 saveFollowUpContext(retryKey, context);
                 const summary = buildTokenSummaryLine(interaction.user.id);
-                const message = `${describeTokenAvailability(quality, spendResult)}\n\n${summary}`;
+                const message = `${describeTokenAvailability(quality, spendResult, imageModel)}\n\n${summary}`;
                 const countdown = spendResult.refreshInSeconds;
                 const components = countdown > 0
                     ? [createRetryButtonRow(retryKey, formatRetryCountdown(countdown))]

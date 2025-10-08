@@ -13,7 +13,6 @@ import {
 } from 'discord.js';
 import { buildPromptFieldValue, truncateForEmbed } from './embed.js';
 import {
-    IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX,
     IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX,
     IMAGE_VARIATION_ASPECT_SELECT_PREFIX,
     IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX,
@@ -22,10 +21,11 @@ import {
     IMAGE_VARIATION_QUALITY_SELECT_PREFIX,
     IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
     IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX,
+    IMAGE_VARIATION_IMAGE_MODEL_SELECT_PREFIX,
     EMBED_FIELD_VALUE_LIMIT
 } from './constants.js';
 import { clampPromptForContext, formatRetryCountdown, formatStylePreset, toTitleCase } from './sessionHelpers.js';
-import { buildQualityTokenDescription } from '../../utils/imageTokens.js';
+import { buildModelTokenDescription, buildQualityTokenDescription } from '../../utils/imageTokens.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
@@ -74,11 +74,12 @@ type VariationConfiguratorView = {
 const VARIATION_SESSION_TTL_MS = 10 * 60 * 1000;
 const sessions = new Map<string, VariationSessionState>();
 
-const QUALITY_OPTIONS: Array<{ value: ImageQualityType; label: string; description: string }> = [
-    { value: 'low', label: 'Low', description: buildQualityTokenDescription('low') },
-    { value: 'medium', label: 'Medium', description: buildQualityTokenDescription('medium') },
-    { value: 'high', label: 'High', description: buildQualityTokenDescription('high') }
-];
+const QUALITY_LABELS: Record<ImageQualityType, string> = {
+    auto: 'Auto',
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High'
+};
 
 const ASPECT_OPTIONS: Array<{ value: ImageGenerationContext['aspectRatio']; label: string }> = [
     { value: 'auto', label: 'Auto' },
@@ -87,11 +88,29 @@ const ASPECT_OPTIONS: Array<{ value: ImageGenerationContext['aspectRatio']; labe
     { value: 'landscape', label: 'Landscape' }
 ];
 
-const BACKGROUND_OPTIONS: Array<{ value: ImageBackgroundType; label: string }> = [
-    { value: 'auto', label: 'Auto' },
-    { value: 'transparent', label: 'Transparent' },
-    { value: 'opaque', label: 'Opaque' }
-];
+const IMAGE_MODEL_LABELS: Record<ImageRenderModel, string> = {
+    'gpt-image-1-mini': 'GPT Image 1 Mini',
+    'gpt-image-1': 'GPT Image 1'
+};
+
+// Menu builders are kept as helpers so we can regenerate token-aware labels each
+// time the configurator re-renders. This keeps the select copy in sync with the
+// active image model or quality without duplicating cost logic at the call site.
+function buildQualityOptions(imageModel: ImageRenderModel): Array<{ value: ImageQualityType; label: string; description: string }> {
+    return (['low', 'medium', 'high'] as ImageQualityType[]).map(quality => ({
+        value: quality,
+        label: QUALITY_LABELS[quality],
+        description: buildQualityTokenDescription(quality, imageModel)
+    }));
+}
+
+function buildImageModelOptions(quality: ImageQualityType): Array<{ value: ImageRenderModel; label: string; description: string }> {
+    return (Object.keys(IMAGE_MODEL_LABELS) as ImageRenderModel[]).map(model => ({
+        value: model,
+        label: IMAGE_MODEL_LABELS[model],
+        description: buildModelTokenDescription(model, quality)
+    }));
+}
 
 // Select menus are limited to four rows, so the "style" selector now doubles as a
 // toggle for whether the AI may refine the prompt. Providing a description keeps
@@ -311,21 +330,22 @@ export function buildVariationConfiguratorView(
         value: buildPromptFieldValue(session.prompt, { label: 'variation prompt' })
     });
 
-    if (session.originalPrompt && session.originalPrompt !== session.prompt) {
-        embed.addFields({
-            name: 'Original prompt',
-            value: buildPromptFieldValue(session.originalPrompt, { label: 'original prompt' })
-        });
-    }
-
-    if (session.refinedPrompt && session.refinedPrompt !== session.prompt && session.refinedPrompt !== session.originalPrompt) {
-        embed.addFields({
-            name: 'Last refined prompt',
-            value: buildPromptFieldValue(session.refinedPrompt, { label: 'refined prompt' })
-        });
-    }
+    embed.addFields({
+        name: 'Original prompt',
+        value: buildPromptFieldValue(session.originalPrompt, { label: 'original prompt' })
+    });
 
     embed.addFields(
+        {
+            name: 'Image model',
+            value: session.imageModel,
+            inline: true
+        },
+        {
+            name: 'Text model',
+            value: session.textModel,
+            inline: true
+        },
         {
             name: 'Quality',
             value: `${toTitleCase(session.quality)} (${session.imageModel})`,
@@ -347,35 +367,46 @@ export function buildVariationConfiguratorView(
             inline: true
         },
         {
-            name: 'Style',
-            value: formatStylePreset(session.style),
-            inline: true
-        },
-        {
             name: 'Prompt adjustment',
             value: session.allowPromptAdjustment ? 'Enabled' : 'Disabled',
             inline: true
         },
         {
-            name: 'Text model',
-            value: session.textModel,
-            inline: true
-        },
-        {
-            name: 'Image model',
-            value: session.imageModel,
+            name: 'Style',
+            value: formatStylePreset(session.style),
             inline: true
         }
     );
 
+    const imageModelOptions = buildImageModelOptions(session.quality);
+    const qualityOptions = buildQualityOptions(session.imageModel);
+
     const rows: ActionRowBuilder<MessageActionRowComponentBuilder>[] = [
         buildSelectRow(
+            `${IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX}${session.responseId}`,
+            PROMPT_ADJUSTMENT_OPTIONS,
+            {
+                selectedValue: session.allowPromptAdjustment ? 'allow' : 'deny',
+                placeholder: 'Select if AI improves prompt',
+                currentLabel: session.allowPromptAdjustment ? 'Enabled' : 'Disabled'
+            }
+        ),
+        buildSelectRow(
+            `${IMAGE_VARIATION_IMAGE_MODEL_SELECT_PREFIX}${session.responseId}`,
+            imageModelOptions,
+            {
+                selectedValue: session.imageModel,
+                placeholder: 'Select image model',
+                currentLabel: IMAGE_MODEL_LABELS[session.imageModel] ?? session.imageModel
+            }
+        ),
+        buildSelectRow(
             `${IMAGE_VARIATION_QUALITY_SELECT_PREFIX}${session.responseId}`,
-            QUALITY_OPTIONS,
+            qualityOptions,
             {
                 selectedValue: session.quality,
                 placeholder: 'Select quality',
-                currentLabel: toTitleCase(session.quality)
+                currentLabel: QUALITY_LABELS[session.quality] ?? toTitleCase(session.quality)
             }
         ),
         buildSelectRow(
@@ -385,24 +416,6 @@ export function buildVariationConfiguratorView(
                 selectedValue: session.aspectRatio,
                 placeholder: 'Select aspect ratio',
                 currentLabel: session.aspectRatioLabel
-            }
-        ),
-        buildSelectRow(
-            `${IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX}${session.responseId}`,
-            BACKGROUND_OPTIONS,
-            {
-                selectedValue: session.background,
-                placeholder: 'Select background',
-                currentLabel: toTitleCase(session.background)
-            }
-        ),
-        buildSelectRow(
-            `${IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX}${session.responseId}`,
-            PROMPT_ADJUSTMENT_OPTIONS,
-            {
-                selectedValue: session.allowPromptAdjustment ? 'allow' : 'deny',
-                placeholder: 'Select if AI improves prompt',
-                currentLabel: session.allowPromptAdjustment ? 'Enabled' : 'Disabled'
             }
         )
     ];

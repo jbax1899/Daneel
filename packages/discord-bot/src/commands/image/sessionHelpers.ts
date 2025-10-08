@@ -306,20 +306,6 @@ export function buildImageResultPresentation(
         }
     };
 
-    assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
-    // Persist both model selections so variations and reboot recovery retain the exact text/image pairing that produced the artwork.
-    assertField('Text Model', followUpContext.textModel, { inline: true });
-    assertField('Image Model', followUpContext.imageModel, { inline: true });
-    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
-    assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
-    assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
-    assertField('Background', toTitleCase(followUpContext.background), { inline: true });
-    assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
-    if (followUpResponseId) {
-        assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
-    }
-    assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
-
     const recordPrompt = (label: string, value: string | null | undefined): boolean => {
         if (!value) {
             return false;
@@ -331,23 +317,24 @@ export function buildImageResultPresentation(
         return truncated;
     };
 
-    // Surface the active model directly within the prompt label so we do not
-    // need a dedicated metadata field while still retaining recovery context
-    // after restarts.
-    const refinedLabel = followUpContext.textModel && refinedPrompt
-        ? `Refined Prompt (${followUpContext.textModel})`
-        : 'Refined Prompt';
-    const originalLabel = !refinedPrompt && followUpContext.textModel
-        ? `Original Prompt (${followUpContext.textModel})`
-        : 'Original Prompt';
+    const currentTruncated = recordPrompt('Current prompt', normalizedActivePrompt);
+    const originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
 
-    const originalTruncated = recordPrompt(originalLabel, originalPrompt);
-    let refinedTruncated = false;
-    if (refinedPrompt) {
-        refinedTruncated = recordPrompt(refinedLabel, refinedPrompt);
+    assertField('Image model', followUpContext.imageModel, { inline: true });
+    assertField('Text model', followUpContext.textModel, { inline: true });
+    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
+    assertField('Aspect ratio', followUpContext.aspectRatioLabel, { inline: true });
+    assertField('Resolution', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
+    assertField('Background', toTitleCase(followUpContext.background), { inline: true });
+    assertField('Prompt adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
+    assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
+    if (followUpResponseId) {
+        assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
     }
+    assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
-    const activeTruncated = refinedPrompt ? refinedTruncated : originalTruncated;
+    const refinedTruncated = normalizedRefinedPrompt ? currentTruncated : false;
+    const activeTruncated = currentTruncated;
 
     embed.addFields(fields);
 
@@ -422,8 +409,8 @@ function formatCostForFooter(amount: number): string {
     }
 
     if (amount < 1) {
-        const cents = Math.max(0, Math.round(amount * 100));
-        return `${cents}¢`;
+        const tenthsOfCent = Math.max(0, Math.round(amount * 1000));
+        return `${(tenthsOfCent / 10).toFixed(1)}¢`;
     }
 
     return formatUsd(amount, 2);
