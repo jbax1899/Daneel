@@ -30,9 +30,10 @@ import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
     ImageQualityType,
-    ImageResponseModel,
+    ImageRenderModel,
     ImageSizeType,
-    ImageStylePreset
+    ImageStylePreset,
+    ImageTextModel
 } from './types.js';
 
 /**
@@ -48,7 +49,8 @@ export interface VariationSessionState {
     prompt: string;
     originalPrompt: string;
     refinedPrompt: string | null;
-    model: ImageResponseModel;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     size: ImageSizeType;
     aspectRatio: ImageGenerationContext['aspectRatio'];
     aspectRatioLabel: string;
@@ -145,7 +147,8 @@ export function initialiseVariationSession(
         prompt: initialPrompt,
         originalPrompt: normalizedOriginal,
         refinedPrompt: normalizedRefined,
-        model: context.model,
+        textModel: context.textModel,
+        imageModel: context.imageModel,
         size: context.size,
         aspectRatio: context.aspectRatio,
         aspectRatioLabel: context.aspectRatioLabel,
@@ -325,7 +328,7 @@ export function buildVariationConfiguratorView(
     embed.addFields(
         {
             name: 'Quality',
-            value: toTitleCase(session.quality),
+            value: `${toTitleCase(session.quality)} (${session.imageModel})`,
             inline: true
         },
         {
@@ -354,8 +357,13 @@ export function buildVariationConfiguratorView(
             inline: true
         },
         {
-            name: 'Model',
-            value: session.model,
+            name: 'Text model',
+            value: session.textModel,
+            inline: true
+        },
+        {
+            name: 'Image model',
+            value: session.imageModel,
             inline: true
         }
     );

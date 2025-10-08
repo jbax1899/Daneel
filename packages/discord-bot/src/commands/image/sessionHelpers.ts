@@ -18,7 +18,14 @@ import {
 } from './constants.js';
 import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
 import { generateImageWithReflection } from './openai.js';
-import type { ImageGenerationCallWithPrompt, ImageStylePreset, PartialImagePayload, ReflectionFields } from './types.js';
+import type {
+    ImageGenerationCallWithPrompt,
+    ImageRenderModel,
+    ImageStylePreset,
+    ImageTextModel,
+    PartialImagePayload,
+    ReflectionFields
+} from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
 
@@ -29,6 +36,8 @@ import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForE
  */
 export interface ImageGenerationArtifacts {
     responseId: string | null;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     revisedPrompt: string | null;
     finalStyle: ImageStylePreset;
     reflection: ReflectionFields;
@@ -77,7 +86,8 @@ export async function executeImageGeneration(
     const generation = await generateImageWithReflection({
         openai,
         prompt: context.prompt,
-        model: context.model,
+        textModel: context.textModel,
+        imageModel: context.imageModel,
         quality: context.quality,
         size: context.size,
         background: context.background,
@@ -102,14 +112,15 @@ export async function executeImageGeneration(
     const finalStyle = imageCall.style_preset ?? context.style;
 
     const textCostEstimate = estimateTextCost(
-        context.model as TextModelPricingKey,
+        context.textModel as TextModelPricingKey,
         inputTokens,
         outputTokens
     );
     const imageCostEstimate = estimateImageGenerationCost({
         quality: context.quality,
         size: context.size,
-        imageCount: successfulImageCount
+        imageCount: successfulImageCount,
+        model: context.imageModel
     });
     const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
 
@@ -125,7 +136,8 @@ export async function executeImageGeneration(
                 title: reflection.title,
                 description: reflection.description,
                 reflectionMessage: reflection.reflection,
-                model: context.model,
+                textModel: context.textModel,
+                imageModel: context.imageModel,
                 quality: context.quality,
                 size: context.size,
                 background: context.background,
@@ -162,6 +174,8 @@ export async function executeImageGeneration(
 
     return {
         responseId: response.id ?? null,
+        textModel: context.textModel,
+        imageModel: context.imageModel,
         revisedPrompt,
         finalStyle,
         reflection,
@@ -228,6 +242,8 @@ export function buildImageResultPresentation(
 
     const followUpContext: ImageGenerationContext = {
         ...context,
+        textModel: artifacts.textModel,
+        imageModel: artifacts.imageModel,
         prompt: normalizedActivePrompt,
         originalPrompt: normalizedOriginalPrompt,
         refinedPrompt: normalizedRefinedPrompt,
@@ -291,7 +307,10 @@ export function buildImageResultPresentation(
     };
 
     assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
-    assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
+    // Persist both model selections so variations and reboot recovery retain the exact text/image pairing that produced the artwork.
+    assertField('Text Model', followUpContext.textModel, { inline: true });
+    assertField('Image Model', followUpContext.imageModel, { inline: true });
+    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
     assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
@@ -315,11 +334,11 @@ export function buildImageResultPresentation(
     // Surface the active model directly within the prompt label so we do not
     // need a dedicated metadata field while still retaining recovery context
     // after restarts.
-    const refinedLabel = followUpContext.model && refinedPrompt
-        ? `Refined Prompt (${followUpContext.model})`
+    const refinedLabel = followUpContext.textModel && refinedPrompt
+        ? `Refined Prompt (${followUpContext.textModel})`
         : 'Refined Prompt';
-    const originalLabel = !refinedPrompt && followUpContext.model
-        ? `Original Prompt (${followUpContext.model})`
+    const originalLabel = !refinedPrompt && followUpContext.textModel
+        ? `Original Prompt (${followUpContext.textModel})`
         : 'Original Prompt';
 
     const originalTruncated = recordPrompt(originalLabel, originalPrompt);

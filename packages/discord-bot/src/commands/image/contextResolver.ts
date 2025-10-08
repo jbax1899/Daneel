@@ -1,14 +1,15 @@
 import type { Message } from 'discord.js';
 import { logger } from '../../utils/logger.js';
-import { DEFAULT_MODEL } from './constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from './constants.js';
 import { clampPromptForContext } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
     ImageQualityType,
-    ImageResponseModel,
+    ImageRenderModel,
     ImageSizeType,
-    ImageStylePreset
+    ImageStylePreset,
+    ImageTextModel
 } from './types.js';
 
 const ASPECT_RATIO_LABELS: Record<ImageGenerationContext['aspectRatio'], string> = {
@@ -95,9 +96,14 @@ function parseSize(value: string | null | undefined): ImageSizeType {
     return SIZE_VALUES.includes(normalised as ImageSizeType) ? (normalised as ImageSizeType) : 'auto';
 }
 
-function parseModel(value: string | null | undefined): ImageResponseModel {
-    const normalised = value?.trim() as ImageResponseModel | undefined;
-    return normalised ?? DEFAULT_MODEL;
+function parseTextModel(value: string | null | undefined): ImageTextModel {
+    const normalised = value?.trim() as ImageTextModel | undefined;
+    return normalised ?? DEFAULT_TEXT_MODEL;
+}
+
+function parseImageModel(value: string | null | undefined): ImageRenderModel {
+    const normalised = value?.trim() as ImageRenderModel | undefined;
+    return normalised ?? DEFAULT_IMAGE_MODEL;
 }
 
 function parsePromptAdjustment(value: string | null | undefined): boolean {
@@ -218,6 +224,15 @@ function extractModelFromPromptLabel(label: string | null | undefined): string |
     return match ? match[1].trim() : null;
 }
 
+function extractModelFromQualityField(value: string | null | undefined): string | null {
+    if (!value) {
+        return null;
+    }
+
+    const match = /\(([^)]+)\)\s*$/.exec(value);
+    return match ? match[1].trim() : null;
+}
+
 function buildContextFromEmbed(message: Message): RecoveredContextDetails | null {
     const embed = message.embeds?.[0];
     if (!embed) {
@@ -262,16 +277,20 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
         ? normalizedRefinedCandidate
         : null;
 
-    const modelFromLabel = extractModelFromPromptLabel(refinedPromptResult.fieldName)
+    const textModelHint = extractModelFromPromptLabel(refinedPromptResult.fieldName)
         ?? extractModelFromPromptLabel(originalPromptResult.fieldName)
+        ?? fieldMap.get('Text Model')
         ?? fieldMap.get('Model');
+    const imageModelHint = fieldMap.get('Image Model')
+        ?? extractModelFromQualityField(fieldMap.get('Quality'));
 
     return {
         context: {
             prompt: normalizedPrompt,
             originalPrompt: normalizedOriginal,
             refinedPrompt: normalizedRefined,
-            model: parseModel(modelFromLabel),
+            textModel: parseTextModel(textModelHint),
+            imageModel: parseImageModel(imageModelHint),
             size,
             aspectRatio,
             aspectRatioLabel: ASPECT_RATIO_LABELS[aspectRatio],
