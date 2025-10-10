@@ -1,4 +1,12 @@
 import { logger } from '../logger.js';
+const VERBOSE_CONTEXT_ENV_FLAG = 'DISCORD_BOT_LOG_FULL_CONTEXT';
+export const isFullContextLoggingEnabled = () => (process.env[VERBOSE_CONTEXT_ENV_FLAG] || '').toLowerCase() === 'true';
+export const logContextIfVerbose = (context) => {
+    if (!isFullContextLoggingEnabled()) {
+        return;
+    }
+    logger.debug(`Full context: ${JSON.stringify(context)}`);
+};
 export class ContextBuilder {
     openaiService;
     DEFAULT_CONTEXT_MESSAGES = 12;
@@ -134,7 +142,7 @@ export class ContextBuilder {
             { role: 'system', content: this.DEFAULT_SYSTEM_PROMPT },
             ...reducedHistory
         ];
-        logger.debug(`Full context: ${JSON.stringify(context)}`); // todo: remove
+        logContextIfVerbose(context);
         logger.debug(`Final context built with ${context.length} messages (${reducedHistory.length} history + 1 system)`);
         return { context };
     }

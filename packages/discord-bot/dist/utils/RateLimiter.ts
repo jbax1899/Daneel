@@ -26,7 +26,6 @@ interface RateLimitRecord {
 export class RateLimiter {
   private readonly limits: Map<string, RateLimitRecord> = new Map();
   private readonly options: Required<RateLimitOptions>;
-  private readonly lastImageGenerationByUser: Map<string, number> = new Map();
 
   /**
    * Creates a new RateLimiter instance.
@@ -83,31 +82,6 @@ export class RateLimiter {
       });
     }
 
-    return { allowed: true };
-  }
-
-  /**
-   * Checks if a request to generate an image (/image) is allowed based on the rate limit rules.
-   * @param {string} userId - The ID of the user making the request
-   * @returns {{allowed: boolean, retryAfter?: number, error?: string}} Result of the rate limit check
-   */
-  public checkRateLimitImageCommand(userId: string): { allowed: boolean; retryAfter?: number; error?: string } {
-    const now = Date.now();
-    const lastGeneration = this.lastImageGenerationByUser.get(userId) || 0;
-    const cooldown = this.options.window;
-
-    // If the last generation was less than the cooldown ago
-    if (now - lastGeneration < cooldown) {
-        return { 
-            allowed: false, 
-            retryAfter: Math.ceil((cooldown - (now - lastGeneration)) / 1000),
-            error: this.options.errorMessage || 'You are generating images too quickly.'
-        };
-    }
-
-    // All checks passed
-    // Update the last generation time
-    this.lastImageGenerationByUser.set(userId, now);
     return { allowed: true };
   }
 
@@ -190,11 +164,3 @@ export function createGuildRateLimiter(limit: number, window: number): RateLimit
     errorMessage: 'Hit the rate limit for this server/guild. Please try again later.'
   });
 }
-
-// Singleton instance of RateLimiter for image command
-export const imageCommandRateLimiter = new RateLimiter({
-  limit: 1, // Not used for image command, but required by the interface
-  window: 5 * 60 * 1000, // 5 minutes
-  scope: 'user',
-  errorMessage: 'You can only generate one image every 5 minutes.'
-});

@@ -20,4 +20,5 @@ export declare class MessageProcessor {
     processMessage(message: Message, directReply?: boolean, trigger?: string): Promise<void>;
     private checkRateLimits;
 }
+export declare function cleanupTTSFile(ttsPath: string): Promise<void>;
 export {};

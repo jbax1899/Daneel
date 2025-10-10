@@ -18,8 +18,10 @@ import type {
     ImageBackgroundType,
     ImageGenerationCallWithPrompt,
     ImageQualityType,
-    ImageResponseModel,
+    ImageRenderModel,
     ImageSizeType,
+    ImageStylePreset,
+    ImageTextModel,
     PartialImagePayload,
     ReflectionFields
 } from './types.js';
@@ -28,10 +30,15 @@ import { mapResponseError } from './errors.js';
 interface GenerateImageOptions {
     openai: OpenAI;
     prompt: string;
-    model: ImageResponseModel;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
+    style: ImageStylePreset;
+    username: string;
+    nickname: string;
+    guildName: string;
     allowPromptAdjustment: boolean;
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
@@ -46,7 +53,22 @@ interface GenerationOutcome {
 }
 
 export async function generateImageWithReflection(options: GenerateImageOptions): Promise<GenerationOutcome> {
-    const { openai, prompt, model, quality, size, background, allowPromptAdjustment, followUpResponseId, onPartialImage } = options;
+    const {
+        openai,
+        prompt,
+        textModel,
+        imageModel,
+        quality,
+        size,
+        background,
+        style,
+        allowPromptAdjustment,
+        followUpResponseId,
+        username,
+        nickname,
+        guildName,
+        onPartialImage
+    } = options;
 
     const input: ResponseInput = [
         {
@@ -61,7 +83,11 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
                 allowPromptAdjustment,
                 size,
                 quality,
-                background
+                background,
+                style,
+                username,
+                nickname,
+                guildName
             }) }]
         },
         {
@@ -71,18 +97,17 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         }
     ];
 
-    const imageTool: Tool.ImageGeneration = {
-        type: 'image_generation',
-        size,
+    const imageTool = createImageGenerationTool({
+        model: imageModel,
         quality,
-        background,
-        partial_images: PARTIAL_IMAGE_LIMIT
-    };
+        size,
+        background
+    });
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
 
     const requestPayload = {
-        model,
+        model: textModel,
         input,
         tools: [imageTool],
         tool_choice: toolChoice,
@@ -150,6 +175,28 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         partialImages,
         reflection
     };
+}
+
+function createImageGenerationTool(options: {
+    model: ImageRenderModel;
+    quality: ImageQualityType;
+    size: ImageSizeType;
+    background: ImageBackgroundType;
+}): Tool.ImageGeneration {
+    // The OpenAI SDK currently narrows the `model` property to only allow the
+    // `gpt-image-1` literal. The API accepts additional models (for example the
+    // more affordable `gpt-image-1-mini`), so we populate the field and then
+    // cast the resulting object back to the SDK's type.
+    const tool = {
+        type: 'image_generation',
+        quality: options.quality,
+        size: options.size,
+        background: options.background,
+        partial_images: PARTIAL_IMAGE_LIMIT,
+        model: options.model
+    } as Tool.ImageGeneration;
+
+    return tool;
 }
 
 function normalizeImageResult(result: unknown): string | null {

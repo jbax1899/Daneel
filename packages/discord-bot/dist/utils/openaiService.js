@@ -109,7 +109,18 @@ export class OpenAIService {
                 ...(verbosity && { text: { verbosity } }),
                 ...(tools.length > 0 && { tools })
             };
-            logger.debug(`Generating AI response with payload: ${JSON.stringify(requestPayload)}`); // TODO: Remove
+            const toolNames = tools
+                .filter(tool => tool?.type === 'function' && typeof tool?.name === 'string')
+                .map(tool => tool.name);
+            const toolTypes = Array.from(new Set(tools.map(tool => tool?.type).filter(Boolean)));
+            const requestMetadata = {
+                model,
+                messageCount: validMessages.length,
+                toolCount: tools.length,
+                toolTypes,
+                ...(toolNames.length > 0 && { toolNames })
+            };
+            logger.debug('Generating AI response', requestMetadata);
             // Generate response
             const response = await this.openai.responses.create(requestPayload);
             // Get output items from response
@@ -240,7 +251,10 @@ export class OpenAIService {
                         content: [
                             {
                                 type: 'text',
-                                text: `What's in this image?${context ? ` (Additional context: ${context})` : ''}`
+                                text: `Describe the image in a structured, observant way.
+              Focus on recurring themes, subject types (people, animals, objects, symbols), and overall visual styles.
+              Be neutral, brief, and descriptive — do not interpret or advise.
+              ${context ? `Additional context: ${context}` : ''}`
                             },
                             {
                                 type: 'image_url',

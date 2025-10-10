@@ -46,10 +46,13 @@ export async function uploadToCloudinary(imageBuffer, metadata) {
         logger.debug(`Uploading image to Cloudinary with estimated cost ${formatUsd(metadata.cost.total)} and ${metadata.usage.totalTokens} tokens...`);
         const nowIso = new Date().toISOString();
         const context = {
-            model: metadata.model,
+            model: metadata.imageModel,
+            text_model: metadata.textModel,
+            image_model: metadata.imageModel,
             quality: metadata.quality,
             size: metadata.size,
             background: metadata.background,
+            style_preset: metadata.style,
             generated_at: nowIso,
             generation_time: `${(Date.now() - metadata.startTime) / 1000}s`,
             text_input_tokens: metadata.usage.inputTokens.toString(),
@@ -79,7 +82,14 @@ export async function uploadToCloudinary(imageBuffer, metadata) {
             resource_type: 'image',
             public_id: `ai-image-${Date.now()}`,
             context,
-            tags: ['ai-generated', 'discord-bot', metadata.model, metadata.quality]
+            tags: [
+                'ai-generated',
+                'discord-bot',
+                metadata.textModel,
+                metadata.imageModel,
+                metadata.quality,
+                metadata.style
+            ]
         });
         logger.debug(`Image uploaded to Cloudinary: ${uploadResult.secure_url}`);
         return uploadResult.secure_url;

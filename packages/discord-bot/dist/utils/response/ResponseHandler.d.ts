@@ -33,7 +33,21 @@ export declare class ResponseHandler {
     sendMessage(content: string, files?: Array<{
         filename: string;
         data: string | Buffer;
-    }>, directReply?: boolean, suppressEmbeds?: boolean): Promise<Message | Message[]>;
+    }>, directReply?: boolean, suppressEmbeds?: boolean, components?: MessageCreateOptions['components']): Promise<Message | Message[]>;
+    /**
+     * Sends a single embed with optional attachments and interactive components.
+     * This is primarily used by automated image responses so we can ship the
+     * generated asset, metadata attachment, and variation buttons in one payload.
+     */
+    sendEmbedMessage(embed: DiscordEmbedBuilder, { content, files, directReply, components }?: {
+        content?: string;
+        files?: Array<{
+            filename: string;
+            data: string | Buffer;
+        }>;
+        directReply?: boolean;
+        components?: MessageCreateOptions['components'];
+    }): Promise<Message>;
     /**
      * Sends an embedded message to the channel where the message was received.
      * @param {CustomEmbedBuilder | DiscordEmbedBuilder} embed - The embed to send

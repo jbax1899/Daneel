@@ -6,6 +6,7 @@ export type TextModelPricingKey = GPT5ModelType | OmniModelType;
 
 export type ImageGenerationQuality = 'low' | 'medium' | 'high' | 'auto';
 export type ImageGenerationSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
+export type ImageModelPricingKey = 'gpt-image-1' | 'gpt-image-1-mini';
 
 export interface TextCostBreakdown {
     inputTokens: number;
@@ -19,6 +20,7 @@ export interface ImageGenerationCostOptions {
     quality: ImageGenerationQuality;
     size: ImageGenerationSize;
     imageCount?: number;
+    model: ImageModelPricingKey;
 }
 
 export interface ImageGenerationCostEstimate {
@@ -30,35 +32,69 @@ export interface ImageGenerationCostEstimate {
 }
 
 const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: number }> = {
-    // Pricing per 1M tokens (USD) sourced from https://platform.openai.com/pricing (2025-03)
-    'gpt-5': { input: 1.25, output: 10 },
-    'gpt-5-mini': { input: 0.25, output: 2.0 },
-    'gpt-5-nano': { input: 0.05, output: 0.4 },
-    'gpt-4o': { input: 5, output: 15 },
-    'gpt-4o-mini': { input: 0.15, output: 0.6 },
-    'gpt-4.1': { input: 15, output: 60 },
-    'gpt-4.1-mini': { input: 3, output: 12 },
-    'gpt-4.1-nano': { input: 1, output: 4 }
+    // Pricing per 1M tokens (USD) sourced from https://platform.openai.com/pricing (2025-04)
+    'gpt-5': { input: 1.25, output: 10.00 },
+    'gpt-5-mini': { input: 0.25, output: 2.00 },
+    'gpt-5-nano': { input: 0.05, output: 0.40 },
+    'gpt-4o': { input: 2.50, output: 10.00 },
+    'gpt-4o-mini': { input: 0.15, output: 0.60 },
+    'gpt-4.1': { input: 2.00, output: 8.00 },
+    'gpt-4.1-mini': { input: 0.40, output: 1.60 },
+    'gpt-4.1-nano': { input: 0.10, output: 0.40 }
 };
 
-const IMAGE_GENERATION_COST_TABLE: Record<Exclude<ImageGenerationQuality, 'auto'>, Record<'1024x1024' | '1024x1536' | '1536x1024', number>> = {
-    // Pricing per image in USD for gpt-image-1 (2025-03)
-    low: {
-        '1024x1024': 0.04,
-        '1024x1536': 0.06,
-        '1536x1024': 0.06
+const IMAGE_GENERATION_COST_TABLE: Record<
+    ImageModelPricingKey,
+    Record<Exclude<ImageGenerationQuality, 'auto'>, Record<'1024x1024' | '1024x1536' | '1536x1024', number>>
+> = {
+    // Pricing per image in USD sourced from https://platform.openai.com/pricing (2025-04)
+    'gpt-image-1': {
+        low: {
+            '1024x1024': 0.011,
+            '1024x1536': 0.016,
+            '1536x1024': 0.016
+        },
+        medium: {
+            '1024x1024': 0.042,
+            '1024x1536': 0.063,
+            '1536x1024': 0.063
+        },
+        high: {
+            '1024x1024': 0.167,
+            '1024x1536': 0.25,
+            '1536x1024': 0.25
+        }
     },
-    medium: {
-        '1024x1024': 0.08,
-        '1024x1536': 0.12,
-        '1536x1024': 0.12
-    },
-    high: {
-        '1024x1024': 0.12,
-        '1024x1536': 0.18,
-        '1536x1024': 0.18
+    'gpt-image-1-mini': {
+        low: {
+            '1024x1024': 0.005,
+            '1024x1536': 0.006,
+            '1536x1024': 0.006
+        },
+        medium: {
+            '1024x1024': 0.011,
+            '1024x1536': 0.015,
+            '1536x1024': 0.015
+        },
+        high: {
+            '1024x1024': 0.036,
+            '1024x1536': 0.052,
+            '1536x1024': 0.052
+        }
     }
 };
+
+function resolveEffectiveQuality(quality: ImageGenerationQuality): Exclude<ImageGenerationQuality, 'auto'> {
+    // The OpenAI API defaults to "low" when quality is set to "auto", so we
+    // mirror that behaviour for cost estimations to keep the numbers aligned.
+    return quality === 'auto' ? 'low' : quality;
+}
+
+function resolveEffectiveSize(size: ImageGenerationSize): Exclude<ImageGenerationSize, 'auto'> {
+    // The service currently resolves "auto" to a 1024x1024 canvas. If the API
+    // ever exposes the chosen size we can update this logic to read it.
+    return size === 'auto' ? '1024x1024' : size;
+}
 
 export function estimateTextCost(model: TextModelPricingKey, inputTokens: number, outputTokens: number): TextCostBreakdown {
     const pricing = TEXT_MODEL_PRICING[model];
@@ -86,14 +122,46 @@ export function estimateTextCost(model: TextModelPricingKey, inputTokens: number
 }
 
 export function estimateImageGenerationCost(options: ImageGenerationCostOptions): ImageGenerationCostEstimate {
+    // Even when callers forget to request a count we assume at least one image
+    // so that the consumer receives a realistic non-zero cost estimate.
     const imageCount = Math.max(1, options.imageCount ?? 1);
-    const effectiveQuality = options.quality === 'auto' ? 'low' : options.quality; // 
-    const effectiveSize = options.size === 'auto' ? '1024x1024' : options.size; // TODO: retrieve actual size chosen by OpenAI
+    const effectiveQuality = resolveEffectiveQuality(options.quality);
+    const effectiveSize = resolveEffectiveSize(options.size);
 
-    const qualityPricing = IMAGE_GENERATION_COST_TABLE[effectiveQuality];
-    const perImageCost = qualityPricing?.[effectiveSize] ?? 0;
-    if (perImageCost === 0) {
-        logger.warn(`Unable to determine pricing for quality ${effectiveQuality} and size ${effectiveSize}.`);
+    const modelPricing = IMAGE_GENERATION_COST_TABLE[options.model];
+    if (!modelPricing) {
+        logger.warn(`Unable to locate pricing table for image model ${options.model}. Assuming zero cost.`);
+        return {
+            effectiveQuality,
+            effectiveSize,
+            imageCount,
+            perImageCost: 0,
+            totalCost: 0
+        };
+    }
+
+    const qualityPricing = modelPricing[effectiveQuality];
+    if (!qualityPricing) {
+        logger.warn(`No pricing tier defined for quality ${effectiveQuality} on model ${options.model}. Assuming zero cost.`);
+        return {
+            effectiveQuality,
+            effectiveSize,
+            imageCount,
+            perImageCost: 0,
+            totalCost: 0
+        };
+    }
+
+    const perImageCost = qualityPricing[effectiveSize];
+    if (typeof perImageCost !== 'number') {
+        logger.warn(`Unable to determine pricing for model ${options.model}, quality ${effectiveQuality}, and size ${effectiveSize}.`);
+        return {
+            effectiveQuality,
+            effectiveSize,
+            imageCount,
+            perImageCost: 0,
+            totalCost: 0
+        };
     }
 
     const totalCost = perImageCost * imageCount;
@@ -107,7 +175,12 @@ export function estimateImageGenerationCost(options: ImageGenerationCostOptions)
     };
 }
 
-export function formatUsd(amount: number, fractionDigits = 6): string {
+export function formatUsd(amount: number | null | undefined, fractionDigits = 6): string {
+    if (typeof amount !== 'number' || !Number.isFinite(amount)) {
+        logger.warn(`formatUsd received an invalid amount: ${amount}. Defaulting to $0.00.`);
+        return '$0.00';
+    }
+
     return `$${amount.toFixed(fractionDigits)}`;
 }
 

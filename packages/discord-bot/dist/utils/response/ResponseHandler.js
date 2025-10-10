@@ -35,7 +35,7 @@ export class ResponseHandler {
      * @param {Object} [replyToMessage] - Optional message reference for replies
      * @returns {Promise<Message | Message[]>} The sent message(s)
      */
-    async sendMessage(content, files = [], directReply = false, suppressEmbeds = true) {
+    async sendMessage(content, files = [], directReply = false, suppressEmbeds = true, components = []) {
         if (!this.channel.isSendable()) {
             throw new Error('Channel is not sendable');
         }
@@ -50,7 +50,8 @@ export class ResponseHandler {
                 // Create base message options
                 const messageOptions = {
                     content: chunk,
-                    flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined
+                    flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined,
+                    components: isLastChunk && components?.length ? components : undefined
                 };
                 // Add message reference for replies
                 if (isFirstChunk && directReply) {
@@ -76,6 +77,34 @@ export class ResponseHandler {
             logger.error('Failed to send message:', error);
             throw error;
         }
+    }
+    /**
+     * Sends a single embed with optional attachments and interactive components.
+     * This is primarily used by automated image responses so we can ship the
+     * generated asset, metadata attachment, and variation buttons in one payload.
+     */
+    async sendEmbedMessage(embed, { content, files = [], directReply = false, components } = {}) {
+        if (!this.channel.isSendable()) {
+            throw new Error('Channel is not sendable');
+        }
+        const messageOptions = {
+            embeds: [embed],
+            content,
+            components
+        };
+        if (directReply) {
+            messageOptions.reply = {
+                messageReference: this.message.id,
+                failIfNotExists: false
+            };
+        }
+        if (files.length > 0) {
+            messageOptions.files = files.map(file => ({
+                attachment: Buffer.from(file.data),
+                name: file.filename
+            }));
+        }
+        return this.channel.send(messageOptions);
     }
     /**
      * Sends an embedded message to the channel where the message was received.
