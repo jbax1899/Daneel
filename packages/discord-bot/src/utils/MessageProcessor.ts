@@ -8,10 +8,7 @@ import { RateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
-//import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-// These defaults now mirror the environment-aware configuration used by the
-// image command so planner-triggered renders stay in sync.
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
@@ -29,6 +26,7 @@ import type {
   ImageStylePreset,
   ImageTextModel
 } from '../commands/image/types.js';
+//import { Pinecone } from '@pinecone-database/pinecone';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;

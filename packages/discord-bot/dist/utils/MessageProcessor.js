@@ -6,7 +6,6 @@ import { RateLimiter } from './RateLimiter.js';
 import { config } from './env.js';
 import { Planner } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
-//import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';

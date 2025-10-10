@@ -3,6 +3,9 @@ import { Command } from './BaseCommand.js';
 import { logger } from '../utils/logger.js';
 import { formatUsd } from '../utils/pricing.js';
 import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './image/embed.js';
+import { imageConfig } from '../config/imageConfig.js';
+// Pulling defaults from the constants module keeps the slash command aligned
+// with any environment overrides exposed by imageConfig.
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import {
@@ -32,6 +35,7 @@ import {
     buildTokenSummaryLine,
     consumeImageTokens,
     describeTokenAvailability,
+    getImageTokenCost,
     refundImageTokens
 } from '../utils/imageTokens.js';
 
@@ -46,6 +50,30 @@ const ensureDeferredReply = async (interaction: RepliableInteraction): Promise<v
 };
 
 type StatusField = { name: string; value: string; inline: boolean };
+
+const QUALITY_LEVELS: ImageQualityType[] = ['low', 'medium', 'high'];
+
+/**
+ * Builds a human-friendly quality description that reflects the configured
+ * token multipliers for each available image model.
+ */
+function buildQualityOptionDescription(): string {
+    const summaries = Object.keys(imageConfig.tokens.modelTokenMultipliers)
+        .sort()
+        .map(model => {
+            const typedModel = model as ImageRenderModel;
+            const costs = QUALITY_LEVELS.map(level => getImageTokenCost(level, typedModel));
+            return `${typedModel}: ${costs.join('/')}`;
+        });
+
+    if (summaries.length === 0) {
+        return 'Image quality (defaults to low)';
+    }
+
+    return `Image quality (${summaries.join(' • ')} tokens; defaults to low)`;
+}
+
+const QUALITY_OPTION_DESCRIPTION = buildQualityOptionDescription();
 
 /**
  * Produces the initial set of status fields for the generation embed so that
@@ -328,7 +356,7 @@ const imageCommand: Command = {
         )
         .addStringOption(option => option
             .setName('quality')
-            .setDescription('Image quality (Mini: 1/3/5 tokens • Full: 2/6/10; defaults to low)')
+            .setDescription(QUALITY_OPTION_DESCRIPTION)
             .addChoices(
                 { name: 'Low', value: 'low' },
                 { name: 'Medium', value: 'medium' },

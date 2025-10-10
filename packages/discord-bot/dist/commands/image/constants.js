@@ -1,3 +1,7 @@
+// Pull resolved defaults from the central image configuration so every caller
+// sees the same values even when operators override them via environment
+// variables.
+import { imageConfig } from '../../config/imageConfig.js';
 export const EMBED_FIELD_VALUE_LIMIT = 1024;
 export const EMBED_FOOTER_TEXT_LIMIT = 2048;
 export const EMBED_DESCRIPTION_LIMIT = 4096;
@@ -10,8 +14,8 @@ export const PARTIAL_IMAGE_LIMIT = 3; // OpenAI's limit is 3
 export const REFLECTION_TITLE_LIMIT = EMBED_TITLE_LIMIT;
 export const REFLECTION_DESCRIPTION_LIMIT = EMBED_DESCRIPTION_LIMIT;
 export const REFLECTION_MESSAGE_LIMIT = 2000; // Discord's max is 2000
-export const DEFAULT_TEXT_MODEL = 'gpt-4.1-mini';
-export const DEFAULT_IMAGE_MODEL = 'gpt-image-1-mini';
+export const DEFAULT_TEXT_MODEL = imageConfig.defaults.textModel;
+export const DEFAULT_IMAGE_MODEL = imageConfig.defaults.imageModel;
 export const IMAGE_VARIATION_CUSTOM_ID_PREFIX = 'image:variation:';
 export const IMAGE_RETRY_CUSTOM_ID_PREFIX = 'image:retry:';
 export const IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX = 'image:variation:generate:';

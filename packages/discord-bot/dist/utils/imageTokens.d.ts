@@ -48,14 +48,6 @@ export declare class UsageTokenManager {
     private ensureBucket;
     private buildSnapshot;
 }
-export declare const IMAGE_TOKEN_REFRESH_INTERVAL_MS: number;
-export declare const IMAGE_TOKENS_PER_REFRESH = 10;
-/**
- * Token multipliers let us represent the heavier footprint of the full render
- * model without rewriting every call site. Administrators can tweak these
- * values to rebalance the economy without touching business logic.
- */
-export declare const IMAGE_MODEL_TOKEN_MULTIPLIER: Record<ImageRenderModel, number>;
 export declare function getImageTokenCost(quality: ImageQualityType, imageModel: ImageRenderModel): number;
 export declare function consumeImageTokens(userId: string, quality: ImageQualityType, imageModel: ImageRenderModel): TokenSpendResult;
 export declare function refundImageTokens(userId: string, qualityOrAmount: ImageQualityType | number, imageModel?: ImageRenderModel): TokenSnapshot;
