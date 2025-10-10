@@ -8,57 +8,20 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 
 ### 🤖 Discord Bot
 - Rich bot features with a user-friendly interface (Discord API / Discord.js)
-- Command handling, event management, and message processing pipelines
-- OpenAI message processing
+- Natural message processing and responses
 - Image analysis
 - Text-to-speech (TTS) generation
-- /news command: Fetches recent articles from across the web; Optional arguments for refining search
-- /image command: Generates an image given a prompt; Optional argument for dimensions (square, portrait, landscape)
+- /news command: Fetches recent articles from across the web
+- /image command: Generates an image given a prompt
 
 #### Realtime Voice Chat
 - **Seamless voice conversations** with OpenAI's Realtime API
 - **Advanced audio processing pipeline** with Discord.js Voice
 - **Real-time transcription and response generation**
 
-### 🌐 Web Client
-- Next.js 15 with React 19
-- Modern UI with Tailwind CSS and shadcn/ui
-- Real-time chat interface with AI SDK
-- Secure authentication with Clerk
-- Responsive design for all devices
-
-### 🧩 Shared Core
-- TypeScript-based shared utilities and types
-- Centralized configuration and logging
-- Consistent AI model integration
-- Common validation schemas
-
-## 🛠️ Technical Stack
-
-### Core
-- **Runtime**: Node.js 18+
-- **Language**: TypeScript 5.0+
-- **Package Manager**: npm 10+
-- **Version Control**: Git/GitHub
-
-### Frontend
-- Next.js 15, React 19
-- Styling: Tailwind CSS, shadcn/ui
-- State: React Context + AI SDK
-- Auth: Clerk
-- Chat: @assistant-ui/react
-
-### Discord Bot
-- Discord.js 14
-- Custom command/event system
-- Winston logging
-- TSX for development
-
-### Development Tools
-- Bundler: Turbopack
-- Linting: ESLint + Prettier
-- CI/CD: GitHub Actions
-- Deployment: Fly.io
+### 🌐 Web Interface
+- Project landing page
+- Settings configuration (coming soon)
 
 ## Configuration
 
