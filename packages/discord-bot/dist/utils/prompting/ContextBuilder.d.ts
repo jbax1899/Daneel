@@ -5,7 +5,6 @@ export declare const logContextIfVerbose: (context: OpenAIMessage[]) => void;
 export declare class ContextBuilder {
     private readonly openaiService;
     private readonly DEFAULT_CONTEXT_MESSAGES;
-    private readonly DEFAULT_SYSTEM_PROMPT;
     constructor(openaiService: OpenAIService);
     /**
      * Builds the message context for the given message

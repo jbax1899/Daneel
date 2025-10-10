@@ -6,6 +6,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { PromptRegistry, renderPrompt as sharedRenderPrompt, setActivePromptRegistry } from '@ai-assistant/shared';
 import { logger } from './logger.js';
 // Get the current directory
 const __filename = fileURLToPath(import.meta.url);
@@ -70,6 +71,34 @@ function validateEnvironment() {
 }
 // Validate environment variables on startup
 validateEnvironment();
+// Resolve the optional prompt override configuration path. Operators may point
+// this to a custom YAML file in production to tweak Daneel's behaviour without
+// redeploying code.
+const rawPromptConfigPath = process.env.PROMPT_CONFIG_PATH;
+const promptConfigPath = rawPromptConfigPath
+    ? path.isAbsolute(rawPromptConfigPath)
+        ? rawPromptConfigPath
+        : path.resolve(__dirname, '../../../../', rawPromptConfigPath)
+    : undefined;
+if (promptConfigPath) {
+    logger.info(`Loading prompt overrides from: ${promptConfigPath}`);
+}
+// Instantiate the shared prompt registry and expose it to downstream modules.
+export const promptRegistry = new PromptRegistry({ overridePath: promptConfigPath });
+setActivePromptRegistry(promptRegistry);
+// Ensure every prompt required by the bot is present at startup. This catches
+// missing keys in overrides before the first request makes it to OpenAI.
+const REQUIRED_PROMPT_KEYS = [
+    'discord.chat.system',
+    'discord.image.system',
+    'discord.image.developer',
+    'discord.news.system',
+    'discord.planner.system',
+    'discord.realtime.system',
+    'discord.summarizer.system'
+];
+promptRegistry.assertKeys(REQUIRED_PROMPT_KEYS);
+export const renderPrompt = sharedRenderPrompt;
 /**
  * Gets a number from environment variables with a default value
  */
@@ -103,6 +132,7 @@ export const config = {
     clientId: process.env.CLIENT_ID,
     guildId: process.env.GUILD_ID,
     openaiApiKey: process.env.OPENAI_API_KEY,
+    promptConfigPath,
     // Environment
     env: process.env.NODE_ENV || 'development',
     isProduction: (process.env.NODE_ENV || 'development') === 'production',

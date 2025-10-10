@@ -1,19 +1,10 @@
+import { renderPrompt } from '../env.js';
 import { logger } from '../logger.js';
 import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel, TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 import { ActivityOptions } from 'discord.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
 const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // TODO: trying out high reasoning effort, and letting it handle verbosity
-const PLAN_SYSTEM_PROMPT = `You are a planning LLM that generates structured responses for the "generate-plan" function.
-Do not omit any required field.
-Only return a function call to "generate-plan", formatted according to its JSON schema.
-Always follow the example pattern: populate 'repoQuery' with relevant keywords, separated by commas.
-If you see <summarized> before a message, it means that message has been summarized by the reduction LLM, and is not the original message, though the role is still the same.
-Prefer the 'message' action whenever the user is chatting, asking questions, or making indirect references. Only pick 'image' when the user explicitly requests an image/variation, directly asks you to create or refine visuals, or it is unmistakably the best response (e.g., "please draw", "make an image", "edit that picture").
-When selecting the 'image' action, default imageRequest.allowPromptAdjustment to false unless the user clearly asks for improvements or rewording.
-When the triggering message directly replies to one of Daneel's earlier messages, treat that replied-to content as the primary target—especially for image variations. Use its identifiers and details if you reference an existing image.
-When you choose 'image', you must populate imageRequest.prompt and may set optional fields to guide the generation.`;
-
 export interface Plan {
   action: 'message' | 'react' | 'ignore' | 'image';
   modality: 'text' | 'tts';
@@ -219,10 +210,11 @@ export class Planner {
     try {
       const messages: OpenAIMessage[] = [...context];
 
+      const plannerPrompt = renderPrompt('discord.planner.system').content;
       const openaiResponse = await this.openaiService.generateResponse(
         PLANNING_MODEL,
         [
-          { role: 'system', content: PLAN_SYSTEM_PROMPT },
+          { role: 'system', content: plannerPrompt },
           { role: 'system', content: `This planner was triggered because ${trigger}.` }, // The planner should know how it was triggered: Either a Discord direct reply/ping, or it decided to reply itself (e.g. a catchup event)
           ...messages
         ],

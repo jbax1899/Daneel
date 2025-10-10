@@ -4,6 +4,7 @@ import fs from 'fs';
 import OpenAI from 'openai';
 import fetch from 'node-fetch';
 import { logger } from './logger.js';
+import { renderPrompt } from './env.js';
 import { ActivityOptions } from 'discord.js';
 import { estimateTextCost, formatUsd, type GPT5ModelType } from './pricing.js';
 
@@ -480,12 +481,7 @@ export class OpenAIService {
 
     const REDUCE_OVER_N_CHARCTERS = 256;
     const REDUCTION_MODEL: GPT5ModelType = 'gpt-5-nano';
-    const SYSTEM_PROMPT = `You are a helpful assistant that summarizes text to reduce token usage.
-    You will recieve a list of messages, and you must summarize each.
-    You will return a single string with each summary prefixed like [reduced-0], [reduced-1], etc.
-    Pass through the original timestamp and username/nickname of the user who said the message.
-    Do not include any additional text or formatting in your response.
-    The summarized strings must be returned in the order given.`;
+    const summarizerPrompt = renderPrompt('discord.summarizer.system').content;
 
     let reducedContext = context; // Set the initial value of reducedContext to the input context; we'll modify it in place
     let messageIndexesToReduce: number[] = []; // We'll store the index of large messages that need summarizing, so we can summarize all at once
@@ -510,7 +506,7 @@ export class OpenAIService {
         const response = await this.openai.chat.completions.create({
           model: REDUCTION_MODEL,
           messages: [
-            { role: "system", content: SYSTEM_PROMPT },
+            { role: "system", content: summarizerPrompt },
             { role: "user", content: messagesToSummarize.map(m => m.content).join('\n\n') }
           ]
         });

@@ -1,15 +1,17 @@
 import { logger } from '../../utils/logger.js';
 import { PARTIAL_IMAGE_LIMIT, REFLECTION_DESCRIPTION_LIMIT, REFLECTION_MESSAGE_LIMIT, REFLECTION_TITLE_LIMIT } from './constants.js';
 import { sanitizeForEmbed, truncateForEmbed } from './embed.js';
-import { buildDeveloperPrompt, IMAGE_SYSTEM_PROMPT } from './prompts.js';
+import { renderPrompt } from '../../utils/env.js';
+import { buildDeveloperPrompt } from './prompts.js';
 import { mapResponseError } from './errors.js';
 export async function generateImageWithReflection(options) {
     const { openai, prompt, textModel, imageModel, quality, size, background, style, allowPromptAdjustment, followUpResponseId, username, nickname, guildName, onPartialImage } = options;
+    const { content: imageSystemPrompt } = renderPrompt('discord.image.system');
     const input = [
         {
             role: 'system',
             type: 'message',
-            content: [{ type: 'input_text', text: IMAGE_SYSTEM_PROMPT }]
+            content: [{ type: 'input_text', text: imageSystemPrompt }]
         },
         {
             role: 'developer',
