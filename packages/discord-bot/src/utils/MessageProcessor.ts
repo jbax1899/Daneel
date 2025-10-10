@@ -10,7 +10,7 @@ import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-import { DEFAULT_MODEL } from '../commands/image/constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
@@ -19,7 +19,14 @@ import {
 } from '../commands/image/sessionHelpers.js';
 import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
 import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
-import type { ImageBackgroundType, ImageQualityType, ImageSizeType, ImageStylePreset } from '../commands/image/types.js';
+import type {
+  ImageBackgroundType,
+  ImageQualityType,
+  ImageRenderModel,
+  ImageSizeType,
+  ImageStylePreset,
+  ImageTextModel
+} from '../commands/image/types.js';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
@@ -248,11 +255,15 @@ export class MessageProcessor {
           ?? referencedContext?.allowPromptAdjustment
           ?? false;
 
+        const textModel: ImageTextModel = referencedContext?.textModel ?? DEFAULT_TEXT_MODEL;
+        const imageModel: ImageRenderModel = referencedContext?.imageModel ?? DEFAULT_IMAGE_MODEL;
+
         const context: ImageGenerationContext = {
           prompt: normalizedPrompt,
           originalPrompt: normalizedPrompt,
           refinedPrompt: null,
-          model: referencedContext?.model ?? DEFAULT_MODEL,
+          textModel,
+          imageModel,
           size,
           aspectRatio,
           aspectRatioLabel,

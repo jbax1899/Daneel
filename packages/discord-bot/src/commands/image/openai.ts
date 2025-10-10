@@ -18,9 +18,10 @@ import type {
     ImageBackgroundType,
     ImageGenerationCallWithPrompt,
     ImageQualityType,
-    ImageResponseModel,
+    ImageRenderModel,
     ImageSizeType,
     ImageStylePreset,
+    ImageTextModel,
     PartialImagePayload,
     ReflectionFields
 } from './types.js';
@@ -29,7 +30,8 @@ import { mapResponseError } from './errors.js';
 interface GenerateImageOptions {
     openai: OpenAI;
     prompt: string;
-    model: ImageResponseModel;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
@@ -54,7 +56,8 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
     const {
         openai,
         prompt,
-        model,
+        textModel,
+        imageModel,
         quality,
         size,
         background,
@@ -94,18 +97,17 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         }
     ];
 
-    const imageTool: Tool.ImageGeneration = {
-        type: 'image_generation',
-        size,
+    const imageTool = createImageGenerationTool({
+        model: imageModel,
         quality,
-        background,
-        partial_images: PARTIAL_IMAGE_LIMIT
-    };
+        size,
+        background
+    });
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
 
     const requestPayload = {
-        model,
+        model: textModel,
         input,
         tools: [imageTool],
         tool_choice: toolChoice,
@@ -173,6 +175,26 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         partialImages,
         reflection
     };
+}
+
+function createImageGenerationTool(options: {
+    model: ImageRenderModel;
+    quality: ImageQualityType;
+    size: ImageSizeType;
+    background: ImageBackgroundType;
+}): Tool.ImageGeneration {
+    // The OpenAI SDK types sometimes omit the optional `model` field. We widen
+    // the type locally so that downstream code always receives a populated
+    // value without having to repeat the cast at each call-site.
+    const tool: Tool.ImageGeneration & { model?: string } = {
+        type: 'image_generation',
+        quality: options.quality,
+        size: options.size,
+        background: options.background,
+        partial_images: PARTIAL_IMAGE_LIMIT
+    };
+    tool.model = options.model;
+    return tool;
 }
 
 function normalizeImageResult(result: unknown): string | null {

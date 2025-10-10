@@ -11,7 +11,6 @@ import { runImageGenerationSession } from './commands/image.js';
 import {
   IMAGE_RETRY_CUSTOM_ID_PREFIX,
   IMAGE_VARIATION_ASPECT_SELECT_PREFIX,
-  IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX,
   IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX,
   IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX,
   IMAGE_VARIATION_PROMPT_INPUT_ID,
@@ -19,6 +18,7 @@ import {
   IMAGE_VARIATION_QUALITY_SELECT_PREFIX,
   IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX,
   IMAGE_VARIATION_PROMPT_ADJUST_SELECT_PREFIX,
+  IMAGE_VARIATION_IMAGE_MODEL_SELECT_PREFIX,
   IMAGE_VARIATION_CUSTOM_ID_PREFIX
 } from './commands/image/constants.js';
 import {
@@ -229,10 +229,10 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-    if (customId.startsWith(IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX)) {
-      const responseId = customId.slice(IMAGE_VARIATION_BACKGROUND_SELECT_PREFIX.length);
+    if (customId.startsWith(IMAGE_VARIATION_IMAGE_MODEL_SELECT_PREFIX)) {
+      const responseId = customId.slice(IMAGE_VARIATION_IMAGE_MODEL_SELECT_PREFIX.length);
       const session = updateVariationSession(interaction.user.id, responseId, current => {
-        current.background = selected as any;
+        current.imageModel = selected as any;
       });
 
       if (!session) {
@@ -340,11 +340,11 @@ client.on(Events.InteractionCreate, async interaction => {
       // Spend tokens only when the user is not in developer bypass mode. This keeps
       // chained variations consistent with the slash-command flow.
       if (!developerBypass) {
-        const spendResult = consumeImageTokens(interaction.user.id, session.quality);
+        const spendResult = consumeImageTokens(interaction.user.id, session.quality, session.imageModel);
         if (!spendResult.allowed) {
           const statusMessage = buildVariationStatusMessage(
             interaction.user.id,
-            describeTokenAvailability(session.quality, spendResult)
+            describeTokenAvailability(session.quality, spendResult, session.imageModel)
           );
 
           const updatedSession = spendResult.remainingTokens === 0 && spendResult.refreshInSeconds > 0
@@ -383,7 +383,8 @@ client.on(Events.InteractionCreate, async interaction => {
           prompt: session.prompt,
           originalPrompt: session.originalPrompt,
           refinedPrompt: session.refinedPrompt,
-          model: session.model,
+          textModel: session.textModel,
+          imageModel: session.imageModel,
           size: session.size,
           aspectRatio: session.aspectRatio,
           aspectRatioLabel: session.aspectRatioLabel,
@@ -515,9 +516,9 @@ client.on(Events.InteractionCreate, async interaction => {
       const isDeveloper = interaction.user.id === process.env.DEVELOPER_USER_ID;
       let retrySpend = null as ReturnType<typeof consumeImageTokens> | null;
       if (!isDeveloper) {
-        const spendResult = consumeImageTokens(interaction.user.id, cachedContext.quality);
+        const spendResult = consumeImageTokens(interaction.user.id, cachedContext.quality, cachedContext.imageModel);
         if (!spendResult.allowed) {
-          const message = `${describeTokenAvailability(cachedContext.quality, spendResult)}\n\n${buildTokenSummaryLine(interaction.user.id)}`;
+          const message = `${describeTokenAvailability(cachedContext.quality, spendResult, cachedContext.imageModel)}\n\n${buildTokenSummaryLine(interaction.user.id)}`;
           const countdown = spendResult.refreshInSeconds;
           const retryRow = countdown > 0 ? createRetryButtonRow(retryKey, formatRetryCountdown(countdown)) : undefined;
           try {

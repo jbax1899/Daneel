@@ -1,4 +1,11 @@
-import type { ImageBackgroundType, ImageQualityType, ImageResponseModel, ImageSizeType, ImageStylePreset } from './types.js';
+import type {
+    ImageBackgroundType,
+    ImageQualityType,
+    ImageRenderModel,
+    ImageSizeType,
+    ImageStylePreset,
+    ImageTextModel
+} from './types.js';
 
 /**
  * Represents the minimum data needed to recreate an image generation request.
@@ -24,7 +31,8 @@ export interface ImageGenerationContext {
      * choose not to alter the prompt.
      */
     refinedPrompt?: string | null;
-    model: ImageResponseModel;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     size: ImageSizeType;
     aspectRatio: 'auto' | 'square' | 'portrait' | 'landscape';
     aspectRatioLabel: string;

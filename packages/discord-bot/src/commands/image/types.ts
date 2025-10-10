@@ -1,7 +1,8 @@
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
-import type { ImageGenerationQuality, ImageGenerationSize } from '../../utils/pricing.js';
+import type { ImageGenerationQuality, ImageGenerationSize, ImageModelPricingKey } from '../../utils/pricing.js';
 
-export type ImageResponseModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano'; // gpt-5 is not supported for image generation (yet)
+export type ImageTextModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano'; // gpt-5 is not supported for prompt adjustment (yet)
+export type ImageRenderModel = ImageModelPricingKey;
 export type ImageQualityType = ImageGenerationQuality;
 export type ImageSizeType = ImageGenerationSize;
 export type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
@@ -48,7 +49,8 @@ export interface UploadMetadata {
     title?: string | null;
     description?: string | null;
     reflectionMessage?: string | null;
-    model: ImageResponseModel;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;

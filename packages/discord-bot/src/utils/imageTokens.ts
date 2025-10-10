@@ -1,5 +1,5 @@
 import { logger } from './logger.js';
-import type { ImageQualityType } from '../commands/image/types.js';
+import type { ImageQualityType, ImageRenderModel } from '../commands/image/types.js';
 
 /**
  * Represents the configurable settings for a token bucket. The manager keeps
@@ -149,23 +149,45 @@ const QUALITY_TOKEN_COST: Record<ImageQualityType, number> = {
     high: 5
 };
 
+/**
+ * Token multipliers let us represent the heavier footprint of the full render
+ * model without rewriting every call site. Administrators can tweak these
+ * values to rebalance the economy without touching business logic.
+ */
+export const IMAGE_MODEL_TOKEN_MULTIPLIER: Record<ImageRenderModel, number> = {
+    'gpt-image-1-mini': 1,
+    'gpt-image-1': 2
+};
+
 const imageTokenManager = new UsageTokenManager({
     tokensPerInterval: IMAGE_TOKENS_PER_REFRESH,
     intervalMs: IMAGE_TOKEN_REFRESH_INTERVAL_MS,
     namespace: 'image'
 });
 
-export function getImageTokenCost(quality: ImageQualityType): number {
-    return QUALITY_TOKEN_COST[quality] ?? QUALITY_TOKEN_COST.low;
+export function getImageTokenCost(quality: ImageQualityType, imageModel: ImageRenderModel): number {
+    const baseCost = QUALITY_TOKEN_COST[quality] ?? QUALITY_TOKEN_COST.low;
+    const multiplier = IMAGE_MODEL_TOKEN_MULTIPLIER[imageModel] ?? 1;
+    return baseCost * multiplier;
 }
 
-export function consumeImageTokens(userId: string, quality: ImageQualityType): TokenSpendResult {
-    const cost = getImageTokenCost(quality);
+export function consumeImageTokens(
+    userId: string,
+    quality: ImageQualityType,
+    imageModel: ImageRenderModel
+): TokenSpendResult {
+    const cost = getImageTokenCost(quality, imageModel);
     return imageTokenManager.consume(userId, cost);
 }
 
-export function refundImageTokens(userId: string, qualityOrAmount: ImageQualityType | number): TokenSnapshot {
-    const amount = typeof qualityOrAmount === 'number' ? qualityOrAmount : getImageTokenCost(qualityOrAmount);
+export function refundImageTokens(
+    userId: string,
+    qualityOrAmount: ImageQualityType | number,
+    imageModel: ImageRenderModel = 'gpt-image-1-mini'
+): TokenSnapshot {
+    const amount = typeof qualityOrAmount === 'number'
+        ? qualityOrAmount
+        : getImageTokenCost(qualityOrAmount, imageModel);
     return imageTokenManager.refund(userId, amount);
 }
 
@@ -175,7 +197,8 @@ export function inspectImageTokens(userId: string): TokenSnapshot {
 
 export function describeTokenAvailability(
     quality: ImageQualityType,
-    result: TokenSpendResult
+    result: TokenSpendResult,
+    imageModel: ImageRenderModel
 ): string {
     const qualityName = quality.charAt(0).toUpperCase() + quality.slice(1);
     const countdown = formatCountdown(result.refreshInSeconds);
@@ -187,12 +210,24 @@ export function describeTokenAvailability(
         ? `Please wait ${countdown} for your balance to refresh.`
         : `Please wait ${countdown} or pick a lower quality.`;
 
-    return `⚠️ ${qualityName} quality requires ${result.cost} token${result.cost === 1 ? '' : 's'}, but you have ${result.remainingTokens}. ${waitInstruction} ${neededText}`.trim();
+    return `⚠️ ${qualityName} quality with ${imageModel} requires ${result.cost} token${result.cost === 1 ? '' : 's'}, but you have ${result.remainingTokens}. ${waitInstruction} ${neededText}`.trim();
 }
 
-export function buildQualityTokenDescription(quality: ImageQualityType): string {
-    const cost = getImageTokenCost(quality);
+export function buildQualityTokenDescription(
+    quality: ImageQualityType,
+    imageModel: ImageRenderModel
+): string {
+    const cost = getImageTokenCost(quality, imageModel);
     return `Uses ${cost} token${cost === 1 ? '' : 's'}`;
+}
+
+export function buildModelTokenDescription(
+    imageModel: ImageRenderModel,
+    quality: ImageQualityType
+): string {
+    const qualityName = quality.charAt(0).toUpperCase() + quality.slice(1);
+    const cost = getImageTokenCost(quality, imageModel);
+    return `${qualityName} quality uses ${cost} token${cost === 1 ? '' : 's'}`;
 }
 
 export function buildTokenSummaryLine(userId: string): string {

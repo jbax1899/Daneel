@@ -2,8 +2,8 @@ import { AttachmentBuilder, ChatInputCommandInteraction, EmbedBuilder, Repliable
 import { Command } from './BaseCommand.js';
 import { logger } from '../utils/logger.js';
 import { formatUsd } from '../utils/pricing.js';
-import { setEmbedFooterText, truncateForEmbed } from './image/embed.js';
-import { DEFAULT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
+import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './image/embed.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import {
     buildImageResultPresentation,
@@ -18,9 +18,10 @@ import { resolveImageCommandError } from './image/errors.js';
 import type {
     ImageBackgroundType,
     ImageQualityType,
-    ImageResponseModel,
+    ImageRenderModel,
     ImageSizeType,
-    ImageStylePreset
+    ImageStylePreset,
+    ImageTextModel
 } from './image/types.js';
 import {
     evictFollowUpContext,
@@ -44,6 +45,89 @@ const ensureDeferredReply = async (interaction: RepliableInteraction): Promise<v
     }
 };
 
+type StatusField = { name: string; value: string; inline: boolean };
+
+/**
+ * Produces the initial set of status fields for the generation embed so that
+ * the layout stays consistent across slash commands, retries, and planner flows.
+ */
+function buildInitialStatusFields(
+    context: ImageGenerationContext,
+    resolutionFieldValue: string,
+    followUpResponseId?: string | null
+): StatusField[] {
+    const activePrompt = context.refinedPrompt ?? context.prompt;
+    const originalPrompt = context.originalPrompt ?? context.prompt;
+
+    const fields: StatusField[] = [
+        {
+            name: 'Current prompt',
+            value: buildPromptFieldValue(activePrompt, { label: 'current prompt' }),
+            inline: false
+        },
+        {
+            name: 'Original prompt',
+            value: buildPromptFieldValue(originalPrompt, { label: 'original prompt' }),
+            inline: false
+        },
+        {
+            name: 'Image model',
+            value: context.imageModel,
+            inline: true
+        },
+        {
+            name: 'Text model',
+            value: context.textModel,
+            inline: true
+        },
+        {
+            name: 'Quality',
+            value: `${toTitleCase(context.quality)} (${context.imageModel})`,
+            inline: true
+        },
+        {
+            name: 'Aspect ratio',
+            value: context.aspectRatioLabel,
+            inline: true
+        },
+        {
+            name: 'Resolution',
+            value: resolutionFieldValue,
+            inline: true
+        },
+        {
+            name: 'Background',
+            value: toTitleCase(context.background),
+            inline: true
+        },
+        {
+            name: 'Prompt adjustment',
+            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
+            inline: true
+        },
+        {
+            name: 'Style',
+            value: formatStylePreset(context.style),
+            inline: true
+        },
+        {
+            name: 'Output ID',
+            value: '…',
+            inline: true
+        }
+    ];
+
+    if (followUpResponseId) {
+        fields.splice(fields.length - 1, 0, {
+            name: 'Input ID',
+            value: `\`${followUpResponseId}\``,
+            inline: true
+        });
+    }
+
+    return fields;
+}
+
 export interface ImageGenerationSessionResult {
     success: boolean;
     responseId: string | null;
@@ -62,7 +146,8 @@ export async function runImageGenerationSession(
 
     const {
         prompt,
-        model,
+        textModel,
+        imageModel,
         size,
         aspectRatioLabel,
         quality,
@@ -70,11 +155,11 @@ export async function runImageGenerationSession(
         style
     } = context;
 
-    logger.debug(`Starting image generation session for user ${interaction.user.id} with model ${model}.`);
+    logger.debug(
+        `Starting image generation session for user ${interaction.user.id} with text model ${textModel} and image model ${imageModel}.`
+    );
 
-    const sizeFieldValue = size !== 'auto'
-        ? `${aspectRatioLabel} (${size})`
-        : aspectRatioLabel;
+    const resolutionFieldValue = size !== 'auto' ? size : 'Auto';
 
     const embed = new EmbedBuilder()
         .setTitle('🎨 Image Generation')
@@ -83,52 +168,7 @@ export async function runImageGenerationSession(
         .setDescription(truncateForEmbed(prompt, PROMPT_DISPLAY_LIMIT))
         .setFooter({ text: 'Generating…' });
 
-    const statusFields = [
-        {
-            name: 'Prompt Adjustment',
-            value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
-            inline: true
-        },
-        {
-            name: 'Quality',
-            value: toTitleCase(quality),
-            inline: true
-        },
-        {
-            name: 'Size',
-            value: sizeFieldValue,
-            inline: true
-        },
-        {
-            name: 'Aspect Ratio',
-            value: aspectRatioLabel,
-            inline: true
-        },
-        {
-            name: 'Background',
-            value: toTitleCase(background),
-            inline: true
-        },
-        {
-            name: 'Style',
-            value: formatStylePreset(style),
-            inline: true
-        },
-        {
-            name: 'Output ID',
-            value: '…',
-            inline: true
-        }
-    ];
-
-    if (followUpResponseId) {
-        statusFields.splice(statusFields.length - 1, 0, {
-            name: 'Input ID',
-            value: `\`${followUpResponseId}\``,
-            inline: true
-        });
-    }
-
+    const statusFields = buildInitialStatusFields(context, resolutionFieldValue, followUpResponseId);
     embed.addFields(statusFields);
 
     await interaction.editReply({ embeds: [embed], components: [], files: [] });
@@ -136,6 +176,9 @@ export async function runImageGenerationSession(
     let editChain: Promise<void> = Promise.resolve();
 
     const queueEmbedUpdate = (task: () => Promise<void>): Promise<void> => {
+        // Discord rate limits edits, so we serialise embed updates to preserve
+        // ordering and to surface a single, easy-to-follow queue for future
+        // contributors.
         editChain = editChain.then(async () => {
             try {
                 await task();
@@ -175,7 +218,7 @@ export async function runImageGenerationSession(
         await editChain;
 
         logger.debug(
-            `Image generation usage - inputTokens: ${artifacts.usage.inputTokens}, outputTokens: ${artifacts.usage.outputTokens}, images: ${artifacts.usage.imageCount}, estimatedCost: ${formatUsd(artifacts.costs.total)}`
+            `Image generation usage - inputTokens: ${artifacts.usage.inputTokens}, outputTokens: ${artifacts.usage.outputTokens}, images: ${artifacts.usage.imageCount}, estimatedCost: ${formatUsd(artifacts.costs.total)}, textModel: ${artifacts.textModel}, imageModel: ${artifacts.imageModel}`
         );
 
         const presentation = buildImageResultPresentation(context, artifacts, { followUpResponseId });
@@ -231,26 +274,6 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
-            .setName('aspect_ratio')
-            .setDescription('The aspect ratio to use (optional; defaults to auto)')
-            .addChoices(
-                { name: 'Square', value: 'square' },
-                { name: 'Portrait', value: 'portrait' },
-                { name: 'Landscape', value: 'landscape' }
-            )
-            .setRequired(false)
-        )
-        .addStringOption(option => option
-            .setName('quality')
-            .setDescription('Image quality (Low=1 token, Medium=3, High=5; defaults to low)')
-            .addChoices(
-                { name: 'Low', value: 'low' },
-                { name: 'Medium', value: 'medium' },
-                { name: 'High', value: 'high' }
-            )
-            .setRequired(false)
-        )
-        .addStringOption(option => option
             .setName('style')
             .setDescription('Image style preset (optional; defaults to unspecified)')
             // Keep the list to 24 presets so the variation select menu can include
@@ -284,6 +307,16 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
+            .setName('aspect_ratio')
+            .setDescription('The aspect ratio to use (optional; defaults to auto)')
+            .addChoices(
+                { name: 'Square', value: 'square' },
+                { name: 'Portrait', value: 'portrait' },
+                { name: 'Landscape', value: 'landscape' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
             .setName('background')
             .setDescription('Image background (optional; defaults to auto)')
             .addChoices(
@@ -294,8 +327,27 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
-            .setName('model')
-            .setDescription(`The model to use for prompt adjustment (optional; defaults to ${DEFAULT_MODEL})`)
+            .setName('quality')
+            .setDescription('Image quality (Mini: 1/3/5 tokens • Full: 2/6/10; defaults to low)')
+            .addChoices(
+                { name: 'Low', value: 'low' },
+                { name: 'Medium', value: 'medium' },
+                { name: 'High', value: 'high' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
+            .setName('image_model')
+            .setDescription(`The image model to render with (optional; defaults to ${DEFAULT_IMAGE_MODEL})`)
+            .addChoices(
+                { name: 'gpt-image-1', value: 'gpt-image-1' },
+                { name: 'gpt-image-1-mini', value: 'gpt-image-1-mini' }
+            )
+            .setRequired(false)
+        )
+        .addStringOption(option => option
+            .setName('text_model')
+            .setDescription(`The text model to use for prompt adjustment (optional; defaults to ${DEFAULT_TEXT_MODEL})`)
             .addChoices(
                 { name: 'gpt-4.1', value: 'gpt-4.1' },
                 { name: 'gpt-4.1-mini', value: 'gpt-4.1-mini' },
@@ -332,7 +384,8 @@ const imageCommand: Command = {
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
         const quality: ImageQualityType = requestedQuality ?? 'low';
 
-        const model = (interaction.options.getString('model') as ImageResponseModel | null) ?? DEFAULT_MODEL;
+        const textModel = (interaction.options.getString('text_model') as ImageTextModel | null) ?? DEFAULT_TEXT_MODEL;
+        const imageModel = (interaction.options.getString('image_model') as ImageRenderModel | null) ?? DEFAULT_IMAGE_MODEL;
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
         const style = (interaction.options.getString('style') as ImageStylePreset | null) ?? 'unspecified';
         const adjustPrompt = interaction.options.getBoolean('adjust_prompt') ?? true;
@@ -347,7 +400,8 @@ const imageCommand: Command = {
             prompt: normalizedPrompt,
             originalPrompt: normalizedPrompt,
             refinedPrompt: null,
-            model,
+            textModel,
+            imageModel,
             size,
             aspectRatio,
             aspectRatioLabel,
@@ -364,12 +418,12 @@ const imageCommand: Command = {
         let tokenSpend = null as ReturnType<typeof consumeImageTokens> | null;
 
         if (!developerBypass) {
-            const spendResult = consumeImageTokens(interaction.user.id, quality);
+            const spendResult = consumeImageTokens(interaction.user.id, quality, imageModel);
             if (!spendResult.allowed) {
                 const retryKey = `retry:${interaction.id}`;
                 saveFollowUpContext(retryKey, context);
                 const summary = buildTokenSummaryLine(interaction.user.id);
-                const message = `${describeTokenAvailability(quality, spendResult)}\n\n${summary}`;
+                const message = `${describeTokenAvailability(quality, spendResult, imageModel)}\n\n${summary}`;
                 const countdown = spendResult.refreshInSeconds;
                 const components = countdown > 0
                     ? [createRetryButtonRow(retryKey, formatRetryCountdown(countdown))]

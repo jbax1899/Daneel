@@ -18,7 +18,14 @@ import {
 } from './constants.js';
 import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
 import { generateImageWithReflection } from './openai.js';
-import type { ImageGenerationCallWithPrompt, ImageStylePreset, PartialImagePayload, ReflectionFields } from './types.js';
+import type {
+    ImageGenerationCallWithPrompt,
+    ImageRenderModel,
+    ImageStylePreset,
+    ImageTextModel,
+    PartialImagePayload,
+    ReflectionFields
+} from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
 
@@ -29,6 +36,8 @@ import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForE
  */
 export interface ImageGenerationArtifacts {
     responseId: string | null;
+    textModel: ImageTextModel;
+    imageModel: ImageRenderModel;
     revisedPrompt: string | null;
     finalStyle: ImageStylePreset;
     reflection: ReflectionFields;
@@ -77,7 +86,8 @@ export async function executeImageGeneration(
     const generation = await generateImageWithReflection({
         openai,
         prompt: context.prompt,
-        model: context.model,
+        textModel: context.textModel,
+        imageModel: context.imageModel,
         quality: context.quality,
         size: context.size,
         background: context.background,
@@ -102,14 +112,15 @@ export async function executeImageGeneration(
     const finalStyle = imageCall.style_preset ?? context.style;
 
     const textCostEstimate = estimateTextCost(
-        context.model as TextModelPricingKey,
+        context.textModel as TextModelPricingKey,
         inputTokens,
         outputTokens
     );
     const imageCostEstimate = estimateImageGenerationCost({
         quality: context.quality,
         size: context.size,
-        imageCount: successfulImageCount
+        imageCount: successfulImageCount,
+        model: context.imageModel
     });
     const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
 
@@ -125,7 +136,8 @@ export async function executeImageGeneration(
                 title: reflection.title,
                 description: reflection.description,
                 reflectionMessage: reflection.reflection,
-                model: context.model,
+                textModel: context.textModel,
+                imageModel: context.imageModel,
                 quality: context.quality,
                 size: context.size,
                 background: context.background,
@@ -162,6 +174,8 @@ export async function executeImageGeneration(
 
     return {
         responseId: response.id ?? null,
+        textModel: context.textModel,
+        imageModel: context.imageModel,
         revisedPrompt,
         finalStyle,
         reflection,
@@ -228,6 +242,8 @@ export function buildImageResultPresentation(
 
     const followUpContext: ImageGenerationContext = {
         ...context,
+        textModel: artifacts.textModel,
+        imageModel: artifacts.imageModel,
         prompt: normalizedActivePrompt,
         originalPrompt: normalizedOriginalPrompt,
         refinedPrompt: normalizedRefinedPrompt,
@@ -290,17 +306,6 @@ export function buildImageResultPresentation(
         }
     };
 
-    assertField('Prompt Adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
-    assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
-    assertField('Size', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
-    assertField('Aspect Ratio', followUpContext.aspectRatioLabel, { inline: true });
-    assertField('Background', toTitleCase(followUpContext.background), { inline: true });
-    assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
-    if (followUpResponseId) {
-        assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
-    }
-    assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
-
     const recordPrompt = (label: string, value: string | null | undefined): boolean => {
         if (!value) {
             return false;
@@ -312,23 +317,24 @@ export function buildImageResultPresentation(
         return truncated;
     };
 
-    // Surface the active model directly within the prompt label so we do not
-    // need a dedicated metadata field while still retaining recovery context
-    // after restarts.
-    const refinedLabel = followUpContext.model && refinedPrompt
-        ? `Refined Prompt (${followUpContext.model})`
-        : 'Refined Prompt';
-    const originalLabel = !refinedPrompt && followUpContext.model
-        ? `Original Prompt (${followUpContext.model})`
-        : 'Original Prompt';
+    const currentTruncated = recordPrompt('Current prompt', normalizedActivePrompt);
+    const originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
 
-    const originalTruncated = recordPrompt(originalLabel, originalPrompt);
-    let refinedTruncated = false;
-    if (refinedPrompt) {
-        refinedTruncated = recordPrompt(refinedLabel, refinedPrompt);
+    assertField('Image model', followUpContext.imageModel, { inline: true });
+    assertField('Text model', followUpContext.textModel, { inline: true });
+    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
+    assertField('Aspect ratio', followUpContext.aspectRatioLabel, { inline: true });
+    assertField('Resolution', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
+    assertField('Background', toTitleCase(followUpContext.background), { inline: true });
+    assertField('Prompt adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
+    assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
+    if (followUpResponseId) {
+        assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
     }
+    assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
-    const activeTruncated = refinedPrompt ? refinedTruncated : originalTruncated;
+    const refinedTruncated = normalizedRefinedPrompt ? currentTruncated : false;
+    const activeTruncated = currentTruncated;
 
     embed.addFields(fields);
 
@@ -403,8 +409,8 @@ function formatCostForFooter(amount: number): string {
     }
 
     if (amount < 1) {
-        const cents = Math.max(0, Math.round(amount * 100));
-        return `${cents}¢`;
+        const tenthsOfCent = Math.max(0, Math.round(amount * 1000));
+        return `${(tenthsOfCent / 10).toFixed(1)}¢`;
     }
 
     return formatUsd(amount, 2);
