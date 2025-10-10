@@ -183,17 +183,19 @@ function createImageGenerationTool(options: {
     size: ImageSizeType;
     background: ImageBackgroundType;
 }): Tool.ImageGeneration {
-    // The OpenAI SDK types sometimes omit the optional `model` field. We widen
-    // the type locally so that downstream code always receives a populated
-    // value without having to repeat the cast at each call-site.
-    const tool: Tool.ImageGeneration & { model?: string } = {
+    // The OpenAI SDK currently narrows the `model` property to only allow the
+    // `gpt-image-1` literal. The API accepts additional models (for example the
+    // more affordable `gpt-image-1-mini`), so we populate the field and then
+    // cast the resulting object back to the SDK's type.
+    const tool = {
         type: 'image_generation',
         quality: options.quality,
         size: options.size,
         background: options.background,
-        partial_images: PARTIAL_IMAGE_LIMIT
-    };
-    tool.model = options.model;
+        partial_images: PARTIAL_IMAGE_LIMIT,
+        model: options.model
+    } as Tool.ImageGeneration;
+
     return tool;
 }
 
