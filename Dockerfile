@@ -24,12 +24,14 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 COPY packages/discord-bot/package*.json packages/discord-bot/
+COPY packages/shared/package.json packages/shared/
 
 # Install dependencies (includes @discordjs/opus build)
 RUN npm install --include=dev
 
 # Copy and build bot
 COPY . .
+RUN npm run build --workspace=@ai-assistant/shared
 RUN npx tsc -p packages/discord-bot/tsconfig.json
 
 # Prune dev dependencies to reduce image size
@@ -46,6 +48,9 @@ COPY --from=frontend-builder /app/packages/daneel-site/dist ./packages/daneel-si
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
+COPY --from=bot-builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=bot-builder /app/packages/shared/dist ./packages/shared/dist
+COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
 RUN cd packages/discord-bot && npm install --production
 
 # Copy the lightweight Node server used to host the static site
