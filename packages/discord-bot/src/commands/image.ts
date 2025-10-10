@@ -49,9 +49,7 @@ type StatusField = { name: string; value: string; inline: boolean };
 
 /**
  * Produces the initial set of status fields for the generation embed so that
- * the layout stays consistent across slash commands, retries, and planner
- * flows. Keeping this logic in one place makes it easier for a junior
- * developer to see which fields belong on the status card.
+ * the layout stays consistent across slash commands, retries, and planner flows.
  */
 function buildInitialStatusFields(
     context: ImageGenerationContext,
