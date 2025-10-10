@@ -4,21 +4,6 @@ Daneel (inspired by the android in Isaac Asimov's "Foundation" series) is a comp
 
 https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 
-## Local development quickstart
-
-The landing page now lives inside the `@ai-assistant/daneel-site` Vite workspace. To work on it locally:
-
-1. Install dependencies from the repository root: `npm install`
-2. Start the development server: `npm run dev -w @ai-assistant/daneel-site`
-3. Visit http://localhost:3000 to preview changes with hot reloads
-
-When you are ready to test the production bundle locally:
-
-- Build the static assets: `npm run build -w @ai-assistant/daneel-site`
-- Preview the production output: `npm run preview -w @ai-assistant/daneel-site`
-
-These commands mirror the Fly.io build pipeline, so a successful preview means the Docker image will also have the compiled assets it needs.
-
 ## Features
 
 ### 🤖 Discord Bot
