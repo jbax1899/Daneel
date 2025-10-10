@@ -3,6 +3,9 @@
  * @description Environment variable configuration and validation for the Discord bot.
  * Handles loading environment variables from .env file and validating required configurations.
  */
+import { PromptRegistry, PromptKey } from '@ai-assistant/shared';
+export declare const promptRegistry: PromptRegistry;
+export declare const renderPrompt: (key: PromptKey, variables?: import("@ai-assistant/shared").PromptVariables) => import("@ai-assistant/shared").RenderedPrompt;
 /**
  * Application configuration object containing all environment-based settings.
  * @type {Object}
@@ -19,6 +22,7 @@ export declare const config: {
     readonly clientId: string;
     readonly guildId: string;
     readonly openaiApiKey: string;
+    readonly promptConfigPath: string | undefined;
     readonly env: string;
     readonly isProduction: boolean;
     readonly rateLimits: {

@@ -1,6 +1,7 @@
 import { SlashCommandBuilder } from 'discord.js';
 import { openaiService } from '../index.js';
 import { EmbedBuilder } from '../utils/response/EmbedBuilder.js';
+import { renderPrompt } from '../utils/env.js';
 import { logger } from '../utils/logger.js';
 const DEFAULT_MAX_RESULTS = 3;
 const MAX_RESULTS = 5;
@@ -129,18 +130,12 @@ const newsCommand = {
                     userLocation: { type: 'approximate' }
                 }
             };
-            const systemPrompt = `You are a news assistant that fetches and summarizes current news using web search.
-      INSTRUCTIONS:
-      1. ALWAYS use the generate_news_response function to return results
-      2. Use web search to find the most recent and relevant news (aim for within the past 24-48 hours)
-      3. Include a concise 1-2 sentence summary of the overall findings
-      4. Return ${maxResults} news items by default unless specified otherwise
-      5. Format each news item with: title, summary, url, source, and timestamp
-      Search parameters:
-      - Query: ${query || 'Not specified'}
-      - Category: ${category || 'Not specified'}
-      - Max results: ${maxResults}
-      - Allowed domains: ${allowedDomains?.join(', ') || 'Any'}`;
+            const { content: systemPrompt } = renderPrompt('discord.news.system', {
+                query: query || 'Not specified',
+                category: category || 'Not specified',
+                maxResults,
+                allowedDomains: allowedDomains?.join(', ') || 'Any'
+            });
             // Race between OpenAI response and timeout
             const response = await Promise.race([
                 openaiService.generateResponse(undefined, [
