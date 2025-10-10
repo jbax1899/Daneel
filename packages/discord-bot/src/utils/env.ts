@@ -115,11 +115,30 @@ promptRegistry.assertKeys(REQUIRED_PROMPT_KEYS);
 export const renderPrompt = sharedRenderPrompt;
 
 /**
- * Gets a number from environment variables with a default value
+ * Reads a numeric configuration value while gracefully handling invalid input.
+ *
+ * A surprising number of production issues stem from misconfigured environment
+ * variables (for example, "ten" instead of "10"). The previous implementation
+ * passed the raw `Number()` result through which produced `NaN`, and that in
+ * turn disabled the rate limiter because comparisons against `NaN` always
+ * returned false. To keep the bot resilient we now validate the parsed number
+ * and fall back to the baked-in defaults when operators provide unusable data.
  */
 function getNumberEnv(key: string, defaultValue: number): number {
   const value = process.env[key];
-  return value ? Number(value) : defaultValue;
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    logger.warn(
+      `Ignoring invalid numeric value for ${key}: "${value}". Expected a non-negative number; using default (${defaultValue}).`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
 }
 
 /**
