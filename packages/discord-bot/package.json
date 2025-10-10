@@ -17,6 +17,7 @@
     "watch": "tsc -w"
   },
   "dependencies": {
+    "@ai-assistant/shared": "file:../shared",
     "@openai/agents": "^0.1.8",
     "@pinecone-database/pinecone": "^6.1.2",
     "body-parser": "^2.2.0",
