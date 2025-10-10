@@ -185,6 +185,31 @@ GUILD_RATE_LIMIT=20           # Max requests per guild per time window
 GUILD_RATE_WINDOW_MS=60000    # Time window in milliseconds (60 seconds)
 ```
 
+#### Image Generation
+
+The `/image` command exposes several environment hooks so you can fine-tune the
+default models and token economy without editing source code:
+
+```env
+# Defaults for slash commands, planner flows, and manual variations
+IMAGE_DEFAULT_TEXT_MODEL=gpt-4.1-mini
+IMAGE_DEFAULT_IMAGE_MODEL=gpt-image-1-mini
+
+# Token bucket configuration
+IMAGE_TOKENS_PER_REFRESH=10
+IMAGE_TOKEN_REFRESH_INTERVAL_MS=86400000  # 24 hours
+
+# Per-model token multipliers (either JSON or individual overrides)
+IMAGE_MODEL_MULTIPLIERS={"gpt-image-1":2,"gpt-image-1-mini":1}
+IMAGE_MODEL_MULTIPLIER_GPT_IMAGE_1=2
+IMAGE_MODEL_MULTIPLIER_GPT_IMAGE_1_MINI=1
+```
+
+> ℹ️ **Tip:** When using the `IMAGE_MODEL_MULTIPLIER_<MODEL>` format, replace
+> hyphens in the model name with underscores (for example,
+> `gpt-image-1-mini` → `IMAGE_MODEL_MULTIPLIER_GPT_IMAGE_1_MINI`). JSON and
+> individual overrides can be mixed—the last matching entry wins.
+
 ## 📁 Project Structure
 
 ```text
