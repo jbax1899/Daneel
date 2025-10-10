@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { getImageModelTokenMultiplier, imageConfig } from '../config/imageConfig.js';
 import type { ImageQualityType, ImageRenderModel } from '../commands/image/types.js';
 
 /**
@@ -139,9 +140,6 @@ export class UsageTokenManager {
     }
 }
 
-export const IMAGE_TOKEN_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
-export const IMAGE_TOKENS_PER_REFRESH = 10;
-
 const QUALITY_TOKEN_COST: Record<ImageQualityType, number> = {
     auto: 1,
     low: 1,
@@ -149,25 +147,21 @@ const QUALITY_TOKEN_COST: Record<ImageQualityType, number> = {
     high: 5
 };
 
-/**
- * Token multipliers let us represent the heavier footprint of the full render
- * model without rewriting every call site. Administrators can tweak these
- * values to rebalance the economy without touching business logic.
- */
-export const IMAGE_MODEL_TOKEN_MULTIPLIER: Record<ImageRenderModel, number> = {
-    'gpt-image-1-mini': 1,
-    'gpt-image-1': 2
-};
-
 const imageTokenManager = new UsageTokenManager({
-    tokensPerInterval: IMAGE_TOKENS_PER_REFRESH,
-    intervalMs: IMAGE_TOKEN_REFRESH_INTERVAL_MS,
+    // The shared image configuration controls refresh cadence and available
+    // balance so the slash command, planner, and manual flows all read the same
+    // limits.
+    tokensPerInterval: imageConfig.tokens.tokensPerRefresh,
+    intervalMs: imageConfig.tokens.refreshIntervalMs,
     namespace: 'image'
 });
 
 export function getImageTokenCost(quality: ImageQualityType, imageModel: ImageRenderModel): number {
+    // Base costs reflect the relative compute footprint for each quality tier,
+    // while model multipliers come from the shared configuration to keep
+    // accounting aligned with operator overrides.
     const baseCost = QUALITY_TOKEN_COST[quality] ?? QUALITY_TOKEN_COST.low;
-    const multiplier = IMAGE_MODEL_TOKEN_MULTIPLIER[imageModel] ?? 1;
+    const multiplier = getImageModelTokenMultiplier(imageModel);
     return baseCost * multiplier;
 }
 
@@ -183,7 +177,7 @@ export function consumeImageTokens(
 export function refundImageTokens(
     userId: string,
     qualityOrAmount: ImageQualityType | number,
-    imageModel: ImageRenderModel = 'gpt-image-1-mini'
+    imageModel: ImageRenderModel = imageConfig.defaults.imageModel
 ): TokenSnapshot {
     const amount = typeof qualityOrAmount === 'number'
         ? qualityOrAmount

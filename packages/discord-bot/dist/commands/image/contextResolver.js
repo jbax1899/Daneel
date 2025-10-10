@@ -1,4 +1,6 @@
 import { logger } from '../../utils/logger.js';
+// Defaults stay in sync with environment overrides via the shared constants
+// module, so every recovery path mirrors the slash-command behaviour.
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from './constants.js';
 import { clampPromptForContext } from './sessionHelpers.js';
 const ASPECT_RATIO_LABELS = {

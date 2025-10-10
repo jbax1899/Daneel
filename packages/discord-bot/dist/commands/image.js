@@ -2,12 +2,15 @@ import { AttachmentBuilder, EmbedBuilder, SlashCommandBuilder } from 'discord.js
 import { logger } from '../utils/logger.js';
 import { formatUsd } from '../utils/pricing.js';
 import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './image/embed.js';
+import { imageConfig } from '../config/imageConfig.js';
+// Pulling defaults from the constants module keeps the slash command aligned
+// with any environment overrides exposed by imageConfig.
 import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import { buildImageResultPresentation, clampPromptForContext, createRetryButtonRow, executeImageGeneration, formatRetryCountdown, formatStylePreset, toTitleCase } from './image/sessionHelpers.js';
 import { resolveImageCommandError } from './image/errors.js';
 import { evictFollowUpContext, saveFollowUpContext } from './image/followUpCache.js';
-import { buildTokenSummaryLine, consumeImageTokens, describeTokenAvailability, refundImageTokens } from '../utils/imageTokens.js';
+import { buildTokenSummaryLine, consumeImageTokens, describeTokenAvailability, getImageTokenCost, refundImageTokens } from '../utils/imageTokens.js';
 /**
  * Ensures that the interaction has been deferred before we begin streaming
  * updates to the reply.
@@ -17,6 +20,25 @@ const ensureDeferredReply = async (interaction) => {
         await interaction.deferReply();
     }
 };
+const QUALITY_LEVELS = ['low', 'medium', 'high'];
+/**
+ * Builds a human-friendly quality description that reflects the configured
+ * token multipliers for each available image model.
+ */
+function buildQualityOptionDescription() {
+    const summaries = Object.keys(imageConfig.tokens.modelTokenMultipliers)
+        .sort()
+        .map(model => {
+        const typedModel = model;
+        const costs = QUALITY_LEVELS.map(level => getImageTokenCost(level, typedModel));
+        return `${typedModel}: ${costs.join('/')}`;
+    });
+    if (summaries.length === 0) {
+        return 'Image quality (defaults to low)';
+    }
+    return `Image quality (${summaries.join(' • ')} tokens; defaults to low)`;
+}
+const QUALITY_OPTION_DESCRIPTION = buildQualityOptionDescription();
 /**
  * Produces the initial set of status fields for the generation embed so that
  * the layout stays consistent across slash commands, retries, and planner flows.
@@ -214,7 +236,7 @@ const imageCommand = {
         .setRequired(false))
         .addStringOption(option => option
         .setName('quality')
-        .setDescription('Image quality (Mini: 1/3/5 tokens • Full: 2/6/10; defaults to low)')
+        .setDescription(QUALITY_OPTION_DESCRIPTION)
         .addChoices({ name: 'Low', value: 'low' }, { name: 'Medium', value: 'medium' }, { name: 'High', value: 'high' })
         .setRequired(false))
         .addStringOption(option => option
