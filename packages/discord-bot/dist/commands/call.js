@@ -79,23 +79,23 @@ const callCommand = {
         const requiredPermissions = ['Connect', 'Speak', 'UseVAD', 'CreateInstantInvite'];
         const missingPermissions = requiredPermissions.filter(perm => !botMember.permissions.has(perm));
         if (missingPermissions.length > 0) {
-            throw Error(`Missing permissions: ${missingPermissions.join(', ')}`);
+            return await safeReply(interaction, `Missing permissions: ${missingPermissions.join(', ')}`);
         }
         // 2. Check if channel is viewable
         if (!voiceChannel.viewable) {
-            throw Error(`I can't see ${voiceChannel.name}. Please check the channel permissions.`);
+            return await safeReply(interaction, `I can't see ${voiceChannel.name}. Please check the channel permissions.`);
         }
         // 3. Check if the channel is joinable
         if (!voiceChannel.joinable) {
-            throw Error(`I don't have permission to join ${voiceChannel.name}. Please check my permissions.`);
+            return await safeReply(interaction, `I don't have permission to join ${voiceChannel.name}. Please check my permissions.`);
         }
         // 4. Check if channel is full
         if (voiceChannel.full) {
-            throw Error(`I can't join ${voiceChannel.name} because it is full.`);
+            return await safeReply(interaction, `I can't join ${voiceChannel.name} because it is full.`);
         }
         // 5. Check if the bot is already in a voice channel
         if (botMember.voice.channel) {
-            throw Error(`I am already in voice channel ${botMember.voice.channel.name} - Please try again later!`);
+            return await safeReply(interaction, `I am already in voice channel ${botMember.voice.channel.name} - Please try again later!`);
         }
         logger.debug(`Passed all checks (bot has permissions, channel is viewable/joinable/not full, not already in a VC) - Attempting to join ${voiceChannel.name}`);
         try {
@@ -109,11 +109,15 @@ const callCommand = {
             });
             // Get the VoiceStateHandler instance from the client
             if (!interaction.client.handlers) {
-                throw new Error('Client handlers not initialized');
+                const message = 'Client handlers not initialized';
+                await safeReply(interaction, message);
+                throw new Error(message);
             }
             const voiceStateHandler = interaction.client.handlers.get('voiceState');
             if (!voiceStateHandler) {
-                throw new Error('VoiceStateHandler not found');
+                const message = 'VoiceStateHandler not found';
+                await safeReply(interaction, message);
+                throw new Error(message);
             }
             // Register the initiating user
             voiceStateHandler.registerInitiatingUser(voiceChannel.guild.id, interaction.user.id);
@@ -127,7 +131,9 @@ const callCommand = {
                 // Double-check the bot is actually in the voice channel
                 const botMember = voiceChannel.guild.members.me;
                 if (!botMember?.voice.channel) {
-                    throw new Error('Bot is not in a voice channel after joining');
+                    const message = 'Bot is not in a voice channel after joining';
+                    await safeReply(interaction, message);
+                    throw new Error(message);
                 }
                 // Update the deferred reply with success message
                 await safeReply(interaction, `I have joined ${voiceChannel.name} - Meet me there!`);
@@ -187,7 +193,7 @@ const callCommand = {
         catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
             logger.error(`Error in voice connection in guild ${interaction.guild.id} and channel ${voiceChannel.name}:`, error);
-            safeReply(interaction, `Error: ${errorMessage}`);
+            await safeReply(interaction, `Error: ${errorMessage}`);
             cleanupVoiceConnection(voiceConnection, interaction.client); // Clean up the connection
         }
     }

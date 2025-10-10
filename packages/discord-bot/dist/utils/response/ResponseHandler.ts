@@ -40,7 +40,8 @@ export class ResponseHandler {
     content: string,
     files: Array<{filename: string, data: string | Buffer}> = [],
     directReply: boolean = false,
-    suppressEmbeds: boolean = true
+    suppressEmbeds: boolean = true,
+    components: MessageCreateOptions['components'] = []
   ): Promise<Message | Message[]> {
     if (!this.channel.isSendable()) {
       throw new Error('Channel is not sendable');
@@ -57,9 +58,10 @@ export class ResponseHandler {
         const hasFiles = files && files.length > 0;
   
         // Create base message options
-        const messageOptions: MessageCreateOptions = { 
+        const messageOptions: MessageCreateOptions = {
           content: chunk,
-          flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined
+          flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined,
+          components: isLastChunk && components?.length ? components : undefined
         };
   
         // Add message reference for replies
@@ -89,6 +91,52 @@ export class ResponseHandler {
       logger.error('Failed to send message:', error);
       throw error;
     }
+  }
+
+  /**
+   * Sends a single embed with optional attachments and interactive components.
+   * This is primarily used by automated image responses so we can ship the
+   * generated asset, metadata attachment, and variation buttons in one payload.
+   */
+  public async sendEmbedMessage(
+    embed: DiscordEmbedBuilder,
+    {
+      content,
+      files = [],
+      directReply = false,
+      components
+    }: {
+      content?: string;
+      files?: Array<{ filename: string; data: string | Buffer }>;
+      directReply?: boolean;
+      components?: MessageCreateOptions['components'];
+    } = {}
+  ): Promise<Message> {
+    if (!this.channel.isSendable()) {
+      throw new Error('Channel is not sendable');
+    }
+
+    const messageOptions: MessageCreateOptions = {
+      embeds: [embed],
+      content,
+      components
+    };
+
+    if (directReply) {
+      messageOptions.reply = {
+        messageReference: this.message.id,
+        failIfNotExists: false
+      };
+    }
+
+    if (files.length > 0) {
+      messageOptions.files = files.map(file => ({
+        attachment: Buffer.from(file.data),
+        name: file.filename
+      }));
+    }
+
+    return this.channel.send(messageOptions);
   }
 
   /**

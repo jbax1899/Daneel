@@ -4,7 +4,7 @@ import { sanitizeForEmbed, truncateForEmbed } from './embed.js';
 import { buildDeveloperPrompt, IMAGE_SYSTEM_PROMPT } from './prompts.js';
 import { mapResponseError } from './errors.js';
 export async function generateImageWithReflection(options) {
-    const { openai, prompt, model, quality, size, background, allowPromptAdjustment, followUpResponseId, onPartialImage } = options;
+    const { openai, prompt, textModel, imageModel, quality, size, background, style, allowPromptAdjustment, followUpResponseId, username, nickname, guildName, onPartialImage } = options;
     const input = [
         {
             role: 'system',
@@ -18,7 +18,11 @@ export async function generateImageWithReflection(options) {
                         allowPromptAdjustment,
                         size,
                         quality,
-                        background
+                        background,
+                        style,
+                        username,
+                        nickname,
+                        guildName
                     }) }]
         },
         {
@@ -27,16 +31,15 @@ export async function generateImageWithReflection(options) {
             content: [{ type: 'input_text', text: prompt }]
         }
     ];
-    const imageTool = {
-        type: 'image_generation',
-        size,
+    const imageTool = createImageGenerationTool({
+        model: imageModel,
         quality,
-        background,
-        partial_images: PARTIAL_IMAGE_LIMIT
-    };
+        size,
+        background
+    });
     const toolChoice = { type: 'image_generation' };
     const requestPayload = {
-        model,
+        model: textModel,
         input,
         tools: [imageTool],
         tool_choice: toolChoice,
@@ -88,6 +91,21 @@ export async function generateImageWithReflection(options) {
         partialImages,
         reflection
     };
+}
+function createImageGenerationTool(options) {
+    // The OpenAI SDK currently narrows the `model` property to only allow the
+    // `gpt-image-1` literal. The API accepts additional models (for example the
+    // more affordable `gpt-image-1-mini`), so we populate the field and then
+    // cast the resulting object back to the SDK's type.
+    const tool = {
+        type: 'image_generation',
+        quality: options.quality,
+        size: options.size,
+        background: options.background,
+        partial_images: PARTIAL_IMAGE_LIMIT,
+        model: options.model
+    };
+    return tool;
 }
 function normalizeImageResult(result) {
     if (!result) {

@@ -1,5 +1,7 @@
 import { Message } from 'discord.js';
 import { OpenAIMessage, OpenAIService } from '../openaiService.js';
+export declare const isFullContextLoggingEnabled: () => boolean;
+export declare const logContextIfVerbose: (context: OpenAIMessage[]) => void;
 export declare class ContextBuilder {
     private readonly openaiService;
     private readonly DEFAULT_CONTEXT_MESSAGES;
