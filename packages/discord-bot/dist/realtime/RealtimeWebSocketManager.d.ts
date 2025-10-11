@@ -1,0 +1,35 @@
+import WebSocket from 'ws';
+export declare class RealtimeWebSocketManager {
+    private ws;
+    private isConnected;
+    private connectionPromise;
+    private connectionResolver;
+    private connectionRejector;
+    private isConnecting;
+    private reconnectAttempts;
+    private maxReconnectAttempts;
+    private reconnectDelay;
+    private maxReconnectDelay;
+    private reconnectTimer;
+    private messageCallbacks;
+    private eventListeners;
+    constructor();
+    connect(url: string, headers: Record<string, string>): Promise<void>;
+    private attemptConnection;
+    private handleConnectionError;
+    private scheduleReconnection;
+    private clearReconnectTimer;
+    private cleanupConnectionPromise;
+    private cleanup;
+    disconnect(): void;
+    send(data: string): void;
+    isConnectionReady(): boolean;
+    onMessage(callback: (data: WebSocket.Data) => void): void;
+    on(event: string, callback: (data: any) => void): void;
+    off(event: string, callback: (data: any) => void): void;
+    private emit;
+    offMessage(callback: (data: WebSocket.Data) => void): void;
+    onError(callback: (error: Error) => void): void;
+    onClose(callback: (code: number, reason: Buffer) => void): void;
+    getWebSocket(): WebSocket | null;
+}
