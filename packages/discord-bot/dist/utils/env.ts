@@ -63,6 +63,27 @@ const DEFAULT_RATE_LIMITS: Record<string, any> = {
 } as const;
 
 /**
+ * Default configuration for limiting back-and-forth conversations with other bots
+ */
+const DEFAULT_BOT_INTERACTION_LIMITS = {
+  MAX_BACK_AND_FORTH: 2,
+  COOLDOWN_MS: 5 * 60_000,
+  CONVERSATION_TTL_MS: 10 * 60_000,
+  ACTION: 'react' as const,
+  REACTION: '👍'
+};
+
+/**
+ * Default thresholds for the channel catch-up logic
+ */
+const DEFAULT_CATCH_UP_LIMITS = {
+  AFTER_MESSAGES: 10,
+  IF_MENTIONED_AFTER_MESSAGES: 5,
+  STALE_COUNTER_TTL_MS: 60 * 60_000,
+  ALLOWED_THREAD_IDS: ['1407811416244617388']
+} as const;
+
+/**
  * Validates that all required environment variables are set.
  * @throws {Error} If any required environment variable is missing
  */
@@ -115,11 +136,23 @@ promptRegistry.assertKeys(REQUIRED_PROMPT_KEYS);
 export const renderPrompt = sharedRenderPrompt;
 
 /**
- * Gets a number from environment variables with a default value
+ * Reads a numeric configuration value while gracefully handling invalid input
  */
 function getNumberEnv(key: string, defaultValue: number): number {
   const value = process.env[key];
-  return value ? Number(value) : defaultValue;
+  if (value === undefined) {
+    return defaultValue;
+  }
+
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) {
+    logger.warn(
+      `Ignoring invalid numeric value for ${key}: "${value}". Expected a non-negative number; using default (${defaultValue}).`
+    );
+    return defaultValue;
+  }
+
+  return parsed;
 }
 
 /**
@@ -129,6 +162,55 @@ function getBooleanEnv(key: string, defaultValue: boolean): boolean {
   const value = process.env[key];
   if (value === undefined) return defaultValue;
   return value.toLowerCase() === 'true';
+}
+
+/**
+ * Parses a comma-delimited list from the environment into an array of strings.
+ *
+ * Discord channel/thread identifiers are strings that may contain leading
+ * zeroes, so we avoid coercing to numbers. Empty or whitespace-only entries are
+ * discarded to protect against configuration mistakes such as stray commas.
+ */
+function getStringArrayEnv(key: string, defaultValue: readonly string[]): string[] {
+  const value = process.env[key];
+  if (!value) {
+    return [...defaultValue];
+  }
+
+  const entries = value
+    .split(',')
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
+
+  if (entries.length === 0) {
+    logger.warn(
+      `Ignoring ${key} because it did not contain any valid thread identifiers. Falling back to default (${defaultValue.join(', ') || 'none'}).`
+    );
+    return [...defaultValue];
+  }
+
+  return entries;
+}
+
+type BotInteractionAction = 'ignore' | 'react';
+
+/**
+ * Reads the preferred action to take once the bot-to-bot conversation limit is reached
+ */
+function getBotInteractionActionEnv(key: string, defaultValue: BotInteractionAction): BotInteractionAction {
+  const value = process.env[key];
+  if (!value) return defaultValue;
+
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'ignore' || normalized === 'react') {
+    return normalized;
+  }
+
+  logger.warn(
+    `Ignoring invalid bot interaction action for ${key}: "${value}". Expected "ignore" or "react"; using default (${defaultValue}).`
+  );
+
+  return defaultValue;
 }
 
 /**
@@ -171,5 +253,27 @@ export const config = {
       limit: getNumberEnv('GUILD_RATE_LIMIT', DEFAULT_RATE_LIMITS.GUILD_LIMIT),
       windowMs: getNumberEnv('GUILD_RATE_WINDOW_MS', DEFAULT_RATE_LIMITS.GUILD_WINDOW_MS)
     }
+  },
+
+  // Behavioural controls that keep Daneel from getting stuck in endless loops with other bots
+  botInteraction: {
+    maxBackAndForth: getNumberEnv('BOT_BACK_AND_FORTH_LIMIT', DEFAULT_BOT_INTERACTION_LIMITS.MAX_BACK_AND_FORTH),
+    cooldownMs: getNumberEnv('BOT_BACK_AND_FORTH_COOLDOWN_MS', DEFAULT_BOT_INTERACTION_LIMITS.COOLDOWN_MS),
+    conversationTtlMs: getNumberEnv('BOT_BACK_AND_FORTH_TTL_MS', DEFAULT_BOT_INTERACTION_LIMITS.CONVERSATION_TTL_MS),
+    afterLimitAction: getBotInteractionActionEnv('BOT_BACK_AND_FORTH_ACTION', DEFAULT_BOT_INTERACTION_LIMITS.ACTION),
+    reactionEmoji: process.env.BOT_BACK_AND_FORTH_REACTION?.trim() || DEFAULT_BOT_INTERACTION_LIMITS.REACTION
+  },
+
+  // Message catch-up tuning. These were previously constants inside
+  // MessageCreate and are now surfaced here so operators can modify them via
+  // environment variables without redeploying.
+  catchUp: {
+    afterMessages: getNumberEnv('CATCHUP_AFTER_MESSAGES', DEFAULT_CATCH_UP_LIMITS.AFTER_MESSAGES),
+    ifMentionedAfterMessages: getNumberEnv(
+      'CATCHUP_IF_MENTIONED_AFTER_MESSAGES',
+      DEFAULT_CATCH_UP_LIMITS.IF_MENTIONED_AFTER_MESSAGES
+    ),
+    staleCounterTtlMs: getNumberEnv('STALE_COUNTER_TTL_MS', DEFAULT_CATCH_UP_LIMITS.STALE_COUNTER_TTL_MS),
+    allowedThreadIds: getStringArrayEnv('ALLOWED_THREAD_IDS', DEFAULT_CATCH_UP_LIMITS.ALLOWED_THREAD_IDS)
   }
 } as const;

@@ -6,6 +6,7 @@
 import { PromptRegistry, PromptKey } from '@ai-assistant/shared';
 export declare const promptRegistry: PromptRegistry;
 export declare const renderPrompt: (key: PromptKey, variables?: import("@ai-assistant/shared").PromptVariables) => import("@ai-assistant/shared").RenderedPrompt;
+type BotInteractionAction = 'ignore' | 'react';
 /**
  * Application configuration object containing all environment-based settings.
  * @type {Object}
@@ -42,4 +43,18 @@ export declare const config: {
             readonly windowMs: number;
         };
     };
+    readonly botInteraction: {
+        readonly maxBackAndForth: number;
+        readonly cooldownMs: number;
+        readonly conversationTtlMs: number;
+        readonly afterLimitAction: BotInteractionAction;
+        readonly reactionEmoji: string;
+    };
+    readonly catchUp: {
+        readonly afterMessages: number;
+        readonly ifMentionedAfterMessages: number;
+        readonly staleCounterTtlMs: number;
+        readonly allowedThreadIds: string[];
+    };
 };
+export {};

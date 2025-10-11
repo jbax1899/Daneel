@@ -33,7 +33,10 @@ export declare class MessageCreate extends Event {
     private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES;
     private readonly channelMessageCounters;
     private readonly STALE_COUNTER_TTL_MS;
-    private readonly ALLOWED_THREAD_IDS;
+    private readonly allowedThreadIds;
+    private readonly botConversationStates;
+    private readonly BOT_CONVERSATION_TTL_MS;
+    private readonly BOT_INTERACTION_COOLDOWN_MS;
     /**
      * Creates an instance of MentionBotEvent
      * @param {Dependencies} dependencies - Required dependencies including OpenAI configuration
@@ -80,5 +83,27 @@ export declare class MessageCreate extends Event {
      * @returns {Promise<void>}
      */
     private handleError;
+    /**
+     * Determines whether we should refuse to respond to another bot in order to avoid
+     * two automated agents getting stuck in an infinite loop. The method keeps lightweight
+     * state per channel so that we can cap the number of back-and-forth exchanges while
+     * still allowing occasional hand-offs between bots.
+     */
+    private shouldSuppressBotResponse;
+    /**
+     * Adds the configured emoji reaction (when enabled) to acknowledge the other bot without
+     * sending a full reply. Errors are swallowed so that a failure to react does not break
+     * the main message handling pipeline.
+     */
+    private reactToSuppressedBotMessage;
+    /**
+     * Marks that Daneel has spoken in the tracked channel so that the next bot message counts
+     * as a new exchange when calculating the back-and-forth limit.
+     */
+    private markBotMessageSent;
+    /**
+     * Periodically purge stale bot conversation tracking entries to prevent unbounded memory growth.
+     */
+    private cleanupStaleBotConversations;
 }
 export {};

@@ -516,8 +516,15 @@ export class OpenAIService {
           logger.debug(`Original context: ${JSON.stringify(context)}`);
           logger.debug(`Summaries: ${JSON.stringify(response.choices[0].message.content)}`);
 
-          // Split the response into an array of strings delimited by [reduced-#]
-          const summaries = response.choices[0].message.content.split('[reduced-');
+          // Normalize the summarizer output into an array of summaries
+          // The LLM is instructed to prefix each summary with markers like "[reduced-0]"
+          const summaries = response.choices[0].message.content
+            // Split on the full marker pattern so the first element is never empty
+            .split(/\[reduced-\d+\]\s*/g)
+            // Trim extra whitespace that may occur between summaries
+            .map(summary => summary.trim())
+            // Remove empty strings in case the model adds trailing whitespace
+            .filter(summary => summary.length > 0);
 
           // Ensure that the number of summaries matches the number of messages to summarize
           if (summaries.length !== messageIndexesToReduce.length) {
@@ -526,9 +533,11 @@ export class OpenAIService {
           
           // Replace the original messages with the summaries, preserving the original role, and noting that it was summarized
           for (let i = 0; i < messageIndexesToReduce.length; i++) {
-            reducedContext[messageIndexesToReduce[i]] = { 
-              role: context[messageIndexesToReduce[i]].role, 
-              content: `<summarized> ${summaries[i]}`
+            // If a summary is missing (e.g., malformed response), fall back to the original message
+            const summaryContent = summaries[i] ?? context[messageIndexesToReduce[i]].content;
+            reducedContext[messageIndexesToReduce[i]] = {
+              role: context[messageIndexesToReduce[i]].role,
+              content: `<summarized> ${summaryContent}`
             };
           }
 
