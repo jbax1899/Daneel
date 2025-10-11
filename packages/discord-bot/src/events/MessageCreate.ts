@@ -296,13 +296,14 @@ export class MessageCreate extends Event {
 
   /**
    * Marks that Daneel has spoken in the tracked channel so that the next bot message counts
-   * as a new exchange when calculating the back-and-forth limit.
+   * as a new exchange when calculating the back-and-forth limit. The existing exchange tally
+   * is preserved so that we continue from the previous count instead of resetting it to zero
+   * each time Daneel chooses to re-engage.
    */
   private markBotMessageSent(channelKey: string): void {
     const state = this.botConversationStates.get(channelKey);
     if (state) {
       state.lastDirection = 'self';
-      state.exchanges = 0;
       state.lastUpdated = Date.now();
       // Clear any existing cooldown after we choose to re-engage manually (e.g., a human unblocks the conversation).
       delete state.blockedUntil;
