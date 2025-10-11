@@ -240,12 +240,18 @@ export class MessageCreate extends Event {
       return false;
     }
 
-    if (state.blockedUntil && now < state.blockedUntil) {
-      state.lastUpdated = now;
-      state.lastDirection = 'other';
-      await this.reactToSuppressedBotMessage(message);
-      logger.debug(`Suppressed response to bot ${message.author.id} in ${channelKey} (cooldown active).`);
-      return true;
+    if (state.blockedUntil) {
+      if (now < state.blockedUntil) {
+        state.lastUpdated = now;
+        state.lastDirection = 'other';
+        await this.reactToSuppressedBotMessage(message);
+        logger.debug(`Suppressed response to bot ${message.author.id} in ${channelKey} (cooldown active).`);
+        return true;
+      }
+
+      // Cooldown elapsed, allow a fresh set of exchanges.
+      delete state.blockedUntil;
+      state.exchanges = 0;
     }
 
     if (state.lastDirection === 'self') {
@@ -296,6 +302,7 @@ export class MessageCreate extends Event {
     const state = this.botConversationStates.get(channelKey);
     if (state) {
       state.lastDirection = 'self';
+      state.exchanges = 0;
       state.lastUpdated = Date.now();
       // Clear any existing cooldown after we choose to re-engage manually (e.g., a human unblocks the conversation).
       delete state.blockedUntil;
