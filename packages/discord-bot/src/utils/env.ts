@@ -63,22 +63,18 @@ const DEFAULT_RATE_LIMITS: Record<string, any> = {
 } as const;
 
 /**
- * Default configuration for limiting back-and-forth conversations with other bots.
- * These values provide sensible behaviour when operators do not override them via the
- * environment while still allowing production systems to tighten or loosen the limits.
+ * Default configuration for limiting back-and-forth conversations with other bots
  */
 const DEFAULT_BOT_INTERACTION_LIMITS = {
   MAX_BACK_AND_FORTH: 2,
   COOLDOWN_MS: 5 * 60_000,
   CONVERSATION_TTL_MS: 10 * 60_000,
   ACTION: 'react' as const,
-  REACTION: '🤖'
+  REACTION: '👍'
 };
 
 /**
- * Default thresholds for the channel catch-up logic. These mirror the previous
- * hard-coded values inside the message handler so existing behaviour remains
- * unchanged when operators do not supply overrides via the environment.
+ * Default thresholds for the channel catch-up logic
  */
 const DEFAULT_CATCH_UP_LIMITS = {
   AFTER_MESSAGES: 10,
@@ -140,14 +136,7 @@ promptRegistry.assertKeys(REQUIRED_PROMPT_KEYS);
 export const renderPrompt = sharedRenderPrompt;
 
 /**
- * Reads a numeric configuration value while gracefully handling invalid input.
- *
- * A surprising number of production issues stem from misconfigured environment
- * variables (for example, "ten" instead of "10"). The previous implementation
- * passed the raw `Number()` result through which produced `NaN`, and that in
- * turn disabled the rate limiter because comparisons against `NaN` always
- * returned false. To keep the bot resilient we now validate the parsed number
- * and fall back to the baked-in defaults when operators provide unusable data.
+ * Reads a numeric configuration value while gracefully handling invalid input
  */
 function getNumberEnv(key: string, defaultValue: number): number {
   const value = process.env[key];
@@ -206,9 +195,7 @@ function getStringArrayEnv(key: string, defaultValue: readonly string[]): string
 type BotInteractionAction = 'ignore' | 'react';
 
 /**
- * Reads the preferred action to take once the bot-to-bot conversation limit is reached.
- * The helper gracefully handles unexpected values to keep the bot resilient to
- * configuration mistakes.
+ * Reads the preferred action to take once the bot-to-bot conversation limit is reached
  */
 function getBotInteractionActionEnv(key: string, defaultValue: BotInteractionAction): BotInteractionAction {
   const value = process.env[key];
