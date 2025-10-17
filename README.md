@@ -13,11 +13,12 @@ https://github.com/user-attachments/assets/fcfd95a2-d956-4b86-a3df-6ef4ac6391fd
 - Text-to-speech (TTS) generation
 - /news command: Fetches recent articles from across the web
 - /image command: Generates an image given a prompt
+- Seamless voice chat conversations (OpenAI Realtime API)
 
-#### Realtime Voice Chat
-- **Seamless voice conversations** with OpenAI's Realtime API
-- **Advanced audio processing pipeline** with Discord.js Voice
-- **Real-time transcription and response generation**
+<img width="900" height="362" alt="Example of text-to-speech (TTS)" src="https://github.com/user-attachments/assets/b0ce1cc3-e388-408d-9574-4fdc40d540fc" />
+<img width="892" height="766" alt="Example of /news command" src="https://github.com/user-attachments/assets/ccd154a8-bb8a-453e-b15c-07f994f741f6" />
+<img width="909" height="953" alt="Example of image analysis" src="https://github.com/user-attachments/assets/49cd2df9-ec29-4eee-85bb-2a77f6ba8537" />
+<img width="646" height="985" alt="image" src="https://github.com/user-attachments/assets/320f317f-4615-4d15-9820-dc02f345b005" />
 
 ### 🌐 Web Interface
 - Project landing page
