@@ -27,17 +27,6 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 | [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
 | [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md)  | Dual-license rationale (MIT + Hippocratic License v3). |
 
-## Monorepo Structure
-This repository houses all major packages:
-```
-packages/
-  ethics-core/    → reasoning engine, provenance, circuit breakers
-  discord-bot/    → conversational interface for Discord
-  web/            → public landing page & explain viewer
-docs/             → philosophy, governance, ethics logs, and framework specs
-examples/         → demo scenarios
-```
-
 ## Quickstart
 You can deploy ARETE locally or on Fly.io (either path uses the same environment configuration).
 1. Clone the repository
@@ -68,6 +57,17 @@ flyctl launch
 flyctl deploy
 ```
 This launches ARETE as a self-contained service in the cloud.
+
+## Monorepo Structure
+This repository houses all major packages:
+```
+packages/
+  ethics-core/    → reasoning engine, provenance, circuit breakers
+  discord-bot/    → conversational interface for Discord
+  web/            → public landing page & explain viewer
+docs/             → philosophy, governance, ethics logs, and framework specs
+examples/         → demo scenarios
+```
 
 ## License
 
