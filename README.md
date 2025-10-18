@@ -1,4 +1,6 @@
 # ARETE
+> Assistant for Realtime Ethical Thought and Evaluation
+
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
 ## Overview
