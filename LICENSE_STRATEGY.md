@@ -30,7 +30,7 @@ This licensing shift is not a symbolic gesture—it is a deliberate extension of
 
 ---
 
-## HL3 Modules: Active Scope (Phase 1)
+## Active Scope
 
 The following **HL3 clauses** are currently active within ARETE’s ethical scope:
 
@@ -42,7 +42,7 @@ These represent ARETE’s **ethical baseline**—a non-negotiable set of moral c
 
 ---
 
-## Anticipated Phase 2 Modules (When Ready)
+## Anticipated Modules
 
 As ARETE’s domain, architecture, and adoption mature, I intend to evaluate adding further HL3 modules that align with our moral commitments and technical risk landscape. Below are candidate modules; each will be introduced only after rigorous deliberation and community feedback.
 
