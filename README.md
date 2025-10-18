@@ -24,8 +24,8 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 
 | Document  | Description |
 | ------------- | ------------- |
-| [PHILOSOPHY.md]  | Founding letter and moral charter. |
-| [LICENSE_STRATEGY.md]  | Dual-license rationale (MIT + Hippocratic License v3). |
+| [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
+| [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md)  | Dual-license rationale (MIT + Hippocratic License v3). |
 
 ## Monorepo Structure
 This repository houses all major packages:
