@@ -1,5 +1,5 @@
 {
-  "name": "@ai-assistant/web",
+  "name": "@arete/web",
   "version": "0.0.1",
   "private": true,
   "type": "module",

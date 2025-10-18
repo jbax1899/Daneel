@@ -7,7 +7,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PromptRegistry, PromptKey, renderPrompt as sharedRenderPrompt, setActivePromptRegistry } from '@ai-assistant/shared';
+import { PromptRegistry, PromptKey, renderPrompt as sharedRenderPrompt, setActivePromptRegistry } from '@arete/shared';
 import { logger } from './logger.js';
 
 // Get the current directory

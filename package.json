@@ -5,7 +5,7 @@
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/web",
+        "start:dev": "npm run dev -w @arete/backend & npm run dev -w @arete/web",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {
@@ -20,6 +20,7 @@
     },
     "dependencies": {
         "@ai-sdk/openai": "^2.0.8",
+        "@arete/shared": "^1.0.0",
         "@assistant-ui/react-ai-sdk": "^0.11.1",
         "@discordjs/voice": "^0.19.0",
         "@modelcontextprotocol/sdk": "^1.18.2",

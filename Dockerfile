@@ -31,7 +31,7 @@ RUN npm install --include=dev
 
 # Copy and build bot
 COPY . .
-RUN npm run build --workspace=@ai-assistant/shared
+RUN npm run build --workspace=@arete/shared
 RUN npx tsc -p packages/discord-bot/tsconfig.json
 
 # Prune dev dependencies to reduce image size
