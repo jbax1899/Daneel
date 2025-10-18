@@ -1,6 +1,6 @@
 /*
  * Simple Node static file server that ships with the Docker image.
- * We host the Vite build output from packages/daneel-site/dist and
+ * We host the Vite build output from packages/web/dist and
  * fall back to index.html for client-side routing support. The script
  * intentionally avoids external dependencies so the runtime image stays small.
  */
@@ -9,7 +9,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 
 // Resolve the directory containing the built frontend assets.
-const DIST_DIR = path.join(__dirname, 'packages', 'daneel-site', 'dist');
+const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');
 
 // Content-Type lookups keep browsers happy when serving static files.
 const MIME_MAP = new Map([

@@ -1,11 +1,11 @@
 {
-    "name": "daneel",
+    "name": "arete",
     "private": true,
     "workspaces": [
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/daneel-site",
+        "start:dev": "npm run dev -w @ai-assistant/backend & npm run dev -w @ai-assistant/web",
         "build": "npm run build --workspaces"
     },
     "devDependencies": {
@@ -15,7 +15,8 @@
         "@types/ws": "^8.5.14",
         "concurrently": "^8.0.1",
         "ts-node": "^10.9.2",
-        "typescript": "^5.9.2"
+        "typescript": "^5.9.2",
+        "vite": "^7.1.10"
     },
     "dependencies": {
         "@ai-sdk/openai": "^2.0.8",

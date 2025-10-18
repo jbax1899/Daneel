@@ -12,7 +12,7 @@ import crypto from 'crypto';
   const index = pc.index('discord-bot-code', 'discord-bot-code-v3tu03c.svc.aped-4627-b74a.pinecone.io');
 
   const owner = 'jbax1899';
-  const repo = 'daneel';
+  const repo = 'arete';
 
   // Fetch repo tree
   const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`);

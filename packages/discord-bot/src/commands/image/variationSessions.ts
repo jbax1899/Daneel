@@ -118,7 +118,7 @@ function buildImageModelOptions(quality: ImageQualityType): Array<{ value: Image
 const PROMPT_ADJUSTMENT_OPTIONS: Array<{ value: 'allow' | 'deny'; label: string; description: string }> = [
     {
         value: 'allow',
-        label: 'Let Daneel improve the prompt',
+        label: 'Automatically improve the prompt',
         description: 'Refine wording for better results'
     },
     {

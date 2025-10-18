@@ -6,14 +6,14 @@ WORKDIR /app
 COPY tsconfig.json ./tsconfig.json
 
 # Copy only the package manifest first to leverage Docker layer caching for node_modules.
-COPY packages/daneel-site/package.json packages/daneel-site/package.json
+COPY packages/web/package.json packages/web/package.json
 
 # Install frontend dependencies in isolation to keep the image lean.
-WORKDIR /app/packages/daneel-site
+WORKDIR /app/packages/web
 RUN npm install
 
 # Bring in the remainder of the landing page source and produce the static dist bundle.
-COPY packages/daneel-site/ /app/packages/daneel-site/
+COPY packages/web/ /app/packages/web/
 RUN npm run build
 
 
@@ -43,7 +43,7 @@ FROM node:22.14.0-slim
 WORKDIR /app
 
 # Copy built frontend assets from the Vite build stage
-COPY --from=frontend-builder /app/packages/daneel-site/dist ./packages/daneel-site/dist
+COPY --from=frontend-builder /app/packages/web/dist ./packages/web/dist
 
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist

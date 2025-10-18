@@ -9,24 +9,25 @@ node_modules/
 # Discord bot logs
 packages/discord-bot/logs/
 
-# Discord bot generated output
-packages/discord-bot/output/
+# Discord bot build artifacts
+packages/discord-bot/dist/
 
-# Reference code
-reference
+# Discord bot Output
+packages/discord-bot/output/
+packages/discord-bot/src/output/
+
+# Shared build artifacts
+packages/shared/dist/
 
 # VSCode settings
 .vscode
 
-# Discord Bot Output
-packages/discord-bot/src/output/
-
 # Frontend build artifacts
-packages/daneel-site/dist/
-packages/daneel-site/src/**/*.js
-packages/daneel-site/src/**/*.js.map
-packages/daneel-site/src/**/*.d.ts
-packages/daneel-site/tsconfig*.tsbuildinfo
-packages/daneel-site/vite.config.js
-packages/daneel-site/vite.config.js.map
-packages/daneel-site/vite.config.d.ts
+packages/web/dist/
+packages/web/src/**/*.js
+packages/web/src/**/*.js.map
+packages/web/src/**/*.d.ts
+packages/web/tsconfig*.tsbuildinfo
+packages/web/vite.config.js
+packages/web/vite.config.js.map
+packages/web/vite.config.d.ts

@@ -125,7 +125,7 @@ export async function executeImageGeneration(
     const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
 
     const finalImageBuffer = Buffer.from(finalImageBase64, 'base64');
-    const finalImageFileName = `daneel-image-${Date.now()}.png`;
+    const finalImageFileName = `arete-image-${Date.now()}.png`;
     let imageUrl: string | null = null;
 
     if (isCloudinaryConfigured) {
