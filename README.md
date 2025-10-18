@@ -1,4 +1,6 @@
 # ARETE
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Hippocratic License HL3-CORE](https://img.shields.io/static/v1?label=Hippocratic%20License&message=HL3-CORE&labelColor=5e2751&color=bc8c3d)](https://firstdonoharm.dev/version/3/0/core.html)
 > Assistant for Realtime Ethical Thought and Evaluation
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
@@ -87,4 +89,5 @@ If you're uncertain where to begin, open a **Discusssion** and describe what you
 
 ## Status
 **Current phase**: foundation, provenance infrastructure.
+
 Focus areas: audit logging, incident reporting, /explain command, ethical circuit breakers.
