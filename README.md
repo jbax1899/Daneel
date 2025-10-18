@@ -75,7 +75,7 @@ Dual-licensed under MIT + Hippocratic License v3.
 
 The HL3 clauses prohibit unethical use (violations of human rights, state violence, labor exploitation, etc.).
 
-See [LICENSE_STRATEGY.md] for details.
+See [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md) for details.
 
 ## Contributing
 
