@@ -5,6 +5,10 @@
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
+⚠️ Project Status: Very early in development. Most components are prototypes or placeholders.
+
+The goal is to design the foundation for an ethics-first reasoning assistant — structure first, functionality later.
+
 ## Overview
 ARETE is a transparent reasoning assistant for open reasoning and ethical reflection.
 It helps make reasoning traceable, decisions explainable, and reflection part of the process rather than an afterthought.
@@ -19,6 +23,8 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 - Responsiveness — Transparency must invite reflection and correction, not just observation.
 - Human oversight — ARETE can guide reflection, but never replace it.
 - Open and self-hostable — Anyone can inspect, modify, or run their own instance.
+
+
 
 ## Documentation
 
