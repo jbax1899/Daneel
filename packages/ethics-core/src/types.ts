@@ -1,18 +1,25 @@
 /**
+ * RiskTier classifies the sensitivity of a response.
+ * - low: General knowledge, casual topics
+ * - medium: Nuanced advice, education, workplace
+ * - high: Sensitive topics near circuit-breaker thresholds
+ * Includes standard colors for UI representation.
+ */
+export type RiskTier = "Low" | "Medium" | "High";
+
+/**
  * Provenance indicates the epistemic origin of a response.
  * - retrieved: Grounded in external sources (web search, documents)
  * - inferred: Logical deduction from context
  * - speculative: Educated guess (lower confidence)
  */
-export type Provenance = "retrieved" | "inferred" | "speculative";
+export type Provenance = "Retrieved" | "Inferred" | "Speculative";
 
 /**
- * RiskTier classifies the sensitivity of a response.
- * - low: General knowledge, casual topics
- * - medium: Nuanced advice, education, workplace
- * - high: Sensitive topics near circuit-breaker thresholds
+ * Calculated confidence score (0.0–1.0) reflects the system's certainty
+ * about the accuracy and reliability of the response.
  */
-export type RiskTier = "low" | "medium" | "high";
+export type ConfidenceScore = number; // 0.0 to 1.0
 
 /**
  * Citation represents a source used in the response.
