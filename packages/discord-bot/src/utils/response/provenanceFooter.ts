@@ -13,6 +13,13 @@
 import { EmbedBuilder } from './EmbedBuilder.js';
 import type { RiskTier, Provenance, ConfidenceScore, Citation } from 'ethics-core';
 
+// UI colors for RiskTier levels
+const RISK_TIER_COLORS: Record<RiskTier, string> = {
+    Low: '#00FF00',     // Green
+    Medium: '#FFFF00',  // Yellow
+    High: '#FF0000',    // Red
+};
+
 export const buildFooterEmbed: (
     riskTier: RiskTier,
     provenance: Provenance,
@@ -27,7 +34,10 @@ export const buildFooterEmbed: (
     const embed = new EmbedBuilder();
 
     // RiskTier is reflected in the embed color band
-    const riskColor: string = riskTier.color || '#000000';
+    const riskColor: string = RISK_TIER_COLORS[riskTier] || '#000000';
+    if (riskColor == '#000000') {
+        console.warn(`Unknown RiskTier: ${riskTier}, defaulting to black color.`);
+    }
     embed.setColor(riskColor);
 
     // First row: Data
@@ -35,8 +45,14 @@ export const buildFooterEmbed: (
     embed.setTitle('Provenance');
     embed.setDescription(provenance);
 
-    // Confidence
-    embed.addFields({ name: 'Confidence', value: `${(confidence * 100).toFixed(0)}%` }); // Display confidence as a percentage (e.g. "85%")
+    // Confidence, displayed as a percentage (e.g. "85%")
+    if (confidence < 0.0 || confidence > 1.0) {
+        console.warn(`Confidence score out of bounds: ${confidence}. Setting to zero.`);
+        embed.addFields({ name: 'Confidence', value: `0% (err: out of bounds)` });
+    } else {
+        embed.addFields({ name: 'Confidence', value: `${(confidence * 100).toFixed(0)}%` });
+    }
+    
 
     // Citations, if any
     if (citations.length > 0) {
