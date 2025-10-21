@@ -26,7 +26,7 @@ export type ConfidenceScore = number; // 0.0 to 1.0
  */
 export type Citation = {
     title: string;
-    url: string;
+    url: URL;
     snippet?: string; // Optional excerpt from source
 }
 
