@@ -24,7 +24,7 @@ export type ConfidenceScore = number; // 0.0 to 1.0
 /**
  * Citation represents a source used in the response.
  */
-export interface Citation {
+export type Citation = {
     title: string;
     url: string;
     snippet?: string; // Optional excerpt from source
@@ -33,7 +33,7 @@ export interface Citation {
 /**
  * The complete provenance package for a response.
  */
-export interface ResponseMetadata {
+export type ResponseMetadata = {
     responseId: string;           // Unique short ID (e.g., "7K3A")
     provenance: Provenance;       // Epistemic origin
     confidence: number;           // 0.0–1.0 confidence
