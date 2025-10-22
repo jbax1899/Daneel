@@ -115,6 +115,21 @@ if (promptConfigPath) {
   logger.info(`Loading prompt overrides from: ${promptConfigPath}`);
 }
 
+const flyAppName = process.env.FLY_APP_NAME?.trim();
+// Default to the Fly-provisioned hostname when present so deployments work without extra config.
+const fallbackWebBaseUrl = flyAppName ? `https://${flyAppName}.fly.dev` : undefined;
+const rawWebBaseUrl = process.env.WEB_BASE_URL?.trim();
+const webBaseUrl = rawWebBaseUrl && rawWebBaseUrl.length > 0
+  ? rawWebBaseUrl
+  : fallbackWebBaseUrl;
+
+if (!webBaseUrl) {
+  throw new Error(
+    'Missing WEB_BASE_URL. Set WEB_BASE_URL explicitly or deploy via Fly.io so FLY_APP_NAME provides the default.'
+  );
+}
+logger.info(`Using web base URL: ${webBaseUrl}`);
+
 // Instantiate the shared prompt registry and expose it to downstream modules.
 export const promptRegistry = new PromptRegistry({ overridePath: promptConfigPath });
 setActivePromptRegistry(promptRegistry);
@@ -231,6 +246,7 @@ export const config = {
   guildId: process.env.GUILD_ID!,
   openaiApiKey: process.env.OPENAI_API_KEY!,
   promptConfigPath,
+  webBaseUrl,
   
   // Environment
   env: process.env.NODE_ENV || 'development',
