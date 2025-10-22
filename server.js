@@ -8,6 +8,9 @@ const http = require('node:http');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 
+// Dynamically import the trace store since it is published as an ES module.
+let traceStoreModule = null;
+
 // Resolve the directory containing the built frontend assets.
 const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');
 
@@ -105,6 +108,17 @@ const logRequest = (req, res, extra = '') => {
   console.log(`[${timestamp}] ${req.method} ${req.url} -> ${res.statusCode} ${extra}`);
 };
 
+(async () => {
+  try {
+    traceStoreModule = await import('@arete/shared');
+    // eslint-disable-next-line no-console
+    console.log('Trace store loaded successfully');
+  } catch (error) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to load trace store:', error);
+  }
+})();
+
 const server = http.createServer(async (req, res) => {
   if (!req.url) {
     res.statusCode = 400;
@@ -112,13 +126,122 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  let traceLogNote = '';
   try {
+    const parsedUrl = new URL(req.url, 'http://localhost');
+    const traceMatch = /^\/trace\/([A-Za-z0-9_-]+)(\.json)?$/.exec(parsedUrl.pathname);
+
+    if (traceMatch) {
+      const responseId = traceMatch[1];
+      const wantsJson = Boolean(traceMatch[2]);
+
+      if (!traceStoreModule) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Trace store not yet initialized');
+        logRequest(req, res, `trace responseId=${responseId} store-unavailable`);
+        return;
+      }
+
+      const traceStore = traceStoreModule.defaultTraceStore;
+      if (!traceStore || typeof traceStore.retrieve !== 'function') {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Trace store unavailable');
+        logRequest(req, res, `trace responseId=${responseId} invalid-store`);
+        return;
+      }
+
+      let metadata = null;
+      try {
+        metadata = await traceStore.retrieve(responseId);
+      } catch (error) {
+        res.statusCode = 500;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Failed to load trace');
+        logRequest(
+          req,
+          res,
+          `trace responseId=${responseId} retrieval-error ${error instanceof Error ? error.message : 'unknown error'}`
+        );
+        return;
+      }
+
+      if (!metadata) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Trace not found');
+        logRequest(req, res, `trace responseId=${responseId} not-found`);
+        return;
+      }
+
+      const staleAfter = metadata.staleAfter ? new Date(metadata.staleAfter) : null;
+      const isStale =
+        staleAfter && Number.isFinite(staleAfter.getTime()) && Date.now() > staleAfter.getTime();
+
+      if (isStale) {
+        if (wantsJson) {
+          res.statusCode = 410;
+          res.setHeader('Cache-Control', 'no-store');
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          const json = JSON.stringify(
+            {
+              message: 'Trace has expired',
+              metadata,
+            },
+            (key, value) => (value instanceof URL ? value.toString() : value),
+            2
+          );
+          res.end(json);
+          logRequest(req, res, `trace responseId=${responseId} stale-json`);
+          return;
+        }
+
+        traceLogNote = `trace responseId=${responseId} stale-forwarded`;
+      }
+
+      const hashParam = parsedUrl.searchParams.get('hash');
+      if (hashParam && hashParam !== metadata.chainHash) {
+        res.statusCode = 409;
+        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end('Chain hash mismatch');
+        logRequest(req, res, `trace responseId=${responseId} hash-mismatch expected=${metadata.chainHash} provided=${hashParam}`);
+        return;
+      }
+
+      if (wantsJson) {
+        res.statusCode = 200;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        const json = JSON.stringify(
+          metadata,
+          (key, value) => (value instanceof URL ? value.toString() : value),
+          2
+        );
+        res.end(json);
+        logRequest(req, res, `trace responseId=${responseId} served-json`);
+        return;
+      }
+
+      if (!traceLogNote) {
+        traceLogNote = `trace responseId=${responseId} forwarded-to-spa`;
+      }
+    }
+
     const asset = await resolveAsset(req.url);
 
     if (!asset) {
       res.statusCode = 404;
       res.end('Not Found');
-      logRequest(req, res, '(missing asset, index.html unavailable)');
+      const extra = traceLogNote
+        ? `${traceLogNote}; missing asset, index.html unavailable`
+        : '(missing asset, index.html unavailable)';
+      logRequest(req, res, extra);
       return;
     }
 
@@ -129,7 +252,7 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=600');
     res.end(asset.content);
-    logRequest(req, res);
+    logRequest(req, res, traceLogNote);
   } catch (error) {
     res.statusCode = 500;
     res.end('Internal Server Error');

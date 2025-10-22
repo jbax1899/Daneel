@@ -1,3 +1,4 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -12,9 +13,11 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@components': '/src/components',
-      '@styles': '/src/styles',
-      '@theme': '/src/theme',
+      '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
+      '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
+      '@ethics-core': fileURLToPath(new URL('../ethics-core/src', import.meta.url)),
+      '@styles': fileURLToPath(new URL('./src/styles', import.meta.url)),
+      '@theme': fileURLToPath(new URL('./src/theme', import.meta.url)),
     },
   },
 });
