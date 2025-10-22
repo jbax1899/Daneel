@@ -333,42 +333,6 @@ export class MessageProcessor {
           });
         }
 
-        // If the plan requested information about the repository, retrieve it
-        // Disabled for now
-        /*
-        if (plan.repoQuery) {
-          const queryTexts = plan.repoQuery
-            .split(',')
-            .map(q => q.trim())
-            .filter(Boolean); // remove empty strings
-        
-          await Promise.all(
-            queryTexts.map(async q => {
-              // 1. Generate embedding for this query
-              const embedding1024 = await this.openaiService.embedText(q, 1024);
-        
-              // 2. Query Pinecone
-              const results = await this.repoIndex.query({
-                vector: embedding1024,
-                topK: 10,
-                includeMetadata: true
-              });
-
-              // Keep only TS or MD files
-              const filtered = results.matches.filter(
-                m => (m.metadata?.filePath as string)?.endsWith('.ts') || (m.metadata?.filePath as string)?.endsWith('.md')
-              );
-        
-              logger.debug(`Retrieved repository information for query "${q}" (not an exhaustive list): ${JSON.stringify(filtered)}`);
-              
-              // 3. Flatten results and add to context as a system message
-              const message: OpenAIMessage = { "role": "system", "content": "Repository information relevant to query \"${q}\":\n${filtered.map(r => JSON.stringify(r.metadata)).join('\n')}" };
-              trimmedContext.push(message);
-            })
-          );
-        }
-        */
-
         try {
           // Generate AI response
           logger.debug(`Generating AI response with options: ${JSON.stringify(plan.openaiOptions)}`);

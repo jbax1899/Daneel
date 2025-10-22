@@ -56,7 +56,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
     } else {
         embed.addField({ name: 'Confidence', value: `${(responseMetadata.confidence * 100).toFixed(0)}%` });
     }
-    
+
     // Citations, if any
     // Only list the hostnames with link embedded - the Sources button can be used for more detailed information
     // Discord also shows you the full URL on mouseover
@@ -89,39 +89,45 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
 
     // Explain button
     const explainButton = new ButtonBuilder()
-       .setCustomId('explain')
-       .setLabel('Explain')
-       .setStyle(ButtonStyle.Primary); // Primary style for emphasis
+        .setCustomId('explain')
+        .setLabel('Explain')
+        .setStyle(ButtonStyle.Primary) // Primary style for emphasis
+        .setEmoji('❓');
     actionRow.addComponents(explainButton);
 
     // Sources button (only if citations exist)
     if (responseMetadata.citations.length > 0) {
         const sourcesButton = new ButtonBuilder()
-           .setCustomId('sources')
-           .setLabel('Sources')
-           .setStyle(ButtonStyle.Secondary);
+            .setCustomId('sources')
+            .setLabel('Sources')
+            .setStyle(ButtonStyle.Secondary)
+            .setEmoji('📚');
         actionRow.addComponents(sourcesButton);
     }
 
     // Alternative Lens button
     const altLensButton = new ButtonBuilder()
-       .setCustomId('alternative_lens')
-       .setLabel('Alternative Lens')
-       .setStyle(ButtonStyle.Secondary);
+        .setCustomId('alternative_lens')
+        .setLabel('Alternative Lens')
+        .setStyle(ButtonStyle.Secondary)
+        .setEmoji('🔄');
     actionRow.addComponents(altLensButton);
 
     // Report Issue button
     const reportIssueButton = new ButtonBuilder()
-       .setCustomId('report_issue')
-       .setLabel('Report Issue')
-       .setStyle(ButtonStyle.Danger); // Danger style for emphasis
+        .setCustomId('report_issue')
+        .setLabel('Report Issue')
+        .setStyle(ButtonStyle.Danger) // Danger style for emphasis
+        .setEmoji('🛠️');
     actionRow.addComponents(reportIssueButton);
 
     // Full Trace button
     const fullTraceButton = new ButtonBuilder()
-       .setCustomId('full_trace')
-       .setLabel('Full Trace')
-       .setStyle(ButtonStyle.Link); // Link style for external URL
+        .setCustomId('full_trace')
+        .setLabel('Full Trace')
+        .setStyle(ButtonStyle.Link) // Link style for external URL
+        .setEmoji('🔍')
+        .setURL(`https://arete.org/trace/${responseMetadata.responseID}`); // TODO: Hypothetical URL to view full trace 
     actionRow.addComponents(fullTraceButton);
 
     // TODO: make the buttons do something 
