@@ -80,7 +80,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
     embed.addField({ name: 'License', value: `[${responseMetadata.licenseContext}](${LICENSE_EXPLANATION_URL})` });
 
     // Footer (model, sessionID, timestamp)
-    embed.setFooter({ text: `Model: ${responseMetadata.modelVersion} | Response ID: ${responseMetadata.sessionID} | ${new Date().toISOString()}` });
+    embed.setFooter({ text: `Model: ${responseMetadata.modelVersion} | Response ID: ${responseMetadata.responseID} | ${new Date().toISOString()}` });
 
     //
     // Interactable Buttons
