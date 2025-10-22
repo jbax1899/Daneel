@@ -33,7 +33,11 @@ export class ResponseHandler {
    * Sends a message to the channel with optional file attachments
    * @param {string} content - The message content to send
    * @param {Array<{filename: string, data: string | Buffer}>} [files=[]] - Optional files to attach
-   * @param {Object} [replyToMessage] - Optional message reference for replies
+   * @param {boolean} [directReply=false] - Whether to reply to the triggering message
+   * @param {boolean} [suppressEmbeds=true] - Whether to suppress automatic embed rendering
+   * @param {MessageCreateOptions['components']} [components=[]] - Message components to include on the final chunk
+   * @param {DiscordEmbedBuilder[]} [embeds=[]] - Embeds to attach to the last chunk of the message
+   * @param {MessageCreateOptions['components']} [embedComponents=[]] - Components associated with the embeds, merged into the final chunk
    * @returns {Promise<Message | Message[]>} The sent message(s)
    */
   public async sendMessage(
@@ -41,28 +45,55 @@ export class ResponseHandler {
     files: Array<{filename: string, data: string | Buffer}> = [],
     directReply: boolean = false,
     suppressEmbeds: boolean = true,
-    components: MessageCreateOptions['components'] = []
+    components: MessageCreateOptions['components'] = [],
+    embeds: DiscordEmbedBuilder[] = [],
+    embedComponents: MessageCreateOptions['components'] = []
   ): Promise<Message | Message[]> {
     if (!this.channel.isSendable()) {
       throw new Error('Channel is not sendable');
     }
   
     try {
-      const chunks = this.splitMessage(content);
+      // Split the message into chunks if it exceeds Discord's limits for a single message
+      let chunks = this.splitMessage(content);
       const messages: Message[] = [];
+      const hasEmbeds = embeds.length > 0;
+      const hasComponents = (components?.length ?? 0) > 0 || (embedComponents?.length ?? 0) > 0;
+      const hasFiles = files && files.length > 0;
+
+      if (chunks.length === 0 && (hasEmbeds || hasComponents || hasFiles)) {
+        // Discord expects at least an empty string when sending embeds/components without body text.
+        chunks = [''];
+      }
   
+      // Send each chunk as a separate message
       for (let i = 0; i < chunks.length; i++) {
         const chunk = chunks[i];
         const isFirstChunk = i === 0;
         const isLastChunk = i === chunks.length - 1;
-        const hasFiles = files && files.length > 0;
+        const chunkHasFiles = hasFiles;
   
         // Create base message options
         const messageOptions: MessageCreateOptions = {
           content: chunk,
-          flags: suppressEmbeds ? ['SuppressEmbeds'] : undefined,
-          components: isLastChunk && components?.length ? components : undefined
+          flags: suppressEmbeds && embeds.length === 0 ? ['SuppressEmbeds'] : undefined
         };
+
+        // Attach embeds and components only to the last chunk
+        if (isLastChunk) {
+          if (embeds.length > 0) {
+            messageOptions.embeds = embeds;
+          }
+
+          const finalComponents = [
+            ...(components ?? []),
+            ...(embedComponents ?? [])
+          ];
+
+          if (finalComponents.length > 0) {
+            messageOptions.components = finalComponents;
+          }
+        }
   
         // Add message reference for replies
         if (isFirstChunk && directReply) {
@@ -73,14 +104,14 @@ export class ResponseHandler {
         }
   
         // Add files if this is the last chunk and there are files
-        if (isLastChunk && hasFiles) {
+        if (isLastChunk && chunkHasFiles) {
           messageOptions.files = files.map(f => ({
             attachment: Buffer.from(f.data),
             name: f.filename
           }));
         }
 
-        //logger.debug(`Message options: ${JSON.stringify(messageOptions)}`);
+        logger.debug(`Sending message to channel ${this.channel.id}(${this.channel.type} type) with options: ${JSON.stringify(messageOptions)}`);
   
         // Send the message
         messages.push(await this.channel.send(messageOptions));
