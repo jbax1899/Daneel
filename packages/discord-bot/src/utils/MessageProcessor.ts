@@ -18,6 +18,8 @@ import {
 } from '../commands/image/sessionHelpers.js';
 import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
 import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
+import { buildResponseMetadata } from './response/metadata.js';
+import { ResponseMetadata } from 'ethics-core';
 import type {
   ImageBackgroundType,
   ImageQualityType,
@@ -348,6 +350,35 @@ export class MessageProcessor {
             plan.openaiOptions
           );
           logger.debug(`Response recieved. Usage: ${JSON.stringify(aiResponse.usage)}`);
+
+          let responseMetadata: ResponseMetadata;
+          try {
+            responseMetadata = buildResponseMetadata(
+              aiResponse.metadata ?? null,
+              plannerRiskTier,
+              {
+                modelVersion: MAIN_MODEL,
+                conversationSnapshot: JSON.stringify(responseContext)
+              }
+            );
+            if (aiResponse.metadata === null) {
+              logger.warn(`No metadata payload received from LLM for message ${message.id}; using fallback defaults.`);
+            }
+          } catch (error) {
+            logger.error(`Error building response metadata for message ${message.id}:`, error);
+            responseMetadata = {
+              responseId: 'FALLBACK-' + Date.now().toString(),
+              provenance: 'Inferred',
+              confidence: 0.0, // Unknown confidence
+              riskTier: plannerRiskTier,
+              tradeoffCount: 0,
+              chainHash: 'fallback-hash',
+              licenseContext: 'MIT + HL3', // Default license (MIT + HL3 core)
+              modelVersion: MAIN_MODEL,
+              staleAfter: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days from now
+              citations: []
+            };
+          }
 
           // Get the assistant's response
           const responseText = aiResponse.message?.content || 'No response generated.';
