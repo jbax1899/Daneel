@@ -12,9 +12,8 @@ export function buildResponseMetadata(
   plannerRiskTier: RiskTier,
   runtimeContext: RuntimeContext
 ): ResponseMetadata {
-  // Generate responseId: 6 alphanumeric characters using crypto.randomBytes and base36
-  const randomBytes = crypto.randomBytes(4); // 32 bits, sufficient for ~7 base36 chars
-  const responseId = randomBytes.toString(36).toUpperCase().slice(0, 6);
+  // Generate responseId: 8 URL-safe characters derived from crypto.randomBytes
+  const responseId = crypto.randomBytes(6).toString('base64url').slice(0, 8);
 
   // Compute chainHash: SHA-256 of conversationSnapshot, first 16 hex chars
   const chainHash = crypto.createHash('sha256').update(runtimeContext.conversationSnapshot).digest('hex').substring(0, 16);
