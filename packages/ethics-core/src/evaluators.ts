@@ -13,7 +13,8 @@ import { Provenance, RiskTier } from './types';
  */
 export function computeProvenance(context: string[]): Provenance {
     // Stub: always return "retrieved" for now
-    return "retrieved";
+    console.debug("[computeProvenance] Context: " + context);
+    return "Retrieved";
 }
 
 /**
@@ -30,5 +31,7 @@ export function computeProvenance(context: string[]): Provenance {
  */
 export function computeRiskTier(content: string, context: string[]): RiskTier {
     // Stub: always return "low" for now
-    return "low";
+    console.debug("[computeRiskTier] Content: " + content);
+    console.debug("[computeRiskTier] Context: " + context);
+    return "Low";
 }
