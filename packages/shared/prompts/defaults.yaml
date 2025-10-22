@@ -142,6 +142,11 @@ discord:
         When selecting the 'image' action, default imageRequest.allowPromptAdjustment to false unless the user clearly asks for improvements or rewording.
         When the triggering message directly replies to one of Arete's earlier messages, treat that replied-to content as the primary target—especially for image variations. Use its identifiers and details if you reference an existing image.
         When you choose 'image', you must populate imageRequest.prompt and may set optional fields to guide the generation.
+
+        Always include a `riskTier` classification in your function call:
+          - Low → everyday or low-stakes requests.
+          - Medium → sensitive, ambiguous, or elevated-risk topics requiring caution.
+          - High → disallowed, harmful, or extremely sensitive content that warrants refusal or escalation.
   summarizer:
     system:
       description: >-

@@ -2,9 +2,12 @@ import { renderPrompt } from '../env.js';
 import { logger } from '../logger.js';
 import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel, TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 import { ActivityOptions } from 'discord.js';
+import type { RiskTier } from 'ethics-core';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
-const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // TODO: trying out high reasoning effort, and letting it handle verbosity
+const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // letting it handle verbosity
+const DEFAULT_RISK_TIER: RiskTier = 'Low';
+
 export interface Plan {
   action: 'message' | 'react' | 'ignore' | 'image';
   modality: 'text' | 'tts';
@@ -17,7 +20,7 @@ export interface Plan {
     afk?: boolean;
   }
   imageRequest?: ImagePlanRequest;
-  //repoQuery?: string;
+  riskTier: RiskTier;
 }
 
 type ImagePlanRequest = {
@@ -43,7 +46,8 @@ const defaultPlan: Plan = {
       userLocation: { type: 'approximate' }
     },
     ttsOptions: TTS_DEFAULT_OPTIONS
-  }
+  },
+  riskTier: DEFAULT_RISK_TIER
 };
 
 const planFunction = {
@@ -55,9 +59,9 @@ const planFunction = {
       action: {
         type: "string",
         enum: ["message", "react", "ignore", "image"],
-      description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 'image' generates an image using the dedicated pipeline (and posts a summary plus buttons). Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
+        description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 'image' generates an image using the dedicated pipeline (and posts a summary plus buttons). Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
       },
-      modality: { 
+      modality: {
         type: "string",
         enum: ["text", "tts"],
         description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
@@ -99,22 +103,22 @@ const planFunction = {
       openaiOptions: {
         type: "object",
         properties: {
-          reasoningEffort: { 
-            type: "string", 
+          reasoningEffort: {
+            type: "string",
             enum: [/*"minimal", */"low", "medium"/*, "high"*/],
             description: "The level of reasoning to use, with 'low' being the default."
           },
-          verbosity: { 
-            type: "string", 
-            enum: ["low","medium"/*,"high"*/],
+          verbosity: {
+            type: "string",
+            enum: ["low", "medium"/*,"high"*/],
             description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses."// Only use 'high' when asked to be verbose/detailed."
           },
           tool_choice: {
             type: "object",
             properties: {
-              type: { 
-                type: "string", 
-                enum: ["none","web_search"],
+              type: {
+                type: "string",
+                enum: ["none", "web_search"],
                 description: "'none' performs no tool calls. 'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message (real-time information especially). Always pair this with reasoningEffort >= low."
               }
             },
@@ -146,17 +150,17 @@ const planFunction = {
             properties: {
               //model:      { type: "string", description: "The model to use for TTS." }, // hardcoded to "gpt-4o-mini-tts" for now
               //voice:      { type: "string", description: "The voice to use for TTS." }, // hardcoded to "echo" for now
-              speed:        { type: "string", enum: ["slow", "normal", "fast"], description: "Speed of speech." },
-              pitch:        { type: "string", enum: ["low", "normal", "high"], description: "Pitch of speech." },
-              emphasis:     { type: "string", enum: ["low", "normal", "high"], description: "Level of emphasis." },
-              style:        { type: "string", enum: ["casual", "narrative", "cheerful", "sad", "angry"], description: "Speaking style." },
-              styleDegree:  { type: "string", enum: ["low", "normal", "high"], description: "Weight of speaking style." },
-              styleNote:    { type: "string", description: "Additional notes about the speaking style." }
+              speed: { type: "string", enum: ["slow", "normal", "fast"], description: "Speed of speech." },
+              pitch: { type: "string", enum: ["low", "normal", "high"], description: "Pitch of speech." },
+              emphasis: { type: "string", enum: ["low", "normal", "high"], description: "Level of emphasis." },
+              style: { type: "string", enum: ["casual", "narrative", "cheerful", "sad", "angry"], description: "Speaking style." },
+              styleDegree: { type: "string", enum: ["low", "normal", "high"], description: "Weight of speaking style." },
+              styleNote: { type: "string", description: "Additional notes about the speaking style." }
             },
             required: ["speed", "pitch", "emphasis", "style", "styleDegree"]
           }
         },
-        required: ["reasoningEffort","verbosity","tool_choice"]
+        required: ["reasoningEffort", "verbosity", "tool_choice"]
       },
       presence: {
         type: "object",
@@ -173,7 +177,7 @@ const planFunction = {
             items: {
               type: "object",
               properties: {
-                type: { 
+                type: {
                   type: "integer",
                   enum: [0, 1, 2, 3, 4, 5],
                   description: "Activity type: 0 = Playing, 1 = Streaming, 2 = Listening, 3 = Watching, 4 = Custom (prefer this), 5 = Competing."
@@ -189,22 +193,19 @@ const planFunction = {
           //shardId: { type: "number", description: "Shard ID to apply this presence to" }
         },
         required: ["status"]
+      },
+      riskTier: {
+        type: "string",
+        enum: ["Low", "Medium", "High"],
+        description: "Risk classification for this turn dependant on context. Use Low for harmless chat, Medium when sensitivity rises, and High when refusal or escalation may be needed."
       }
     },
-    // Disabled for now - It keeps adding WAY too much context, but is rarely needed/useful
-    /*
-    repoQuery: {
-      type: "string",
-      description: "Retrieves information about this repository (Daneel's open-source code base). Do this when asked about the codebase, on request, or if it may be relevant to the conversation. Return a string with up to THREE queries to perform, separated by commas.",
-      default: ""
-    },
-    */
-    required: ["action","modality","openaiOptions","presence"]
+    required: ["action", "modality", "openaiOptions", "presence", "riskTier"]
   }
 };
 
 export class Planner {
-  constructor(private readonly openaiService: OpenAIService) {}
+  constructor(private readonly openaiService: OpenAIService) { }
 
   public async generatePlan(context: OpenAIMessage[] = [], trigger: string = ''): Promise<Plan> {
     try {
@@ -218,9 +219,9 @@ export class Planner {
           { role: 'system', content: `This planner was triggered because ${trigger}.` }, // The planner should know how it was triggered: Either a Discord direct reply/ping, or it decided to reply itself (e.g. a catchup event)
           ...messages
         ],
-        { 
-          ...PLANNING_OPTIONS, 
-          functions: [planFunction], 
+        {
+          ...PLANNING_OPTIONS,
+          functions: [planFunction],
           function_call: { name: 'generate-plan' }
         }
       )
@@ -257,10 +258,10 @@ export class Planner {
   private validatePlan(plan: Partial<Plan>): Plan {
     //logger.debug(`Validating plan: ${JSON.stringify(plan)}`);
     //logger.debug(`Default plan: ${JSON.stringify(defaultPlan)}`);
-  
+
     // Deep copy of defaultPlan
     const validatedPlan: Plan = JSON.parse(JSON.stringify(defaultPlan));
-  
+
     // Merge openaiOptions (with nested ttsOptions)
     if (plan.openaiOptions) {
       validatedPlan.openaiOptions = {
@@ -274,7 +275,7 @@ export class Planner {
         } : {})
       };
     }
-  
+
     // Merge other top-level properties
     const mergedPlan: Plan = {
       ...validatedPlan,
@@ -287,7 +288,23 @@ export class Planner {
       mergedPlan.imageRequest = this.normalizeImageRequest(plan.imageRequest);
     }
 
+    // Ensure callers always see a supported risk tier value
+    mergedPlan.riskTier = this.normalizeRiskTier(plan.riskTier);
+
     return mergedPlan;
+  }
+
+  private normalizeRiskTier(candidate: Partial<Plan>['riskTier']): RiskTier {
+    // Tighten to the ethics-core enum; default to Low so we never block responses
+    if (candidate === 'Low' || candidate === 'Medium' || candidate === 'High') {
+      return candidate;
+    }
+
+    if (candidate !== undefined) {
+      logger.warn(`Planner returned unexpected risk tier "${candidate}", defaulting to ${DEFAULT_RISK_TIER}.`);
+    }
+
+    return DEFAULT_RISK_TIER;
   }
 
   private normalizeImageRequest(request: Partial<ImagePlanRequest>): ImagePlanRequest {

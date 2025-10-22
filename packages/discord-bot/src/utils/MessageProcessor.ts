@@ -140,8 +140,14 @@ export class MessageProcessor {
       });
     }
 
+    //
     // Generate plan
+    //
     const plan: Plan = await this.planner.generatePlan(planContext, trigger);
+
+    // Capture the planner's safety classification
+    const plannerRiskTier = plan.riskTier;
+    logger.debug(`Planner classified message ${message.id} as ${plannerRiskTier} risk.`);
 
     // If the plan updated the bot's presence, update it
     if (plan.presence) {
@@ -172,7 +178,7 @@ export class MessageProcessor {
       // Regular message response
       //
       case 'image': {
-        logger.debug(`Planner requested automated image generation for message: ${message.content.slice(0, 100)}...`);
+        logger.debug(`Planner requested automated image generation (risk tier: ${plannerRiskTier}) for message: ${message.content.slice(0, 100)}...`);
 
         const request = plan.imageRequest;
         if (!request?.prompt?.trim()) {
@@ -316,7 +322,7 @@ export class MessageProcessor {
       }
 
       case 'message':
-        logger.debug(`Generating response for message: ${message.content.slice(0, 100)}...`);
+        logger.debug(`Generating response for message (risk tier: ${plannerRiskTier}): ${message.content.slice(0, 100)}...`);
 
         await responseHandler.startTyping(); // Start persistent typing indicator
 
