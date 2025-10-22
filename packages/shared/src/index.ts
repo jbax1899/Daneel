@@ -19,3 +19,13 @@ export {
   renderPrompt,
   setActivePromptRegistry
 } from './prompts/promptRegistry.js';
+
+/**
+ * Trace storage utilities for persisting and retrieving response metadata.
+ */
+export {
+  TraceStore,
+  type TraceStoreConfig,
+  createTraceStore,
+  defaultTraceStore
+} from './traceStore.js';

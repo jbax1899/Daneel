@@ -9,6 +9,8 @@
         "build": "npm run build --workspaces"
     },
     "devDependencies": {
+        "@swc/core": "^1.13.5",
+        "@swc/helpers": "^0.5.17",
         "@types/js-yaml": "^4.0.9",
         "@types/node": "^24.5.1",
         "@types/winston": "^2.4.4",
