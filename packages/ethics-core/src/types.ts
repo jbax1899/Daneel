@@ -36,7 +36,7 @@ export type Citation = {
 export type ResponseMetadata = {
     responseId: string;           // Unique short ID (e.g., "7K3A")
     provenance: Provenance;       // Epistemic origin
-    confidence: number;           // 0.0–1.0 confidence
+    confidence: ConfidenceScore;  // 0.0–1.0 confidence
     riskTier: RiskTier;           // Sensitivity classification
     tradeoffCount: number;        // Number of competing values surfaced
     chainHash: string;            // Cryptographic hash of reasoning chain
