@@ -80,6 +80,21 @@ export interface OpenAIResponse {
     cost?: string;
   };
   newPresence?: ActivityOptions;
+  metadata?: AssistantMetadataPayload | null; // Parsed footer metadata emitted via <ARETE_METADATA>{...}
+}
+
+export interface AssistantMetadataCitation {
+  title: string;           // Human-readable source name
+  url: URL;                // Normalized URL instance for downstream rendering
+  snippet?: string;        // Optional short excerpt from the cited content
+}
+
+export interface AssistantMetadataPayload {
+  provenance?: string;     // Raw provenance flag (Retrieved/Inferred/Speculative)
+  confidence?: number;     // 0.0–1.0 certainty estimate
+  tradeoffCount?: number;  // Number of value tradeoffs the model noted
+  citations: AssistantMetadataCitation[]; // Fully parsed citation set
+  rawPayload: unknown;     // Original JSON blob for diagnostics/fallback handling
 }
 
 // Extended interface for OpenAI Responses output items
@@ -117,6 +132,7 @@ const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
 export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
 export const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType = 'text-embedding-3-small';
+const METADATA_MARKER = '<ARETE_METADATA>'; // Marker appended to chat completions so we can reliably split conversational text and metadata
 
 let isDirectoryInitialized = false; // Tracks if output directories have been initialized
 
@@ -257,25 +273,25 @@ export class OpenAIService {
       const outputItems = response.output as ResponseOutputItemExtended[];
 
       // Find the assistant's message and web search results
-      let outputText = '';
+      let rawOutputText = '';
       let finishReason = 'stop';
-      const citations: Array<{url: string; title: string; text: string}> = [];
+      const annotationCitations: Array<{url: string; title: string; text: string}> = [];
 
       for (const item of outputItems ?? []) {
         // Handle message with citations
         if (item.type === 'message' && item.role === 'assistant' && item.content) {
           const textContent = item.content.find(c => c.type === 'output_text');
           if (textContent?.text) {
-            outputText = textContent.text;
+            rawOutputText = textContent.text;
             
             // Extract citations if any
             if (textContent.annotations?.length) {
               for (const annotation of textContent.annotations) {
                 if (annotation.type === 'url_citation' && annotation.url) {
-                  citations.push({
+                  annotationCitations.push({
                     url: annotation.url,
                     title: annotation.title || 'Source',
-                    text: outputText.slice(annotation.start_index, annotation.end_index)
+                    text: rawOutputText.slice(annotation.start_index, annotation.end_index)
                   });
                 }
               }
@@ -287,11 +303,11 @@ export class OpenAIService {
       }
 
       // Fall back to output_text if no message found
-      if (!outputText) {
+      if (!rawOutputText) {
         const firstTextItem = outputItems.find(
           i => i.type === 'output_text' && i.content?.[0]?.text?.trim()
         );
-        outputText = firstTextItem?.content?.[0]?.text ?? '';
+        rawOutputText = firstTextItem?.content?.[0]?.text ?? '';
         finishReason = firstTextItem?.finish_reason ?? finishReason;
       }
 
@@ -307,13 +323,25 @@ export class OpenAIService {
         }
       }
 
-      return {
-        normalizedText: outputText,
+      // Separate the conversational reply from the metadata JSON appended by the LLM
+      const { text: conversationalText, metadata: assistantMetadata } = this.extractTextAndMetadata(rawOutputText);
+
+      // Prefer metadata-provided citations; fall back to annotations when the JSON block is missing or incomplete
+      const normalizedCitations = assistantMetadata?.citations?.length
+        ? assistantMetadata.citations.map(citation => ({
+            url: citation.url.toString(),
+            title: citation.title,
+            text: citation.snippet ?? ''
+          }))
+        : annotationCitations;
+
+      const responsePayload: OpenAIResponse = {
+        normalizedText: conversationalText,
         message: {
           role: 'assistant',
-          content: outputText,
+          content: conversationalText,
           ...(parsedFunctionCall && { function_call: parsedFunctionCall }),
-          ...(citations.length > 0 && { citations })
+          ...(normalizedCitations.length > 0 && { citations: normalizedCitations })
         },
         finish_reason: finishReason,
         usage: (() => {
@@ -329,10 +357,165 @@ export class OpenAIService {
         })()
       };
 
+      if (assistantMetadata) {
+        responsePayload.metadata = assistantMetadata;
+      }
+
+      return responsePayload;
+
     } catch (error) {
       logger.error('Error in generateGPT5Response:', error);
       throw error;
     }
+  }
+
+  /**
+   * Splits the assistant's raw reply into the human-facing body and the optional `<ARETE_METADATA>{...}` payload.
+   * If parsing fails we drop the marker so users never see stray debug text.
+   */
+  private extractTextAndMetadata(rawOutputText: string): { text: string; metadata: AssistantMetadataPayload | null } {
+    if (!rawOutputText) {
+      return { text: '', metadata: null };
+    }
+
+    const markerIndex = rawOutputText.lastIndexOf(METADATA_MARKER);
+    if (markerIndex === -1) {
+      logger.warn('No metadata marker detected in assistant response; returning plain-text reply.');
+      return { text: rawOutputText.trimEnd(), metadata: null };
+    }
+
+    const conversationalPortion = rawOutputText.slice(0, markerIndex).trimEnd();
+    let metadataCandidate = rawOutputText.slice(markerIndex + METADATA_MARKER.length).trim();
+
+    // Sanitize common code-fence wrappers, stray backticks, and zero-width spaces
+    metadataCandidate = this.stripJsonFences(metadataCandidate);
+
+    if (!metadataCandidate) {
+      logger.warn('Metadata marker detected without JSON payload; ignoring metadata block.');
+      return { text: conversationalPortion, metadata: null };
+    }
+
+    try {
+      const parsed = JSON.parse(metadataCandidate);
+      const normalized = this.normalizeAssistantMetadata(parsed);
+      return { text: conversationalPortion, metadata: normalized };
+    } catch (error) {
+      logger.warn('Failed to parse assistant metadata payload; returning plain-text reply.', error);
+      return { text: conversationalPortion, metadata: null };
+    }
+  }
+
+  /**
+   * Validates the JSON metadata payload, coercing citation URLs into `URL` objects and discarding malformed entries.
+   */
+  private normalizeAssistantMetadata(candidate: unknown): AssistantMetadataPayload | null {
+    if (!candidate || typeof candidate !== 'object') {
+      logger.warn('Assistant metadata payload is not an object; ignoring.');
+      return null;
+    }
+
+    const record = candidate as Record<string, unknown>;
+    const citations: AssistantMetadataCitation[] = [];
+
+    if (Array.isArray(record.citations)) {
+      for (const rawCitation of record.citations) {
+        if (!rawCitation || typeof rawCitation !== 'object') {
+          continue;
+        }
+
+        const citationRecord = rawCitation as Record<string, unknown>;
+        if (typeof citationRecord.url !== 'string') {
+          continue;
+        }
+
+        try {
+          const normalizedUrl = new URL(citationRecord.url);
+          citations.push({
+            title: typeof citationRecord.title === 'string' && citationRecord.title.trim()
+              ? citationRecord.title.trim()
+              : 'Source',
+            url: normalizedUrl,
+            snippet: typeof citationRecord.snippet === 'string' && citationRecord.snippet.trim()
+              ? citationRecord.snippet
+              : undefined
+          });
+        } catch (error) {
+          logger.warn(`Skipping invalid citation URL "${citationRecord.url}" from metadata payload.`);
+        }
+      }
+    }
+
+    // Tighten and coerce fields according to verification notes
+    // Allowed provenance values
+    const allowedProvenance = new Set(['Retrieved', 'Inferred', 'Speculative']);
+
+    // Provenance: accept only allowed values
+    const provenance = typeof record.provenance === 'string' && allowedProvenance.has(record.provenance)
+      ? record.provenance
+      : undefined;
+
+    // Confidence: clamp numeric values to [0,1]
+    let confidence: number | undefined = undefined;
+    if (typeof record.confidence === 'number' && !Number.isNaN(record.confidence) && isFinite(record.confidence)) {
+      confidence = Math.min(1, Math.max(0, record.confidence));
+    }
+
+    // tradeoffCount: coerce to integer >= 0
+    let tradeoffCount: number | undefined = undefined;
+    if (record.tradeoffCount !== undefined && record.tradeoffCount !== null) {
+      const asNumber = typeof record.tradeoffCount === 'number'
+        ? record.tradeoffCount
+        : typeof record.tradeoffCount === 'string'
+          ? Number(record.tradeoffCount)
+          : NaN;
+      const intVal = Number.isFinite(asNumber) ? Math.trunc(asNumber) : NaN;
+      tradeoffCount = Number.isNaN(intVal) || intVal < 0 ? 0 : intVal;
+    }
+
+    const metadata: AssistantMetadataPayload = {
+      provenance,
+      confidence,
+      tradeoffCount,
+      citations,
+      rawPayload: candidate
+    };
+
+    // Drop empty payloads so downstream code can rely on `null` to signal "no metadata supplied"
+    if (
+      metadata.provenance === undefined &&
+      metadata.confidence === undefined &&
+      metadata.tradeoffCount === undefined &&
+      metadata.citations.length === 0
+    ) {
+      logger.warn('Assistant metadata payload is empty, ignoring: ', candidate);
+      return null;
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Remove common code fences and stray backticks/zero-width spaces from a JSON candidate string.
+   * This helps defensive parsing when LLMs wrap JSON in ``` or add stray characters.
+   */
+  private stripJsonFences(input: string): string {
+    if (!input || typeof input !== 'string') return input;
+
+    // Remove Unicode zero-width characters that sometimes sneak in
+    const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/g;
+    let s = input.replace(ZERO_WIDTH_RE, '').trim();
+
+    // Remove leading/trailing single or double backticks
+    s = s.replace(/^`+|`+$/g, '').trim();
+
+    // Remove triple-backtick fenced blocks: ```json ... ``` or ``` ... ```
+    // Match optional language after opening fence
+    const fenceMatch = s.match(/^```(?:json|js|text)?\s*([\s\S]*?)\s*```$/i);
+    if (fenceMatch && fenceMatch[1]) {
+      s = fenceMatch[1].trim();
+    }
+
+    return s;
   }
 
   public async generateSpeech(
