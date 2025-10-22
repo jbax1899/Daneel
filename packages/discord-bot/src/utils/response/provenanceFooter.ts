@@ -80,7 +80,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
     embed.addField({ name: 'License', value: `[${responseMetadata.licenseContext}](${LICENSE_EXPLANATION_URL})` });
 
     // Footer (model, sessionID, timestamp)
-    embed.setFooter({ text: `Model: ${responseMetadata.modelVersion} | Response ID: ${responseMetadata.responseID} | ${new Date().toISOString()}` });
+    embed.setFooter({ text: `Model: ${responseMetadata.modelVersion} | Response ID: ${responseMetadata.responseId} | ${new Date().toISOString()}` });
 
     //
     // Interactable Buttons
@@ -127,7 +127,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
         .setLabel('Full Trace')
         .setStyle(ButtonStyle.Link) // Link style for external URL
         .setEmoji('🔍')
-        .setURL(`https://arete.org/trace/${responseMetadata.responseID}`); // TODO: Hypothetical URL to view full trace 
+        .setURL(`https://arete.org/trace/${responseMetadata.responseId}`); // TODO: Hypothetical URL to view full trace 
     actionRow.addComponents(fullTraceButton);
 
     // TODO: make the buttons do something 
