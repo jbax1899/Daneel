@@ -1,11 +1,14 @@
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';
-import { ResponseMetadata } from 'ethics-core';
+import type { ResponseMetadata } from 'ethics-core';
 
 const RENAME_MAX_ATTEMPTS = 5;
 const RENAME_RETRY_DELAY_MS = 20;
-const RETRYABLE_RENAME_ERRORS = new Set(['EPERM', 'EBUSY', 'EEXIST']);
+const RETRYABLE_RENAME_ERRORS = new Set(['EPERM', 'EBUSY']);
+const LOCK_MAX_ATTEMPTS = 5;
+const LOCK_RETRY_DELAY_MS = 25;
+const LOCK_STALE_THRESHOLD_MS = 2 * 60 * 1000; // Two minutes.
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 const traceStoreJsonReplacer = (_key: string, value: unknown) => {
@@ -16,17 +19,66 @@ const traceStoreJsonReplacer = (_key: string, value: unknown) => {
   return value;
 };
 
-const traceStoreJsonReviver = (key: string, value: unknown) => {
-  if (key === 'url') {
-    if (typeof value !== 'string') {
-      throw new Error(`Invalid trace citation URL type: expected string but received ${typeof value}`);
-    }
-
-    return new URL(value);
+function assertValidResponseMetadata(
+  value: unknown,
+  filePath: string,
+  responseId: string
+): asserts value is ResponseMetadata {
+  if (!value || typeof value !== 'object') {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (expected object).`);
   }
 
-  return value;
-};
+  const record = value as Record<string, unknown>;
+  const requiredStringFields: Array<keyof ResponseMetadata> = [
+    'responseId',
+    'chainHash',
+    'staleAfter',
+    'licenseContext',
+    'modelVersion'
+  ];
+
+  for (const field of requiredStringFields) {
+    if (typeof record[field] !== 'string' || (record[field] as string).length === 0) {
+      throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (missing field ${field}).`);
+    }
+  }
+
+  if (typeof record.tradeoffCount !== 'number') {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (tradeoffCount must be number).`);
+  }
+
+  if (typeof record.confidence !== 'number') {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (confidence must be number).`);
+  }
+
+  if (typeof record.provenance !== 'string') {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (provenance must be string).`);
+  }
+
+  if (typeof record.riskTier !== 'string') {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (riskTier must be string).`);
+  }
+
+  if (!Array.isArray(record.citations)) {
+    throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (citations must be an array).`);
+  }
+
+  for (const citation of record.citations) {
+    if (!citation || typeof citation !== 'object') {
+      throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (citation must be object).`);
+    }
+
+    const citationRecord = citation as Record<string, unknown>;
+
+    if (typeof citationRecord.title !== 'string') {
+      throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (citation title missing).`);
+    }
+
+    if (!(citationRecord.url instanceof URL)) {
+      throw new Error(`Trace file "${filePath}" for response "${responseId}" is invalid (citation URL missing).`);
+    }
+  }
+}
 
 /**
  * Configuration options for {@link TraceStore}.
@@ -80,6 +132,8 @@ export class TraceStore {
 
   /**
    * Inserts or updates the persisted metadata for a response.
+   * Employs per-response advisory lock files (with a two minute staleness threshold) to
+   * serialize concurrent writers before performing an atomic temp-file rename.
    * @param metadata Metadata to persist.
    * @throws {Error} When the filesystem operation fails.
    */
@@ -87,65 +141,149 @@ export class TraceStore {
     const filePath = this.getFilePath(metadata.responseId);
     await this.ensureStorageDirectory();
 
-    const serializableMetadata = {
-      ...metadata,
-      citations: metadata.citations.map((citation) => {
-        if (!(citation.url instanceof URL)) {
+    const lockPath = `${filePath}.lock`;
+    let lockHandle: fs.FileHandle | null = null;
+
+    // Acquire an advisory lock to serialize concurrent writers targeting the same response.
+    for (let attempt = 1; attempt <= LOCK_MAX_ATTEMPTS; attempt++) {
+      try {
+        lockHandle = await fs.open(lockPath, 'wx');
+        break;
+      } catch (error) {
+        const nodeError = error as NodeJS.ErrnoException;
+
+        if (nodeError.code === 'EEXIST') {
+          let isStale = false;
+          try {
+            const stats = await fs.stat(lockPath);
+            if (Date.now() - stats.mtimeMs > LOCK_STALE_THRESHOLD_MS) {
+              isStale = true;
+            }
+          } catch (statError) {
+            const statErr = statError as NodeJS.ErrnoException;
+            if (statErr.code === 'ENOENT') {
+              continue;
+            }
+          }
+
+          if (isStale) {
+            await fs.unlink(lockPath).catch(() => {
+              // Another writer may have removed the stale lock already.
+            });
+            continue;
+          }
+
+          if (attempt < LOCK_MAX_ATTEMPTS) {
+            await sleep(LOCK_RETRY_DELAY_MS * attempt);
+            continue;
+          }
+        }
+
+        const message = nodeError.message ?? String(nodeError);
+        throw new Error(`Failed to acquire trace lock for response "${metadata.responseId}": ${message}`);
+      }
+    }
+
+    if (!lockHandle) {
+      throw new Error(`Failed to acquire trace lock for response "${metadata.responseId}".`);
+    }
+
+    try {
+      const normalizedCitations = metadata.citations.map((citation) => {
+        if (!citation || typeof citation !== 'object') {
+          throw new Error(`Invalid citation entry for response "${metadata.responseId}".`);
+        }
+
+        let url: URL;
+        if (citation.url instanceof URL) {
+          url = citation.url;
+        } else if (typeof citation.url === 'string') {
+          try {
+            url = new URL(citation.url);
+          } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            throw new Error(`Failed to normalize citation URL for response "${metadata.responseId}": ${message}`);
+          }
+        } else {
           throw new Error(
-            `Cannot serialize citation URL for response "${metadata.responseId}". The url must be a URL instance.`
+            `Cannot serialize citation URL for response "${metadata.responseId}". Expected string or URL instance.`
           );
         }
 
         return {
           ...citation,
-          url: citation.url.toString()
+          url
         };
-      })
-    };
+      });
 
-    const payload = JSON.stringify(serializableMetadata, traceStoreJsonReplacer, 2);
-    const tempFilePath = `${filePath}.${crypto.randomUUID()}.tmp`;
+      const serializableMetadata = {
+        ...metadata,
+        citations: normalizedCitations
+      };
 
-    try {
-      await fs.writeFile(tempFilePath, payload, { encoding: 'utf-8' });
+      const payload = JSON.stringify(serializableMetadata, traceStoreJsonReplacer, 2);
+      const tempFilePath = `${filePath}.${crypto.randomUUID()}.tmp`;
 
-      let renameAttempt = 0;
-      // Retry renames to mitigate transient Windows locking issues.
-      while (true) {
-        try {
-          await fs.rename(tempFilePath, filePath);
-          break;
-        } catch (renameError) {
-          const nodeError = renameError as NodeJS.ErrnoException;
+      try {
+        await fs.writeFile(tempFilePath, payload, { encoding: 'utf-8' });
 
-           if (nodeError.code === 'EEXIST') {
-             await fs.unlink(filePath).catch(() => {
-               // The destination may not exist or could be locked; retry loop will handle subsequent errors.
-             });
-           }
+        let renameAttempt = 0;
+        while (true) {
+          try {
+            await fs.rename(tempFilePath, filePath);
+            break;
+          } catch (renameError) {
+            const nodeError = renameError as NodeJS.ErrnoException;
 
-          renameAttempt += 1;
+            if (nodeError.code === 'EEXIST') {
+              await fs.rm(filePath, { force: true }).catch(() => {
+                // If removal fails we'll surface the subsequent rename error.
+              });
 
-          if (
-            renameAttempt >= RENAME_MAX_ATTEMPTS ||
-            !nodeError.code ||
-            !RETRYABLE_RENAME_ERRORS.has(nodeError.code)
-          ) {
-            throw renameError;
+              try {
+                await fs.rename(tempFilePath, filePath);
+                break;
+              } catch (retryError) {
+                throw retryError;
+              }
+            }
+
+            renameAttempt += 1;
+
+            if (
+              renameAttempt >= RENAME_MAX_ATTEMPTS ||
+              !nodeError.code ||
+              !RETRYABLE_RENAME_ERRORS.has(nodeError.code)
+            ) {
+              throw renameError;
+            }
+
+            await sleep(RENAME_RETRY_DELAY_MS * renameAttempt);
           }
+        }
+      } catch (error) {
+        try {
+          await fs.unlink(tempFilePath);
+        } catch {
+          // Best-effort cleanup of the temporary file; lingering temp files can be pruned later.
+        }
 
-          await sleep(RENAME_RETRY_DELAY_MS * renameAttempt);
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Failed to persist trace for response "${metadata.responseId}": ${message}`);
+      }
+    } finally {
+      // Always release the advisory lock to avoid blocking future writers.
+      if (lockHandle) {
+        try {
+          await lockHandle.close();
+        } catch {
+          // Ignore close errors; lock removal below will surface issues if necessary.
         }
       }
-    } catch (error) {
-      try {
-        await fs.unlink(tempFilePath);
-      } catch {
-        // Ignore cleanup failures
-      }
 
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to persist trace for response "${metadata.responseId}": ${message}`);
+      await fs.unlink(lockPath).catch(() => {
+        // Ignore unlink errors; lock files may have been cleaned up by other recovery logic.
+      });
     }
   }
 
@@ -161,7 +299,39 @@ export class TraceStore {
     try {
       const raw = await fs.readFile(filePath, { encoding: 'utf-8' });
       try {
-        const parsed = JSON.parse(raw, traceStoreJsonReviver);
+        const parsed = JSON.parse(raw) as unknown;
+
+        if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as { citations?: unknown }).citations)) {
+          throw new Error(`Trace file "${filePath}" is corrupted: missing citations array.`);
+        }
+
+        const citations = (parsed as { citations: unknown[] }).citations;
+        // Rehydrate citation URLs now that the raw JSON has been parsed.
+        for (const citation of citations) {
+          if (!citation || typeof citation !== 'object') {
+            throw new Error(`Trace file "${filePath}" is corrupted: citation entry is invalid.`);
+          }
+
+          const citationRecord = citation as Record<string, unknown>;
+
+          if (typeof citationRecord.url === 'string') {
+            try {
+              citationRecord.url = new URL(citationRecord.url);
+            } catch (error) {
+              const message = error instanceof Error ? error.message : String(error);
+              throw new Error(`Trace file "${filePath}" is corrupted: invalid citation URL (${message}).`);
+            }
+          } else if (!(citationRecord.url instanceof URL)) {
+            throw new Error(`Trace file "${filePath}" is corrupted: citation URL missing.`);
+          }
+        }
+
+        assertValidResponseMetadata(parsed, filePath, responseId);
+        if ((parsed as ResponseMetadata).responseId !== responseId) {
+          throw new Error(
+            `Trace file "${filePath}" is corrupted: responseId mismatch (expected "${responseId}" but found "${(parsed as ResponseMetadata).responseId}").`
+          );
+        }
         return parsed as ResponseMetadata;
       } catch (parseError) {
         const message = parseError instanceof Error ? parseError.message : String(parseError);

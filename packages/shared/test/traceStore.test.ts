@@ -27,6 +27,11 @@ test('TraceStore round trips metadata with citation URLs', async () => {
         title: 'Example Source',
         url: new URL('https://example.com/article'),
         snippet: 'Example snippet'
+      },
+      {
+        title: 'String URL source',
+        // Cast through unknown so the runtime value stays a string and exercises normalization.
+        url: 'https://example.com/string' as unknown as URL
       }
     ]
   };
@@ -40,6 +45,8 @@ test('TraceStore round trips metadata with citation URLs', async () => {
 
     assert.equal(typeof persistedJson.citations[0].url, 'string', 'citation URL should persist as a string');
     assert.equal(persistedJson.citations[0].url, metadata.citations[0].url.toString(), 'persisted URL should match original string');
+    assert.equal(typeof persistedJson.citations[1].url, 'string', 'string citation URL should persist as string');
+    assert.equal(persistedJson.citations[1].url, 'https://example.com/string/', 'string citation should be normalized');
 
     const retrieved = await store.retrieve(metadata.responseId);
     assert.ok(retrieved, 'retrieve should return stored metadata');
@@ -47,6 +54,8 @@ test('TraceStore round trips metadata with citation URLs', async () => {
     assert.equal(retrieved.chainHash, metadata.chainHash);
     assert.ok(retrieved.citations[0].url instanceof URL, 'citation URL should revive to URL instance');
     assert.equal(retrieved.citations[0].url.href, metadata.citations[0].url.href, 'revived URL should match original');
+    assert.ok(retrieved.citations[1].url instanceof URL, 'string citation URL should normalize and revive to URL');
+    assert.equal(retrieved.citations[1].url.href, 'https://example.com/string/', 'string citation should normalize to canonical URL');
 
     await store.delete(metadata.responseId);
     await assert.rejects(
