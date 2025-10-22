@@ -32,6 +32,7 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 | ------------- | ------------- |
 | [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
 | [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md)  | Dual-license rationale (MIT + Hippocratic License v3). |
+| [SECURITY.md](.github/SECURITY.md) | Security and ethical safety policy. |
 
 ## Quickstart
 You can deploy ARETE locally or on Fly.io (either path uses the same environment configuration).
