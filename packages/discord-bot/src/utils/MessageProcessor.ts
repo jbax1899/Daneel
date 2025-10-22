@@ -354,7 +354,7 @@ export class MessageProcessor {
           let responseMetadata: ResponseMetadata;
           try {
             responseMetadata = buildResponseMetadata(
-              aiResponse.metadata,
+              aiResponse.metadata ?? null,
               plannerRiskTier,
               {
                 modelVersion: MAIN_MODEL,
