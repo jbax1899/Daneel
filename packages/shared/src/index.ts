@@ -23,9 +23,5 @@ export {
 /**
  * Trace storage utilities for persisting and retrieving response metadata.
  */
-export {
-  TraceStore,
-  type TraceStoreConfig,
-  createTraceStore,
-  defaultTraceStore
-} from './traceStore.js';
+export * from './traceStore.js';
+export { defaultTraceStore } from './traceStore.js';

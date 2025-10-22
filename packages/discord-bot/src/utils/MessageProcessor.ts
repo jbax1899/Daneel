@@ -19,7 +19,9 @@ import {
 import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
 import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
 import { buildResponseMetadata } from './response/metadata.js';
+import { buildFooterEmbed } from './response/provenanceFooter.js';
 import { ResponseMetadata } from 'ethics-core';
+import { defaultTraceStore } from '@arete/shared';
 import type {
   ImageBackgroundType,
   ImageQualityType,
@@ -83,9 +85,9 @@ export class MessageProcessor {
     this.planner = options.planner ?? new Planner(this.openaiService);
 
     this.rateLimiters = {};
-    if (config.rateLimits.user.enabled)     this.rateLimiters.user    = new RateLimiter({ limit: config.rateLimits.user.limit,    window: config.rateLimits.user.windowMs,    scope: 'user' });
-    if (config.rateLimits.channel.enabled)  this.rateLimiters.channel = new RateLimiter({ limit: config.rateLimits.channel.limit, window: config.rateLimits.channel.windowMs, scope: 'channel' });
-    if (config.rateLimits.guild.enabled)    this.rateLimiters.guild   = new RateLimiter({ limit: config.rateLimits.guild.limit,   window: config.rateLimits.guild.windowMs,   scope: 'guild' });
+    if (config.rateLimits.user.enabled) this.rateLimiters.user = new RateLimiter({ limit: config.rateLimits.user.limit, window: config.rateLimits.user.windowMs, scope: 'user' });
+    if (config.rateLimits.channel.enabled) this.rateLimiters.channel = new RateLimiter({ limit: config.rateLimits.channel.limit, window: config.rateLimits.channel.windowMs, scope: 'channel' });
+    if (config.rateLimits.guild.enabled) this.rateLimiters.guild = new RateLimiter({ limit: config.rateLimits.guild.limit, window: config.rateLimits.guild.windowMs, scope: 'guild' });
   }
 
   /**
@@ -380,6 +382,52 @@ export class MessageProcessor {
             };
           }
 
+          const originalResponseId = responseMetadata.responseId;
+          if (!/^[A-Za-z0-9_-]+$/.test(originalResponseId)) {
+            // Persisting metadata requires filesystem-safe identifiers, so coerce anything unexpected.
+            let sanitizedResponseId = originalResponseId.replace(/[^A-Za-z0-9_-]+/g, '_'); // Replace invalid chars with underscores
+            sanitizedResponseId = sanitizedResponseId.replace(/^_+/, '').replace(/_+$/, ''); // Trim leading/trailing underscores
+            if (!sanitizedResponseId) {
+              sanitizedResponseId = `FALLBACK_${Date.now()}`;
+            }
+            if (sanitizedResponseId !== originalResponseId) {
+              logger.warn(
+                `Sanitized responseId for message ${message.id} from "${originalResponseId}" to "${sanitizedResponseId}" to satisfy trace storage requirements.`
+              );
+            }
+            responseMetadata = {
+              ...responseMetadata,
+              responseId: sanitizedResponseId
+            };
+          }
+
+          // Build provenance footer
+          let footerPayload: ReturnType<typeof buildFooterEmbed> | null = null;
+          try {
+            footerPayload = buildFooterEmbed(responseMetadata, config.webBaseUrl);
+          } catch (error) {
+            logger.error(
+              `Failed to build provenance footer for response ${responseMetadata.responseId}: ${(
+                error as Error
+              )?.message ?? error}`
+            );
+            footerPayload = null;
+          }
+
+          // Save trace asynchronously
+          const persistTrace = async () => {
+            try {
+              await defaultTraceStore.upsert(responseMetadata);
+              logger.debug(`Persisted response metadata for response ${responseMetadata.responseId} to trace store.`);
+            } catch (error) {
+              logger.error(
+                `Failed to persist response metadata for response ${responseMetadata.responseId}: ${(
+                  error as Error
+                )?.message ?? error}`
+              );
+            }
+          };
+
           // Get the assistant's response
           const responseText = aiResponse.message?.content || 'No response generated.';
 
@@ -400,8 +448,9 @@ export class MessageProcessor {
 
           // If the assistant has a response, send it
           if (responseText) {
-            // Special rules if we're sending a TTS
+            // Is this a TTS response?
             if (ttsPath) {
+              // TTS - Special rules (if we're sending a TTS too, put the text transcript in a code block)
               // Read the file into a Buffer
               const fileBuffer = await fs.promises.readFile(ttsPath);
 
@@ -415,12 +464,55 @@ export class MessageProcessor {
                   filename: path.basename(ttsPath),
                   data: fileBuffer
                 }],
-                true // Make it a reply
+                directReply // honour caller preference for threaded replies
               );
+
+              // Save trace asynchronously
+              await persistTrace();
+
+              // Send the provenance footer as a follow-up message
+              if (footerPayload) {
+                try {
+                  // Footer follows as a separate message so components render even when the TTS chunk has attachments.
+                  await responseHandler.sendMessage(
+                    '',
+                    [],
+                    false,
+                    false,
+                    [],
+                    footerPayload.embeds.map(embed => embed.build()),
+                    footerPayload.components
+                  );
+                } catch (error) {
+                  logger.error(
+                    `Failed to send provenance footer follow-up for response ${responseMetadata.responseId}: ${(
+                      error as Error
+                    )?.message ?? error}`
+                  );
+                }
+              }
+
               await cleanupTTSFile(ttsPath);
             } else {
-              // Not tts, send regular response
-              await responseHandler.sendMessage(responseText, [], directReply);
+              // NOT a TTS response - send regular response
+              // Build footer embed/components
+              const footerEmbed = footerPayload?.embeds[0]?.build();
+              const footerEmbeds = footerEmbed ? [footerEmbed] : [];
+              const footerComponents = footerPayload?.components ?? [];
+
+              // Send the response with footer
+              await responseHandler.sendMessage(
+                responseText,
+                [],
+                directReply,
+                footerEmbeds.length === 0,
+                [],
+                footerEmbeds,
+                footerComponents
+              );
+
+              // Save trace asynchronously
+              await persistTrace();
             }
             logger.debug(`Response sent (${responseText}) for message: ${message.content.slice(0, 100)}...`);
           }

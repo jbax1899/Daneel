@@ -13,13 +13,6 @@
     "paths": {
       "@/*": [
         "./src/*"
-      ],
-      "@arete/shared": [
-        "../shared/dist/index.js",
-        "../shared/dist/index.d.ts"
-      ],
-      "@arete/shared/*": [
-        "../shared/dist/*"
       ]
     },
     "typeRoots": [

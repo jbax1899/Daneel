@@ -5,3 +5,5 @@
  */
 export type { PromptCachePolicy, PromptDefinition, PromptKey, PromptMetadata, PromptVariables, RenderedPrompt } from './prompts/promptRegistry.js';
 export { PromptRegistry, getActivePromptRegistry, renderPrompt, setActivePromptRegistry } from './prompts/promptRegistry.js';
+
+export * from './traceStore.js';

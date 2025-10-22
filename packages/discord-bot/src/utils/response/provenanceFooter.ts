@@ -31,9 +31,15 @@ const RISK_TIER_COLORS: Record<RiskTier, string> = {
     High: '#FF0000',
 };
 
-// Main function to build the footer embed
-export function buildFooterEmbed(responseMetadata: ResponseMetadata): ProvenanceFooterPayload {
+/**
+ * Builds the provenance footer embed and button components for a Discord message.
+ *
+ * @param responseMetadata - Metadata describing the generated response and its provenance.
+ * @param webBaseUrl - Base URL for linking to the full trace; defaults to https://arete.org when falsy.
+ */
+export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl: string): ProvenanceFooterPayload {
     const embed = new EmbedBuilder();
+    const normalizedBaseUrl = webBaseUrl.trim().replace(/\/+$/, ''); // Remove trailing slashes
 
     // RiskTier is reflected in the embed color band
     const riskColor: string = RISK_TIER_COLORS[responseMetadata.riskTier] || '#000000';
@@ -123,11 +129,10 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata): Provenance
 
     // Full Trace button
     const fullTraceButton = new ButtonBuilder()
-        .setCustomId('full_trace')
         .setLabel('Full Trace')
         .setStyle(ButtonStyle.Link) // Link style for external URL
         .setEmoji('🔍')
-        .setURL(`https://arete.org/trace/${responseMetadata.responseId}`); // TODO: Hypothetical URL to view full trace 
+        .setURL(`${normalizedBaseUrl}/trace/${responseMetadata.responseId}`);
     actionRow.addComponents(fullTraceButton);
 
     // TODO: make the buttons do something 
