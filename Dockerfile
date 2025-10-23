@@ -14,6 +14,7 @@ RUN npm install
 
 # Bring in the remainder of the landing page source and produce the static dist bundle.
 COPY packages/web/ /app/packages/web/
+COPY packages/ethics-core/ /app/packages/ethics-core/
 RUN npm run build
 
 
