@@ -52,6 +52,7 @@ COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/disco
 COPY --from=bot-builder /app/packages/shared/package*.json ./packages/shared/
 COPY --from=bot-builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
+COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
 RUN cd packages/shared && npm install --production
 RUN cd packages/discord-bot && npm install --production
 
