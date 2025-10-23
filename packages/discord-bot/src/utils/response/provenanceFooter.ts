@@ -98,7 +98,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setCustomId('explain')
         .setLabel('Explain')
         .setStyle(ButtonStyle.Primary) // Primary style for emphasis
-        .setEmoji('❓');
+        .setEmoji('\u{1F9E0}'); // Brain
     actionRow.addComponents(explainButton);
 
     // Sources button (only if citations exist)
@@ -106,8 +106,8 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         const sourcesButton = new ButtonBuilder()
             .setCustomId('sources')
             .setLabel('Sources')
-            .setStyle(ButtonStyle.Secondary)
-            .setEmoji('📚');
+            .setStyle(ButtonStyle.Secondary) // Secondary style
+            .setEmoji('\u{1F4D6}'); // Open book
         actionRow.addComponents(sourcesButton);
     }
 
@@ -115,8 +115,8 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     const altLensButton = new ButtonBuilder()
         .setCustomId('alternative_lens')
         .setLabel('Alternative Lens')
-        .setStyle(ButtonStyle.Secondary)
-        .setEmoji('🔄');
+        .setStyle(ButtonStyle.Secondary) // Secondary style
+        .setEmoji('\u{1F50D}'); // Magnifying glass
     actionRow.addComponents(altLensButton);
 
     // Report Issue button
@@ -124,14 +124,14 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setCustomId('report_issue')
         .setLabel('Report Issue')
         .setStyle(ButtonStyle.Danger) // Danger style for emphasis
-        .setEmoji('🛠️');
+        .setEmoji('\u{1F6A9}'); // Red flag
     actionRow.addComponents(reportIssueButton);
 
     // Full Trace button
     const fullTraceButton = new ButtonBuilder()
         .setLabel('Full Trace')
         .setStyle(ButtonStyle.Link) // Link style for external URL
-        .setEmoji('🔍')
+        .setEmoji('\u{1F4DC}') // Scroll
         .setURL(`${normalizedBaseUrl}/trace/${responseMetadata.responseId}`);
     actionRow.addComponents(fullTraceButton);
 
@@ -143,3 +143,4 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     // Return the ProvenanceFooterPayload - Embed plus interactive components (buttons)
     return { embeds: [embed], components: [actionRow] };
 };
+

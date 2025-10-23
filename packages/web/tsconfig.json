@@ -6,11 +6,15 @@
     "baseUrl": "./src",
     "paths": {
       "@components/*": ["components/*"],
+      "@pages/*": ["pages/*"],
+      "@ethics-core": ["../../ethics-core/src/index.ts"],
       "@styles/*": ["styles/*"],
       "@theme": ["theme"],
       "@types/*": ["types/*"]
     }
   },
-  "include": ["src"],
-  "references": []
+  "include": ["src", "../ethics-core/src/**/*.ts"],
+  "references": [
+    { "path": "../ethics-core" }
+  ]
 }

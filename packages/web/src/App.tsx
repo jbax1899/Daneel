@@ -1,3 +1,4 @@
+import { Routes, Route } from 'react-router-dom';
 import Hero from '@components/Hero';
 import MeetDaneel from '@components/MeetDaneel';
 import Invite from '@components/Invite';
@@ -6,20 +7,29 @@ import Arete from '@components/Arete';
 import OpenAccountable from '@components/OpenAccountable';
 import EthicsNote from '@components/EthicsNote';
 import Footer from '@components/Footer';
+import TracePage from '@pages/TracePage';
 
 // The App component stitches together the landing page sections in their intended scroll order.
 const App = (): JSX.Element => (
   <div className="app-shell">
-    <main>
-      <Hero />
-      <MeetDaneel />
-      <Services />
-      <OpenAccountable />
-      <EthicsNote />
-      <Invite />
-      <Arete />
-      <Footer />
-    </main>
+    <Routes>
+      <Route
+        path="/"
+        element={(
+          <main>
+            <Hero />
+            <MeetDaneel />
+            <Services />
+            <OpenAccountable />
+            <EthicsNote />
+            <Invite />
+            <Arete />
+            <Footer />
+          </main>
+        )}
+      />
+      <Route path="/trace/:responseId" element={<TracePage />} />
+    </Routes>
   </div>
 );
 
