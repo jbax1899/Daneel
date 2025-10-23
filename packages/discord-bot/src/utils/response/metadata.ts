@@ -24,7 +24,7 @@ export function buildResponseMetadata(
 
   // Enforce defaults
   const provenance: Provenance = assistantPayload?.provenance || 'Inferred';
-  const confidence: number = assistantPayload?.confidence ?? 0.7;
+  const confidence: number = assistantPayload?.confidence ?? 0.0;
   const tradeoffCount: number = assistantPayload?.tradeoffCount ?? 0;
   const citations: Citation[] = assistantPayload?.citations?.map(c => ({
     title: c.title,
