@@ -171,15 +171,19 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (!metadata) {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end('Trace not found');
-        logRequest(req, res, `trace responseId=${responseId} not-found`);
-        return;
+        if (wantsJson) {
+          res.statusCode = 404;
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end('Trace not found');
+          logRequest(req, res, `trace responseId=${responseId} not-found-json`);
+          return;
+        }
+
+        traceLogNote = `trace responseId=${responseId} not-found-forwarded`;
       }
 
-      const staleAfter = metadata.staleAfter ? new Date(metadata.staleAfter) : null;
+      const staleAfter = metadata?.staleAfter ? new Date(metadata.staleAfter) : null;
       const isStale =
         staleAfter && Number.isFinite(staleAfter.getTime()) && Date.now() > staleAfter.getTime();
 
@@ -205,13 +209,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       const hashParam = parsedUrl.searchParams.get('hash');
-      if (hashParam && hashParam !== metadata.chainHash) {
-        res.statusCode = 409;
-        res.setHeader('Content-Type', 'text/plain; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end('Chain hash mismatch');
-        logRequest(req, res, `trace responseId=${responseId} hash-mismatch expected=${metadata.chainHash} provided=${hashParam}`);
-        return;
+      if (metadata && hashParam && hashParam !== metadata.chainHash) {
+        if (wantsJson) {
+          res.statusCode = 409;
+          res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end('Chain hash mismatch');
+          logRequest(req, res, `trace responseId=${responseId} hash-mismatch-json expected=${metadata.chainHash} provided=${hashParam}`);
+          return;
+        }
+
+        traceLogNote = `trace responseId=${responseId} hash-mismatch-forwarded expected=${metadata.chainHash} provided=${hashParam}`;
       }
 
       if (wantsJson) {
