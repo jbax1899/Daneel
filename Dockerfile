@@ -49,7 +49,7 @@ COPY --from=frontend-builder /app/packages/web/dist ./packages/web/dist
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
-COPY --from=bot-builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=bot-builder /app/packages/shared/package*.json ./packages/shared/
 COPY --from=bot-builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
 RUN cd packages/shared && npm install --production
