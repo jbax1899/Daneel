@@ -53,7 +53,8 @@ COPY --from=bot-builder /app/packages/shared/package*.json ./packages/shared/
 COPY --from=bot-builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
 COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
-RUN cd packages/shared && npm install --production
+COPY --from=bot-builder /app/package-lock.json ./package-lock.json
+RUN npm install --production --ignore-scripts
 RUN cd packages/discord-bot && npm install --production
 
 # Copy the lightweight Node server used to host the static site
