@@ -130,7 +130,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setCustomId('report_issue')
         .setLabel('Report Issue')
         .setStyle(ButtonStyle.Danger) // Danger style for emphasis
-        .setEmoji('\u{1F6A9}'); // Red flag
+        .setEmoji('\u{1F6A7}'); // Construction sign
     actionRow.addComponents(reportIssueButton);
 
     // Return the ProvenanceFooterPayload - Embed plus interactive components (buttons)
