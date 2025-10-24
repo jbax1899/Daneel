@@ -5,9 +5,9 @@
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
-⚠️ Project Status: Early development. Most components are still prototypes or scaffolding.
+ARETE evolved from Daneel, a Discord assistant (see [PHILOSOPHY.md](PHILOSOPHY.md) for the full origin story). The goal is to expand that groundwork into a transparent, ethics-first reasoning assistant.
 
-ARETE evolved from Daneel, a Discord assistant (see [PHILOSOPHY.md](PHILOSOPHY.md) for the full origin story). The goal is to expand that groundwork into a transparent, ethics-first reasoning assistant — structure first, then functionality.
+⚠️ Project Status: Early development. Some components are still prototypes or scaffolding.
 
 ## Overview
 ARETE is a transparent reasoning assistant for open reasoning and ethical reflection.
@@ -17,21 +17,19 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 
 ## Key Principles
 - Ethics-first design — Every feature should help people think more clearly about what matters.
-- Transparency & provenance — Reasoning is transparent; each response traces its chain of thought and source.
+- Transparency & provenance — Reasoning is transparent; traces its chain of thought and source.
 - Humility and pluralism — Expresses uncertainty and welcomes alternate perspectives.
 - Auditability — Decisions are logged and explainable, not ephemeral.
 - Responsiveness — Transparency must invite reflection and correction, not just observation.
 - Human oversight — ARETE can guide reflection, but never replace it.
-- Open and self-hostable — Anyone can inspect, modify, or run their own instance.
-
-
+- Open and self-hostable — Anyone can inspect, modify, and run their own instance.
 
 ## Documentation
 
 | Document  | Description |
 | ------------- | ------------- |
 | [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
-| [SECURITY.md](.github/SECURITY.md) | Security and ethical safety policy. |
+| [SECURITY.md](SECURITY.md) | Security and ethical safety policy. |
 | [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md)  | Dual-license rationale (MIT + Hippocratic License v3). |
 
 ## Quickstart
@@ -94,8 +92,3 @@ Guidelines and governance structure are documented (COMING SOON) in:
 - CODE_OF_CONDUCT.md — expectations for dialogue and collaboration
   
 For now: open a Discussion to propose ideas, or pick a good-first-task issue from the tracker.
-
-## Status
-**Current phase**: foundation, provenance infrastructure.
-
-Focus areas: audit logging, incident reporting, /explain command, ethical circuit breakers.
