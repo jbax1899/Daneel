@@ -82,18 +82,18 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
             const domain = c.url.hostname.replace('www.', '');
             // Return hostname embedded with url
             return `[${domain}](${c.url}) `;
-        }).join(' · '); // Join multiple citations with smaller dot
+        }).join(' • '); // Join multiple citations with smaller dot
         descriptionParts.push(`Citations:\n${citationLines}`); // Push citations to new line for readability
     }
     
     // At last, set the description
-    embed.setDescription(descriptionParts.join(' • ')); // Use larger dot to separate main items
+    embed.setDescription(descriptionParts.join(' • '));
 
     // Footer: model | chainHash | sessionID | license
     // I would add links to sessionID and license, but Discord footers don't support links
     // Thankfully we already have the Full Trace button, which provides a source for more detailed information
     embed.setFooter({ 
-        text: `${responseMetadata.modelVersion} · ${responseMetadata.chainHash} · ${responseMetadata.responseId} · ${responseMetadata.licenseContext}`
+        text: `${responseMetadata.modelVersion} • ${responseMetadata.chainHash} • ${responseMetadata.responseId} • ${responseMetadata.licenseContext}`
     });
 
     //
