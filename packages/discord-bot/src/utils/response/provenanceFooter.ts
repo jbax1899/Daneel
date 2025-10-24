@@ -1,19 +1,22 @@
 /**
  * Creates a Discord embed to act as a messaage footer with these components:
- * Provenance
- * Citations (if any)
- * Alternative Lens button (rephrase the response with a different perspective)
- * Report Issue button (report incorrect or harmful information)
- * Full Trace button (view the complete reasoning trace)
+ * Title: Provenance
+ * Description: Confidence score | Trade-offs (if any) | Citations (if any)
+ * Footer: model version | chain hash | response ID | license context
+ * Interactive Buttons:
+ * * Explain button (get an explanation of the reasoning)
+ * * Alternative Lens button (rephrase the response with a different perspective)
+ * * Full Trace button (view the complete reasoning trace)
+ * * Report Issue button (report incorrect or harmful information)
  * 
  * Embed color band reflects the calculated RiskTier
  * 
  * Uses types from the ethics-core package (ethics-core/src/types.ts)
  */
 import { EmbedBuilder } from './EmbedBuilder.js';
-import type { ResponseMetadata, RiskTier, Citation } from 'ethics-core';
 import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
 import { logger } from '../logger.js';
+import type { ResponseMetadata, RiskTier, Citation } from 'ethics-core';
 
 // Footer payload type: Embed plus interactive components (buttons)
 type ProvenanceFooterPayload = { embeds: EmbedBuilder[], components: ActionRowBuilder<ButtonBuilder>[] };
@@ -21,14 +24,12 @@ type ProvenanceFooterPayload = { embeds: EmbedBuilder[], components: ActionRowBu
 // Module-scoped logger
 const console = logger.child({ module: 'provenanceFooter' });
 
-// Static link to license explanation
-const LICENSE_EXPLANATION_URL = 'https://github.com/arete-org/arete/blob/main/LICENSE_STRATEGY.md';
-
 // UI colors for RiskTier levels
 const RISK_TIER_COLORS: Record<RiskTier, string> = {
-    Low: '#00FF00',
-    Medium: '#FFFF00',
-    High: '#FF0000',
+    Low: '#7FDCA4',     // Sage green
+    Medium: '#F8E37C',  // Warm gold
+    High: '#E27C7C',    // Soft coral
+    // Used to be green/yellow/red but changed to be friendlier without losing the meaning
 };
 
 /**
@@ -52,15 +53,24 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     // Embed content
     //
     // Provenance
-    embed.setTitle('Decision Trace'); // friendlier title than just "Provenance"
-    embed.setDescription(responseMetadata.provenance);
+    embed.setTitle(`Reasoning - ${responseMetadata.provenance }`); // reduce vertical space, provenance in title
+
+    // Build description string
+    // Instead of using inline eelements, we build a description that ideally only takes one line
+    // This keeps the footer compact and avoids wrapping on narrow screens
+    const descriptionParts: string[] = [];
 
     // Confidence, displayed as a percentage (e.g. "85%")
     if (responseMetadata.confidence < 0.0 || responseMetadata.confidence > 1.0) {
         console.warn(`Confidence score out of bounds: ${responseMetadata.confidence}. Setting to zero.`);
-        embed.addField({ name: 'Confidence', value: `0% (err: out of bounds)` });
-    } else {
-        embed.addField({ name: 'Confidence', value: `${(responseMetadata.confidence * 100).toFixed(0)}%` });
+        responseMetadata.confidence = 0.0;        
+    }
+    descriptionParts.push(`Confidence: ${(responseMetadata.confidence * 100).toFixed(0)}%`);
+
+    // Trade-offs, if any
+    // We won't always have trade-offs surfaced as it depends on the context
+    if (responseMetadata.tradeoffCount > 0) {
+        descriptionParts.push(`Trade-offs: ${responseMetadata.tradeoffCount}`);
     }
 
     // Citations, if any
@@ -71,22 +81,20 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
             // Extract just the hostname from the URL
             const domain = c.url.hostname.replace('www.', '');
             // Return hostname embedded with url
-            return `[${domain}](${c.url})`;
-        }).join('\n');
-        embed.addField({ name: 'Citations', value: citationLines });
+            return `[${domain}](${c.url}) `;
+        }).join(', '); // Join multiple citations with commas
+        descriptionParts.push(`Citations:\n${citationLines}`); // Push citations to new line for readability
     }
+    
+    // At last, set the description
+    embed.setDescription(descriptionParts.join(' | '));
 
-    // Trade-offs
-    embed.addField({ name: 'Trade-offs', value: responseMetadata.tradeoffCount.toString() });
-
-    // Chain hash
-    embed.addField({ name: 'Chain Hash', value: responseMetadata.chainHash });
-
-    // License context
-    embed.addField({ name: 'License', value: `[${responseMetadata.licenseContext}](${LICENSE_EXPLANATION_URL})` });
-
-    // Footer (model, sessionID, timestamp)
-    embed.setFooter({ text: `Model: ${responseMetadata.modelVersion} | Response ID: ${responseMetadata.responseId} | ${new Date().toISOString()}` });
+    // Footer: model | chainHash | sessionID | license
+    // I would add links to sessionID and license, but Discord footers don't support links
+    // Thankfully we already have the Full Trace button, which provides a source for more detailed information
+    embed.setFooter({ 
+        text: `${responseMetadata.modelVersion} | ${responseMetadata.chainHash} | ${responseMetadata.responseId} | ${responseMetadata.licenseContext}`
+    });
 
     //
     // Interactable Buttons
@@ -101,16 +109,6 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setEmoji('\u{1F9E0}'); // Brain
     actionRow.addComponents(explainButton);
 
-    // Sources button (only if citations exist)
-    if (responseMetadata.citations.length > 0) {
-        const sourcesButton = new ButtonBuilder()
-            .setCustomId('sources')
-            .setLabel('Sources')
-            .setStyle(ButtonStyle.Secondary) // Secondary style
-            .setEmoji('\u{1F4D6}'); // Open book
-        actionRow.addComponents(sourcesButton);
-    }
-
     // Alternative Lens button
     const altLensButton = new ButtonBuilder()
         .setCustomId('alternative_lens')
@@ -118,14 +116,6 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setStyle(ButtonStyle.Secondary) // Secondary style
         .setEmoji('\u{1F50D}'); // Magnifying glass
     actionRow.addComponents(altLensButton);
-
-    // Report Issue button
-    const reportIssueButton = new ButtonBuilder()
-        .setCustomId('report_issue')
-        .setLabel('Report Issue')
-        .setStyle(ButtonStyle.Danger) // Danger style for emphasis
-        .setEmoji('\u{1F6A9}'); // Red flag
-    actionRow.addComponents(reportIssueButton);
 
     // Full Trace button
     const fullTraceButton = new ButtonBuilder()
@@ -135,10 +125,13 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         .setURL(`${normalizedBaseUrl}/trace/${responseMetadata.responseId}`);
     actionRow.addComponents(fullTraceButton);
 
-    // TODO: make the buttons do something 
-    // (maybe start with an ephemeral "Sorry, that hasn't been implemented yet, but here's what it might look like")
-    // This is currently handled in discord-bot/index.ts with interaction.IsButton()
-    // We should probably decouple them 
+    // Report Issue button
+    const reportIssueButton = new ButtonBuilder()
+        .setCustomId('report_issue')
+        .setLabel('Report Issue')
+        .setStyle(ButtonStyle.Danger) // Danger style for emphasis
+        .setEmoji('\u{1F6A9}'); // Red flag
+    actionRow.addComponents(reportIssueButton);
 
     // Return the ProvenanceFooterPayload - Embed plus interactive components (buttons)
     return { embeds: [embed], components: [actionRow] };
