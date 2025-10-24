@@ -499,6 +499,15 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
+    if (customId === 'report_issue') {
+      logger.info(`Report Issue button clicked by user: ${interaction.user.id} on message: ${interaction.message.id} (${interaction.message.url})`);
+      await interaction.reply({
+        content: "This feature isn't active yet. To report ethical or security issues, please follow the instructions in [SECURITY.md](https://github.com/arete-org/arete/blob/main/SECURITY.md).",
+        ephemeral: true
+      });
+      return;
+    }
+
     // Other button handlers fall through to the retry logic below.
     if (customId.startsWith(IMAGE_RETRY_CUSTOM_ID_PREFIX)) {
       const retryKey = interaction.customId.slice(IMAGE_RETRY_CUSTOM_ID_PREFIX.length);
