@@ -1,18 +1,5 @@
-import {
-  Client,
-  GatewayIntentBits,
-  Events,
-  Collection,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  StringSelectMenuBuilder,
-  StringSelectMenuOptionBuilder,
-  ModalBuilder,
-  TextInputBuilder,
-  TextInputStyle,
-  type Message
-} from 'discord.js';
+import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
+import type { Message } from 'discord.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
@@ -20,8 +7,7 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
-import { defaultTraceStore } from '@arete/shared';
-import type { ResponseMetadata } from 'ethics-core';
+import { ResponseHandler } from './utils/response/ResponseHandler.js';
 import { evictFollowUpContext, readFollowUpContext, saveFollowUpContext } from './commands/image/followUpCache.js';
 import { runImageGenerationSession } from './commands/image.js';
 import {
@@ -63,20 +49,24 @@ import {
   describeTokenAvailability,
   refundImageTokens
 } from './utils/imageTokens.js';
+// Alternative lens workflow utilities (session state + interaction handlers)
 import {
   ALTERNATIVE_LENS_MODAL_PREFIX,
   ALTERNATIVE_LENS_SELECT_PREFIX,
   ALTERNATIVE_LENS_SUBMIT_PREFIX,
-  buildLensPayload,
-  clearAlternativeLensSession,
-  createAlternativeLensSession,
-  generateAlternativeLensMessage,
-  getAlternativeLensDefinitions,
-  getAlternativeLensDefinition,
-  getAlternativeLensSession,
-  setAlternativeLensCustomDescription,
-  setAlternativeLensSelection,
-  type AlternativeLensKey
+  handleAlternativeLensButton,
+  handleAlternativeLensModal,
+  handleAlternativeLensSelect,
+  handleAlternativeLensSubmit,
+  generateExplanationMessage,
+  requestProvenanceOpenAIOptions,
+  resolveMemberDisplayName,
+  buildExplainSessionKey,
+  isExplainInProgress,
+  markExplainInProgress,
+  clearExplainInProgress,
+  recoverFullMessageText,
+  resolveProvenanceMetadata
 } from './utils/response/provenanceInteractions.js';
 //import express from 'express'; // For webhook
 //import bodyParser from "body-parser"; // For webhook
@@ -89,109 +79,6 @@ const __dirname = path.dirname(__filename);
 
 // Initialize OpenAI service
 export const openaiService = new OpenAIService(config.openaiApiKey); // Exported for use in other files, like /news command
-
-const ALT_LENS_CUSTOM_DESCRIPTION_INPUT_ID = 'alt_lens_custom_description';
-
-const buildAlternativeLensSessionKey = (userId: string, messageId: string) => `${userId}:${messageId}`;
-const DISCORD_MAX_CONTENT_LENGTH = 2000;
-
-function extractResponseIdFromFooterText(footerText?: string | null): string | null {
-  if (!footerText) {
-    return null;
-  }
-
-  const match = footerText.match(/^([\w.-]+)\W+([\w.-]+)\W+([\w-]+)\W+/);
-  return match?.[3] ?? null;
-}
-
-function deriveResponseIdFromMessage(message: Message | null): string | null {
-  if (!message) {
-    return null;
-  }
-
-  for (const embed of message.embeds ?? []) {
-    const responseId = extractResponseIdFromFooterText(embed.footer?.text);
-    if (responseId) {
-      return responseId;
-    }
-  }
-
-  return null;
-}
-
-async function resolveProvenanceMetadata(message: Message): Promise<{ responseId?: string; metadata: ResponseMetadata | null }> {
-  const responseId = deriveResponseIdFromMessage(message);
-  if (!responseId) {
-    return { metadata: null };
-  }
-
-  try {
-    const metadata = await defaultTraceStore.retrieve(responseId);
-    return { responseId, metadata };
-  } catch (error) {
-    logger.warn(`Failed to load provenance metadata for response ${responseId}:`, error);
-    return { responseId, metadata: null };
-  }
-}
-
-async function recoverFullMessageText(message: Message): Promise<string> {
-  const directContent = message.content?.trim();
-  if (directContent) {
-    return directContent;
-  }
-
-  const referencedId = message.reference?.messageId;
-  if (referencedId && message.channel.isTextBased()) {
-    try {
-      const referenced = await message.channel.messages.fetch(referencedId);
-      if (referenced?.content?.trim()) {
-        return referenced.content.trim();
-      }
-    } catch (error) {
-      logger.warn(`Failed to fetch referenced message ${referencedId} while preparing alternative lens:`, error);
-    }
-  }
-
-  return '';
-}
-
-function splitContentForDiscord(content: string, maxLength: number = DISCORD_MAX_CONTENT_LENGTH): string[] {
-  const normalized = content.replace(/\r\n/g, '\n').trim();
-  if (!normalized) {
-    return [];
-  }
-
-  const chunks: string[] = [];
-  let remaining = normalized;
-
-  while (remaining.length > maxLength) {
-    let breakIndex = remaining.lastIndexOf('\n\n', maxLength);
-    if (breakIndex <= 0) {
-      breakIndex = remaining.lastIndexOf('\n', maxLength);
-    }
-    if (breakIndex <= 0) {
-      breakIndex = remaining.lastIndexOf(' ', maxLength);
-    }
-    if (breakIndex <= 0) {
-      breakIndex = maxLength;
-    }
-
-    let chunk = remaining.slice(0, breakIndex).trimEnd();
-    if (!chunk) {
-      chunk = remaining.slice(0, maxLength);
-      breakIndex = maxLength;
-    }
-
-    chunks.push(chunk);
-    remaining = remaining.slice(breakIndex).trimStart();
-  }
-
-  if (remaining.length > 0) {
-    chunks.push(remaining);
-  }
-
-  return chunks;
-}
 
 // ====================
 // Client Configuration
@@ -256,7 +143,7 @@ client.handlers = new Collection();
     await client.login(config.token);
     logger.info('Bot is now connected to Discord and ready!');
   } catch (error) {
-    logger.error('Failed to initialize bot:', error);
+    logger.error('Failed to initialize bot:' + error);
     process.exit(1);
   }
 })();
@@ -309,6 +196,13 @@ client.on(Events.InteractionCreate, async interaction => {
 
   if (interaction.isStringSelectMenu()) {
     const { customId, values } = interaction;
+
+    // Alternative lens select menu flow
+    if (customId.startsWith(ALTERNATIVE_LENS_SELECT_PREFIX)) {
+      await handleAlternativeLensSelect(interaction);
+      return;
+    }
+
     const selected = values?.[0];
 
     if (!selected) {
@@ -316,58 +210,10 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
-
-    if (customId.startsWith(ALTERNATIVE_LENS_SELECT_PREFIX)) {
-      const messageId = customId.slice(ALTERNATIVE_LENS_SELECT_PREFIX.length);
-      const lensDefinition = getAlternativeLensDefinition(selected as AlternativeLensKey);
-
-      if (!lensDefinition) {
-        await interaction.reply({
-          content: 'That lens is no longer available. Please choose a different option.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
-      const session = setAlternativeLensSelection(sessionKey, lensDefinition.key);
-      if (!session) {
-        await interaction.reply({
-          content: 'That alternative lens session expired. Click **Alternative Lens** again to restart.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      if (lensDefinition.requiresCustomDescription) {
-        const modal = new ModalBuilder()
-          .setCustomId(`${ALTERNATIVE_LENS_MODAL_PREFIX}${messageId}`)
-          .setTitle('Custom Lens Details');
-        const input = new TextInputBuilder()
-          .setCustomId(ALT_LENS_CUSTOM_DESCRIPTION_INPUT_ID)
-          .setLabel('Describe the custom lens')
-          .setStyle(TextInputStyle.Paragraph)
-          .setPlaceholder('Explain the perspective you want to apply.')
-          .setMinLength(10)
-          .setMaxLength(500);
-
-        if (session.customDescription) {
-          input.setValue(session.customDescription);
-        }
-
-        modal.addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
-        await interaction.showModal(modal);
-        return;
-      }
-
-      await interaction.deferUpdate();
-      return;
-    }
-
     const respondWithExpiryNotice = async () => {
-      await interaction.reply({ 
+      await interaction.reply({
         content: '⚠️ That variation configurator expired. Press the variation button again.',
-        flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        flags: [1 << 6]
       });
     };
 
@@ -458,35 +304,9 @@ client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isModalSubmit()) {
     const { customId } = interaction;
 
-
+    // Alternative lens custom modal submission
     if (customId.startsWith(ALTERNATIVE_LENS_MODAL_PREFIX)) {
-      const messageId = customId.slice(ALTERNATIVE_LENS_MODAL_PREFIX.length);
-      const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
-      const session = getAlternativeLensSession(sessionKey);
-
-      if (!session) {
-        await interaction.reply({
-          content: 'That alternative lens session expired. Click **Alternative Lens** again to restart.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      const description = interaction.fields.getTextInputValue(ALT_LENS_CUSTOM_DESCRIPTION_INPUT_ID).trim();
-      if (!description) {
-        await interaction.reply({
-          content: 'Please describe your custom lens before submitting.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      setAlternativeLensSelection(sessionKey, 'CUSTOM');
-      setAlternativeLensCustomDescription(sessionKey, description);
-      await interaction.reply({
-        content: 'Custom lens saved. Press Submit when you are ready to generate the alternative perspective.',
-        flags: [1 << 6] // [1 << 6] = EPHEMERAL
-      });
+      await handleAlternativeLensModal(interaction);
       return;
     }
 
@@ -527,7 +347,7 @@ client.on(Events.InteractionCreate, async interaction => {
           );
         }
       } catch (error) {
-        logger.warn('Failed to refresh variation configurator after prompt update:', error);
+        logger.warn('Failed to refresh variation configurator after prompt update:' + error);
       }
 
       await interaction.reply({ 
@@ -544,165 +364,112 @@ client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isButton()) {
     const { customId } = interaction;
 
-    if (customId === 'alternative_lens') {
+    // Provenance footer: share a reasoning explanation
+    if (customId === 'explain') {
+      const explainKey = buildExplainSessionKey(interaction.message.id);
+      if (isExplainInProgress(explainKey)) {
+        await interaction.reply({
+          content: '⚠️ An explanation is already in progress for this response. Please wait for it to finish.',
+          flags: [1 << 6]
+        });
+        return;
+      }
+
+      markExplainInProgress(explainKey);
+
+      const requester = resolveMemberDisplayName(interaction.member, interaction.user.username);
+      const progressContent = `⏳ Explanation requested by **${requester}** — compiling reasoning…`;
+      try {
+        await interaction.reply({
+          content: progressContent,
+          allowedMentions: { parse: [] }
+        });
+      } catch (error) {
+        clearExplainInProgress(explainKey);
+        logger.warn('Failed to acknowledge explanation request:' + error);
+        if (!interaction.replied) {
+          await interaction.followUp({
+            content: 'I could not start the explanation flow. Please try again.',
+            flags: [1 << 6]
+          }).catch(() => undefined);
+        }
+        return;
+      }
+
       try {
         const messageText = await recoverFullMessageText(interaction.message);
         if (!messageText) {
-          await interaction.reply({
-            content: 'I could not find the response text to reinterpret. Please try again from the original message.',
-            flags: [1 << 6] // [1 << 6] = EPHEMERAL
+          await interaction.editReply({
+            content: 'I could not locate the response to explain. Please try again from the original message.'
           });
           return;
         }
 
-        const { responseId, metadata } = await resolveProvenanceMetadata(interaction.message);
-        const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, interaction.message.id);
-        clearAlternativeLensSession(sessionKey);
-        createAlternativeLensSession(sessionKey, {
+        const { metadata } = await resolveProvenanceMetadata(interaction.message);
+        const plannerOptions = await requestProvenanceOpenAIOptions(openaiService, {
+          kind: 'explain',
           messageText,
-          metadata,
-          messageId: interaction.message.id,
-          channelId: interaction.message.channelId,
-          responseId
+          metadata
         });
-
-        const selectOptions = getAlternativeLensDefinitions();
-        const selectMenu = new StringSelectMenuBuilder()
-          .setCustomId(`${ALTERNATIVE_LENS_SELECT_PREFIX}${interaction.message.id}`)
-          .setPlaceholder('Choose a lens')
-          .addOptions(
-            selectOptions.map(option => new StringSelectMenuOptionBuilder()
-              .setLabel(option.label)
-              .setValue(option.key)
-              .setDescription(option.description.length > 100 ? `${option.description.slice(0, 97)}...` : option.description)
-            )
-          );
-
-        const selectRow = new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(selectMenu);
-        const submitRow = new ActionRowBuilder<ButtonBuilder>().addComponents(
-          new ButtonBuilder()
-            .setCustomId(`${ALTERNATIVE_LENS_SUBMIT_PREFIX}${interaction.message.id}`)
-            .setLabel('Submit')
-            .setStyle(ButtonStyle.Primary)
-        );
-
-        await interaction.reply({
-          content: 'Pick a perspective to reframe this response. Selecting "Custom Lens" will prompt for details.',
-          components: [selectRow, submitRow],
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-      } catch (error) {
-        logger.error('Failed to initialise alternative lens session:', error);
-        if (interaction.deferred || interaction.replied) {
-          await interaction.followUp({
-            content: 'Something went wrong while starting the alternative lens flow. Please try again later.',
-            flags: [1 << 6] // [1 << 6] = EPHEMERAL
-          });
-        } else {
-          await interaction.reply({
-            content: 'Something went wrong while starting the alternative lens flow. Please try again later.',
-            flags: [1 << 6] // [1 << 6] = EPHEMERAL
-          });
-        }
-      }
-
-      return;
-    }
-
-    if (customId.startsWith(ALTERNATIVE_LENS_SUBMIT_PREFIX)) {
-      const messageId = customId.slice(ALTERNATIVE_LENS_SUBMIT_PREFIX.length);
-      const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
-      const session = getAlternativeLensSession(sessionKey);
-
-      if (!session) {
-        await interaction.reply({
-          content: 'That alternative lens session expired. Click **Alternative Lens** again to start over.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      if (!session.context.messageText) {
-        clearAlternativeLensSession(sessionKey);
-        await interaction.reply({
-          content: 'The original response is no longer available for reinterpretation. Start a new alternative lens request.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      const lens = buildLensPayload(session);
-      if (!lens) {
-        await interaction.reply({
-          content: 'Select a lens first. If you choose Custom Lens, provide a description before submitting.',
-          flags: [1 << 6] // [1 << 6] = EPHEMERAL
-        });
-        return;
-      }
-
-      try {
-        await interaction.deferReply({ ephemeral: true });
-      } catch (error) {
-        logger.warn('Failed to defer alternative lens reply:', error);
-        if (!interaction.deferred && !interaction.replied) {
-          try {
-            await interaction.reply({
-              content: 'I could not begin generating that alternative lens. Please try again.',
-              flags: [1 << 6] // [1 << 6] = EPHEMERAL
-            });
-          } catch (replyError) {
-            logger.warn('Failed to reply after defer failure:', replyError);
-          }
-        }
-        return;
-      }
-
-      try {
-        const generated = await generateAlternativeLensMessage(
+        const explanation = await generateExplanationMessage(
           openaiService,
           {
-            messageText: session.context.messageText,
-            metadata: session.context.metadata
+            messageText,
+            confidence: metadata?.confidence,
+            tradeoffCount: metadata?.tradeoffCount,
+            chainHash: metadata?.chainHash
           },
-          lens
+          plannerOptions
         );
 
         const channel = interaction.channel;
         if (!channel || !channel.isSendable()) {
           await interaction.editReply({
-            content: 'I could not post the alternative lens response in this channel.'
+            content: 'I could not post the explanation in this channel.'
           });
           return;
         }
 
-        const combinedContent = `**Alternative Lens: ${lens.label}**\n\n${generated.trim()}`;
-        const chunks = splitContentForDiscord(combinedContent);
-        const replyReference = {
-          messageReference: session.context.messageId,
-          failIfNotExists: false
-        };
-        const deliverableChunks = chunks.length > 0 ? chunks : ['(no alternative lens content produced)'];
-
-        let isFirstChunk = true;
-        for (const chunk of deliverableChunks) {
-          const safeContent = chunk.length > 0 ? chunk : '\u200B';
-          await channel.send({
-            content: safeContent,
-            ...(isFirstChunk ? { reply: replyReference } : {})
-          });
-          isFirstChunk = false;
+        let targetMessage: Message | null = null;
+        if (channel.isTextBased()) {
+          try {
+            targetMessage = await channel.messages.fetch(interaction.message.id);
+          } catch (fetchError) {
+            logger.warn(`Failed to fetch original message ${interaction.message.id} for explanation reply: ${fetchError}`);
+          }
         }
 
-        await interaction.editReply({ content: 'Posted the alternative lens response.' });
+        const explanationContent = `**Explanation:**\n\n${explanation.trim()}`;
+        if (targetMessage) {
+          const responseHandler = new ResponseHandler(targetMessage, channel, interaction.user);
+          await responseHandler.sendMessage(explanationContent, [], true, true);
+        } else {
+          const responseHandler = new ResponseHandler(interaction.message as Message, channel, interaction.user);
+          await responseHandler.sendMessage(explanationContent, [], true, true);
+        }
+
+        await interaction.editReply({ content: '✅ Explanation posted.' });
       } catch (error) {
-        logger.error('Failed to generate alternative lens response:', error);
+        logger.error('Failed to generate explanation reply: ' + error);
         await interaction.editReply({
-          content: 'I could not generate that alternative lens. Please try again later.'
+          content: '⚠️ I could not generate that explanation. Please try again later.'
         });
       } finally {
-        clearAlternativeLensSession(sessionKey);
+        clearExplainInProgress(explainKey);
       }
 
+      return;
+    }
+
+    // Provenance footer: start alternative lens flow
+    if (customId === 'alternative_lens') {
+      await handleAlternativeLensButton(interaction);
+      return;
+    }
+
+    // Provenance footer: generate reframed response
+    if (customId.startsWith(ALTERNATIVE_LENS_SUBMIT_PREFIX)) {
+      await handleAlternativeLensSubmit(interaction, openaiService);
       return;
     }
 
@@ -752,7 +519,7 @@ client.on(Events.InteractionCreate, async interaction => {
                 buildVariationConfiguratorView(updatedSession, { statusMessage })
               );
             } catch (error) {
-              logger.warn('Failed to refresh variation configurator after token denial:', error);
+              logger.warn('Failed to refresh variation configurator after token denial: ' + error);
             }
           }
 
@@ -771,7 +538,7 @@ client.on(Events.InteractionCreate, async interaction => {
           await session.messageUpdater({ content: '⏳ Generating variation…', embeds: [], components: [] });
         }
       } catch (error) {
-        logger.warn('Failed to update variation configurator before generation:', error);
+        logger.warn('Failed to update variation configurator before generation:' + error);
       }
 
       await interaction.deferReply();
@@ -798,7 +565,7 @@ client.on(Events.InteractionCreate, async interaction => {
           refundImageTokens(interaction.user.id, tokenSpend.cost);
         }
       } catch (error) {
-        logger.error('Unexpected error while generating variation:', error);
+        logger.error('Unexpected error while generating variation:' + error);
         if (tokenSpend) {
           refundImageTokens(interaction.user.id, tokenSpend.cost);
         }
@@ -881,7 +648,7 @@ client.on(Events.InteractionCreate, async interaction => {
             saveFollowUpContext(followUpResponseId, recovered);
           }
         } catch (error) {
-          logger.error('Failed to recover cached context for variation button:', error);
+          logger.error('Failed to recover cached context for variation button:' + error);
         }
       }
 
@@ -899,7 +666,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
       const session = initialiseVariationSession(interaction.user.id, followUpResponseId, cachedContext);
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: [1 << 6] });
       const view = buildVariationConfiguratorView(session, {
         statusMessage: buildVariationStatusMessage(interaction.user.id)
       });
@@ -972,7 +739,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const artifacts = await executeImageGeneration(cachedContext, {
           user: {
             username: interaction.user.username,
-            nickname: interaction.user.displayName ?? interaction.user.username,
+            nickname: resolveMemberDisplayName(interaction.member, interaction.user.username),
             guildName: interaction.guild?.name ?? `No guild for ${interaction.type} interaction`
           }
         });
@@ -995,11 +762,11 @@ client.on(Events.InteractionCreate, async interaction => {
         if (retrySpend) {
           refundImageTokens(interaction.user.id, retrySpend.cost);
         }
-        logger.error('Unexpected error while handling image retry button:', error);
+        logger.error('Unexpected error while handling image retry button: ' + error);
         try {
           await interaction.editReply({ content: '⚠️ I was unable to generate that image. Please try again later.', components: [] });
         } catch (replyError) {
-          logger.error('Failed to send retry failure message:', replyError);
+          logger.error('Failed to send retry failure message: ' + replyError);
         }
       }
 
@@ -1052,3 +819,4 @@ appServer.listen(WEBHOOK_PORT, () => {
   console.log(`GitHub webhook server listening on port ${WEBHOOK_PORT}`);
 });
 */
+

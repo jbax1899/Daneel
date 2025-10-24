@@ -65,12 +65,12 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
         console.warn(`Confidence score out of bounds: ${responseMetadata.confidence}. Setting to zero.`);
         responseMetadata.confidence = 0.0;        
     }
-    descriptionParts.push(`Confidence: ${(responseMetadata.confidence * 100).toFixed(0)}%`);
+    descriptionParts.push(`${(responseMetadata.confidence * 100).toFixed(0)}% confidence`);
 
     // Trade-offs, if any
     // We won't always have trade-offs surfaced as it depends on the context
     if (responseMetadata.tradeoffCount > 0) {
-        descriptionParts.push(`Trade-offs: ${responseMetadata.tradeoffCount}`);
+        descriptionParts.push(`${responseMetadata.tradeoffCount} trade-offs considered`);
     }
 
     // Citations, if any
@@ -83,7 +83,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
             // Return hostname embedded with url
             return `[${domain}](${c.url}) `;
         }).join(' • '); // Join multiple citations with smaller dot
-        descriptionParts.push(`Citations:\n${citationLines}`); // Push citations to new line for readability
+        descriptionParts.push(`Sources:\n${citationLines}`); // Push citations to new line for readability. Use term "Sources " instead of "Citations" for clarity
     }
     
     // At last, set the description
