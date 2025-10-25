@@ -74,6 +74,9 @@ export interface AlternativeLensSession {
   customDescription: string | null;
 }
 
+type LensTelemetryInteraction = ButtonInteraction | StringSelectMenuInteraction;
+type AlternativeLensAction = 'alt_lens:init' | 'alt_lens:select' | 'alt_lens:submit';
+
 // -----------------------------
 // Lens catalogue configuration
 // -----------------------------
@@ -110,6 +113,8 @@ const LENS_DEFINITIONS: AlternativeLensDefinition[] = [
     requiresCustomDescription: true
   }
 ];
+
+const provenanceLogger = logger.child({ module: 'provenance' });
 
 export const ALTERNATIVE_LENS_SELECT_PREFIX = 'alt_lens_select:';
 export const ALTERNATIVE_LENS_SUBMIT_PREFIX = 'alt_lens_submit:';
@@ -224,6 +229,31 @@ export function setAlternativeLensCustomDescription(sessionKey: string, descript
 
 export function clearAlternativeLensSession(sessionKey: string): void {
   sessions.delete(sessionKey);
+}
+
+/**
+ * 
+ * @param interaction - The Discord component that triggered the event.
+ * @param action - The provenance action identifier.
+ * @param responseId - Provenance response ID to associate with the metadata.
+ * @param extra - Additional context to include in the log entry.
+ * @returns - A structured log context object.
+ */
+function buildAlternativeLensLogContext(
+  interaction: LensTelemetryInteraction,
+  action: AlternativeLensAction,
+  responseId?: string,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    action,
+    userId: interaction.user.id,
+    guildId: interaction.guild?.id ?? null,
+    channelId: interaction.channelId ?? null,
+    messageId: interaction.message.id,
+    ...(responseId ? { responseId } : {}),
+    ...extra
+  };
 }
 
 export function buildLensPayload(session: AlternativeLensSession): {
@@ -541,9 +571,18 @@ export async function recoverFullMessageText(message: Message): Promise<string> 
 // Interaction handlers
 // -----------------------------
 export async function handleAlternativeLensButton(interaction: ButtonInteraction): Promise<void> {
+  const baseContext = buildAlternativeLensLogContext(interaction, 'alt_lens:init');
+  let telemetryContext = baseContext;
+  provenanceLogger.info('Alternative lens init started', { ...telemetryContext, phase: 'start' });
+
   try {
     const messageText = await recoverFullMessageText(interaction.message);
     if (!messageText) {
+      provenanceLogger.error('Alternative lens init failed (missing message text)', {
+        ...telemetryContext,
+        phase: 'error',
+        reason: 'missing_message_text'
+      });
       await interaction.reply({
         content: 'I could not find the response text to reinterpret. Please try again from the original message.',
         flags: [1 << 6]
@@ -553,6 +592,9 @@ export async function handleAlternativeLensButton(interaction: ButtonInteraction
 
     // Prime session state with the text + metadata snapshot from the original response.
     const { responseId, metadata } = await resolveProvenanceMetadata(interaction.message);
+    if (responseId) {
+      telemetryContext = buildAlternativeLensLogContext(interaction, 'alt_lens:init', responseId);
+    }
     const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, interaction.message.id);
     clearAlternativeLensSession(sessionKey);
     createAlternativeLensSession(sessionKey, {
@@ -591,8 +633,14 @@ export async function handleAlternativeLensButton(interaction: ButtonInteraction
       components: [selectRow, submitRow],
       flags: [1 << 6]
     } satisfies InteractionReplyOptions);
+    provenanceLogger.info('Alternative lens init completed', { ...telemetryContext, phase: 'success' });
   } catch (error) {
-    logger.error('Failed to initialise alternative lens session:', error);
+    provenanceLogger.error('Alternative lens init error', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'initialisation_failed',
+      error
+    });
     const replyOptions: InteractionReplyOptions = {
       content: 'Something went wrong while starting the alternative lens flow. Please try again later.',
       flags: [1 << 6]
@@ -607,58 +655,109 @@ export async function handleAlternativeLensButton(interaction: ButtonInteraction
 }
 
 export async function handleAlternativeLensSelect(interaction: StringSelectMenuInteraction): Promise<void> {
-  const { customId, values } = interaction;
-  const selected = values?.[0];
+  const baseContext = buildAlternativeLensLogContext(interaction, 'alt_lens:select');
+  let telemetryContext = baseContext;
+  provenanceLogger.info('Alternative lens select started', { ...telemetryContext, phase: 'start' });
 
-  if (!selected) {
-    await interaction.deferUpdate();
-    return;
-  }
+  try {
+    const { customId, values } = interaction;
+    const selected = values?.[0];
 
-  const messageId = customId.slice(ALTERNATIVE_LENS_SELECT_PREFIX.length);
-  const lensDefinition = getAlternativeLensDefinition(selected as AlternativeLensKey);
-
-  if (!lensDefinition) {
-    await interaction.reply({
-      content: 'That lens is no longer available. Please choose a different option.',
-      flags: [1 << 6]
-    });
-    return;
-  }
-
-  const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
-  const session = setAlternativeLensSelection(sessionKey, lensDefinition.key);
-  if (!session) {
-    await interaction.reply({
-      content: 'That alternative lens session expired. Click **Alternative Lens** again to restart.',
-      flags: [1 << 6]
-    });
-    return;
-  }
-
-  if (lensDefinition.requiresCustomDescription) {
-    const input = new TextInputBuilder()
-      .setCustomId(ALT_LENS_CUSTOM_DESCRIPTION_INPUT_ID)
-      .setLabel('Describe the custom lens')
-      .setStyle(TextInputStyle.Paragraph)
-      .setPlaceholder('Explain the perspective you want to apply.')
-      .setMinLength(10)
-      .setMaxLength(500);
-
-    if (session.customDescription) {
-      input.setValue(session.customDescription);
+    if (!selected) {
+      provenanceLogger.error('Alternative lens select failed (no selection)', {
+        ...telemetryContext,
+        phase: 'error',
+        reason: 'no_selection'
+      });
+      await interaction.deferUpdate();
+      return;
     }
 
-    const modal = new ModalBuilder()
-      .setCustomId(`${ALTERNATIVE_LENS_MODAL_PREFIX}${messageId}`)
-      .setTitle('Custom Lens Details')
-      .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+    const messageId = customId.slice(ALTERNATIVE_LENS_SELECT_PREFIX.length);
+    const lensDefinition = getAlternativeLensDefinition(selected as AlternativeLensKey);
 
-    await interaction.showModal(modal);
-    return;
+    if (!lensDefinition) {
+      provenanceLogger.error('Alternative lens select failed (unknown lens)', {
+        ...telemetryContext,
+        phase: 'error',
+        reason: 'unknown_lens',
+        lensKey: selected
+      });
+      await interaction.reply({
+        content: 'That lens is no longer available. Please choose a different option.',
+        flags: [1 << 6]
+      });
+      return;
+    }
+
+    const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
+    const session = setAlternativeLensSelection(sessionKey, lensDefinition.key);
+    if (!session) {
+      provenanceLogger.error('Alternative lens select failed (session expired)', {
+        ...telemetryContext,
+        phase: 'error',
+        reason: 'session_expired',
+        lensKey: lensDefinition.key
+      });
+      await interaction.reply({
+        content: 'That alternative lens session expired. Click **Alternative Lens** again to restart.',
+        flags: [1 << 6]
+      });
+      return;
+    }
+
+    if (session.context.responseId) {
+      telemetryContext = buildAlternativeLensLogContext(interaction, 'alt_lens:select', session.context.responseId);
+    }
+
+    if (lensDefinition.requiresCustomDescription) {
+      const input = new TextInputBuilder()
+        .setCustomId(ALT_LENS_CUSTOM_DESCRIPTION_INPUT_ID)
+        .setLabel('Describe the custom lens')
+        .setStyle(TextInputStyle.Paragraph)
+        .setPlaceholder('Explain the perspective you want to apply.')
+        .setMinLength(10)
+        .setMaxLength(500);
+
+      if (session.customDescription) {
+        input.setValue(session.customDescription);
+      }
+
+      const modal = new ModalBuilder()
+        .setCustomId(`${ALTERNATIVE_LENS_MODAL_PREFIX}${messageId}`)
+        .setTitle('Custom Lens Details')
+        .addComponents(new ActionRowBuilder<TextInputBuilder>().addComponents(input));
+
+      await interaction.showModal(modal);
+      provenanceLogger.info('Alternative lens select completed', {
+        ...telemetryContext,
+        phase: 'success',
+        lensKey: lensDefinition.key,
+        mode: 'modal_prompt'
+      });
+      return;
+    }
+
+    await interaction.deferUpdate();
+    provenanceLogger.info('Alternative lens select completed', {
+      ...telemetryContext,
+      phase: 'success',
+      lensKey: lensDefinition.key
+    });
+  } catch (error) {
+    provenanceLogger.error('Alternative lens select error', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'selection_failed',
+      error
+    });
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.reply({
+        content: 'Something went wrong while updating the alternative lens selection. Please try again later.',
+        flags: [1 << 6]
+      }).catch(() => undefined);
+    }
   }
-
-  await interaction.deferUpdate();
 }
 
 export async function handleAlternativeLensModal(interaction: ModalSubmitInteraction): Promise<void> {
@@ -692,11 +791,20 @@ export async function handleAlternativeLensModal(interaction: ModalSubmitInterac
 }
 
 export async function handleAlternativeLensSubmit(interaction: ButtonInteraction, openaiService: OpenAIService): Promise<void> {
+  const baseContext = buildAlternativeLensLogContext(interaction, 'alt_lens:submit');
+  let telemetryContext = baseContext;
+  provenanceLogger.info('Alternative lens submit started', { ...telemetryContext, phase: 'start' });
+
   const messageId = interaction.customId.slice(ALTERNATIVE_LENS_SUBMIT_PREFIX.length);
   const sessionKey = buildAlternativeLensSessionKey(interaction.user.id, messageId);
   const session = getAlternativeLensSession(sessionKey);
 
   if (!session) {
+    provenanceLogger.error('Alternative lens submit failed (session expired)', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'session_expired'
+    });
     await interaction.reply({
       content: 'That alternative lens session expired. Click **Alternative Lens** again to start over.',
       flags: [1 << 6]
@@ -704,8 +812,17 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
     return;
   }
 
+  if (session.context.responseId) {
+    telemetryContext = buildAlternativeLensLogContext(interaction, 'alt_lens:submit', session.context.responseId);
+  }
+
   if (!session.context.messageText) {
     clearAlternativeLensSession(sessionKey);
+    provenanceLogger.error('Alternative lens submit failed (missing message text)', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'missing_message_text'
+    });
     await interaction.reply({
       content: 'The original response is no longer available for reinterpretation. Start a new alternative lens request.',
       flags: [1 << 6]
@@ -715,6 +832,11 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
 
   const lens = buildLensPayload(session);
   if (!lens) {
+    provenanceLogger.error('Alternative lens submit failed (lens not selected)', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'missing_lens'
+    });
     await interaction.reply({
       content: 'Select a lens first. If you choose Custom Lens, provide a description before submitting.',
       flags: [1 << 6]
@@ -723,6 +845,11 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
   }
 
   if (isAlternativeLensInProgress(messageId)) {
+    provenanceLogger.error('Alternative lens submit failed (already in progress)', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'in_progress'
+    });
     await interaction.reply({
       content: '⚠️ An alternative lens is already being generated for this response. Please wait for it to finish.',
       flags: [1 << 6]
@@ -744,7 +871,12 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
     });
   } catch (error) {
     clearAlternativeLensInProgress(messageId);
-    logger.warn('Failed to acknowledge alternative lens request:', error);
+    provenanceLogger.error('Alternative lens submit failed (acknowledgement error)', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'ack_failed',
+      error
+    });
     if (!interaction.replied) {
       await interaction.followUp({
         content: 'I could not begin generating that alternative lens. Please try again.',
@@ -774,6 +906,11 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
 
     const channel = interaction.channel;
     if (!channel || !channel.isSendable()) {
+      provenanceLogger.error('Alternative lens submit failed (unsendable channel)', {
+        ...telemetryContext,
+        phase: 'error',
+        reason: 'unsendable_channel'
+      });
       await interaction.editReply({
         content: 'I could not post the alternative lens response in this channel.'
       });
@@ -808,8 +945,18 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
       ? `✅ Posted alternative lens (${lens.label} — ${lensDescription}).`
       : `✅ Posted alternative lens (${lens.label}).`;
     await interaction.editReply({ content: completionSummary });
+    provenanceLogger.info('Alternative lens submit completed', {
+      ...telemetryContext,
+      phase: 'success',
+      lensKey: lens.key
+    });
   } catch (error) {
-    logger.error('Failed to generate alternative lens response:', error);
+    provenanceLogger.error('Alternative lens submit error', {
+      ...telemetryContext,
+      phase: 'error',
+      reason: 'generation_failed',
+      error
+    });
     await interaction.editReply({
       content: 'I could not generate that alternative lens. Please try again later.'
     });

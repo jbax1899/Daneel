@@ -1,5 +1,5 @@
 import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
-import type { Message } from 'discord.js';
+import type { Message, ButtonInteraction } from 'discord.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
@@ -171,6 +171,24 @@ function buildVariationStatusMessage(userId: string, base?: string): string {
 
   const summary = buildTokenSummaryLine(userId);
   return base ? `${base}\n\n${summary}` : summary;
+}
+
+const provenanceLogger = typeof logger.child === 'function' ? logger.child({ module: 'provenance' }) : logger;
+
+function buildExplainLogContext(
+  interaction: ButtonInteraction,
+  responseId?: string,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    action: 'explain',
+    userId: interaction.user.id,
+    guildId: interaction.guild?.id ?? null,
+    channelId: interaction.channelId ?? null,
+    messageId: interaction.message.id,
+    ...(responseId ? { responseId } : {}),
+    ...extra
+  };
 }
 
 // Slash commands handler
@@ -377,6 +395,10 @@ client.on(Events.InteractionCreate, async interaction => {
 
       markExplainInProgress(explainKey);
 
+      const baseExplainContext = buildExplainLogContext(interaction);
+      let explainLogContext = baseExplainContext;
+      provenanceLogger.info('Explain flow started', { ...explainLogContext, phase: 'start' });
+
       const requester = resolveMemberDisplayName(interaction.member, interaction.user.username);
       const progressContent = `⏳ Explanation requested by **${requester}** — compiling reasoning…`;
       try {
@@ -386,7 +408,12 @@ client.on(Events.InteractionCreate, async interaction => {
         });
       } catch (error) {
         clearExplainInProgress(explainKey);
-        logger.warn('Failed to acknowledge explanation request:' + error);
+        provenanceLogger.error('Explain flow failed (acknowledgement error)', {
+          ...explainLogContext,
+          phase: 'error',
+          reason: 'ack_failed',
+          error
+        });
         if (!interaction.replied) {
           await interaction.followUp({
             content: 'I could not start the explanation flow. Please try again.',
@@ -399,13 +426,21 @@ client.on(Events.InteractionCreate, async interaction => {
       try {
         const messageText = await recoverFullMessageText(interaction.message);
         if (!messageText) {
+          provenanceLogger.error('Explain flow failed (missing message text)', {
+            ...explainLogContext,
+            phase: 'error',
+            reason: 'missing_message_text'
+          });
           await interaction.editReply({
             content: 'I could not locate the response to explain. Please try again from the original message.'
           });
           return;
         }
 
-        const { metadata } = await resolveProvenanceMetadata(interaction.message);
+        const { responseId, metadata } = await resolveProvenanceMetadata(interaction.message);
+        if (responseId) {
+          explainLogContext = buildExplainLogContext(interaction, responseId);
+        }
         const plannerOptions = await requestProvenanceOpenAIOptions(openaiService, {
           kind: 'explain',
           messageText,
@@ -424,6 +459,11 @@ client.on(Events.InteractionCreate, async interaction => {
 
         const channel = interaction.channel;
         if (!channel || !channel.isSendable()) {
+          provenanceLogger.error('Explain flow failed (unsendable channel)', {
+            ...explainLogContext,
+            phase: 'error',
+            reason: 'unsendable_channel'
+          });
           await interaction.editReply({
             content: 'I could not post the explanation in this channel.'
           });
@@ -449,8 +489,17 @@ client.on(Events.InteractionCreate, async interaction => {
         }
 
         await interaction.editReply({ content: '✅ Explanation posted.' });
+        provenanceLogger.info('Explain flow completed', {
+          ...explainLogContext,
+          phase: 'success'
+        });
       } catch (error) {
-        logger.error('Failed to generate explanation reply: ' + error);
+        provenanceLogger.error('Explain flow error', {
+          ...explainLogContext,
+          phase: 'error',
+          reason: 'generation_failed',
+          error
+        });
         await interaction.editReply({
           content: '⚠️ I could not generate that explanation. Please try again later.'
         });
