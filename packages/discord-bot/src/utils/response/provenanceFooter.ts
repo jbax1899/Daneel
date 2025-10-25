@@ -62,10 +62,11 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
 
     // Confidence, displayed as a percentage (e.g. "85%")
     if (responseMetadata.confidence < 0.0 || responseMetadata.confidence > 1.0) {
-        console.warn(`Confidence score out of bounds: ${responseMetadata.confidence}. Setting to zero.`);
-        responseMetadata.confidence = 0.0;        
+        console.warn(`Confidence score out of bounds: ${responseMetadata.confidence} - Reporting as 0%`);
+        descriptionParts.push(`0% confidence`);
+    } else {
+        descriptionParts.push(`${(responseMetadata.confidence * 100).toFixed(0)}% confidence`);
     }
-    descriptionParts.push(`${(responseMetadata.confidence * 100).toFixed(0)}% confidence`);
 
     // Trade-offs, if any
     // We won't always have trade-offs surfaced as it depends on the context
