@@ -82,7 +82,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
             // Extract just the hostname from the URL
             const domain = c.url.hostname.replace('www.', '');
             // Return hostname embedded with url
-            return `[${domain}](${c.url}) `;
+            return `[${domain}](${c.url})`;
         }).join(' • '); // Join multiple citations with smaller dot
         descriptionParts.push(`Sources:\n${citationLines}`); // Push citations to new line for readability. Use term "Sources " instead of "Citations" for clarity
     }
