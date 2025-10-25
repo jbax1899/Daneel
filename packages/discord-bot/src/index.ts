@@ -397,6 +397,24 @@ client.on(Events.InteractionCreate, async interaction => {
 
       const baseExplainContext = buildExplainLogContext(interaction);
       let explainLogContext = baseExplainContext;
+      let explainTimeout: NodeJS.Timeout | undefined;
+
+      try {
+        explainTimeout = setTimeout(() => {
+          provenanceLogger.warn('Explain flow auto-cleared after timeout', {
+            ...explainLogContext,
+            phase: 'timeout'
+          });
+          clearExplainInProgress(explainKey);
+        }, 3 * 60_000);
+      } catch (timerError) {
+        provenanceLogger.warn('Explain flow failed to schedule timeout', {
+          ...explainLogContext,
+          phase: 'timer_error',
+          error: timerError
+        });
+      }
+
       provenanceLogger.info('Explain flow started', { ...explainLogContext, phase: 'start' });
 
       const requester = resolveMemberDisplayName(interaction.member, interaction.user.username);
@@ -408,6 +426,9 @@ client.on(Events.InteractionCreate, async interaction => {
         });
       } catch (error) {
         clearExplainInProgress(explainKey);
+        if (explainTimeout) {
+          clearTimeout(explainTimeout);
+        }
         provenanceLogger.error('Explain flow failed (acknowledgement error)', {
           ...explainLogContext,
           phase: 'error',
@@ -505,6 +526,9 @@ client.on(Events.InteractionCreate, async interaction => {
         });
       } finally {
         clearExplainInProgress(explainKey);
+        if (explainTimeout) {
+          clearTimeout(explainTimeout);
+        }
       }
 
       return;
