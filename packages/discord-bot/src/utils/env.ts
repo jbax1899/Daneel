@@ -63,6 +63,14 @@ const DEFAULT_RATE_LIMITS: Record<string, any> = {
 } as const;
 
 /**
+ * Limits on channel/thread visibility
+ */
+const DEFAULT_VISIBILITY_LIMITS = {
+  ALLOW_THREAD_RESPONSES: true,
+  ALLOWED_THREAD_IDS: [""] // Comma-separated list of thread IDs; takes priority over ALLOW_THREAD_RESPONSES
+} as const;
+
+/**
  * Default configuration for limiting back-and-forth conversations with other bots
  */
 const DEFAULT_BOT_INTERACTION_LIMITS = {
@@ -79,8 +87,7 @@ const DEFAULT_BOT_INTERACTION_LIMITS = {
 const DEFAULT_CATCH_UP_LIMITS = {
   AFTER_MESSAGES: 10,
   IF_MENTIONED_AFTER_MESSAGES: 5,
-  STALE_COUNTER_TTL_MS: 60 * 60_000,
-  ALLOWED_THREAD_IDS: ['1407811416244617388']
+  STALE_COUNTER_TTL_MS: 60 * 60_000
 } as const;
 
 /**
@@ -271,7 +278,7 @@ export const config = {
     }
   },
 
-  // Behavioural controls that keep Daneel from getting stuck in endless loops with other bots
+  // Behavioural controls to prevent getting stuck in endless loops with other bots
   botInteraction: {
     maxBackAndForth: getNumberEnv('BOT_BACK_AND_FORTH_LIMIT', DEFAULT_BOT_INTERACTION_LIMITS.MAX_BACK_AND_FORTH),
     cooldownMs: getNumberEnv('BOT_BACK_AND_FORTH_COOLDOWN_MS', DEFAULT_BOT_INTERACTION_LIMITS.COOLDOWN_MS),
@@ -280,16 +287,20 @@ export const config = {
     reactionEmoji: process.env.BOT_BACK_AND_FORTH_REACTION?.trim() || DEFAULT_BOT_INTERACTION_LIMITS.REACTION
   },
 
-  // Message catch-up tuning. These were previously constants inside
-  // MessageCreate and are now surfaced here so operators can modify them via
-  // environment variables without redeploying.
+  // Message catch-up tuning
   catchUp: {
     afterMessages: getNumberEnv('CATCHUP_AFTER_MESSAGES', DEFAULT_CATCH_UP_LIMITS.AFTER_MESSAGES),
     ifMentionedAfterMessages: getNumberEnv(
       'CATCHUP_IF_MENTIONED_AFTER_MESSAGES',
       DEFAULT_CATCH_UP_LIMITS.IF_MENTIONED_AFTER_MESSAGES
     ),
-    staleCounterTtlMs: getNumberEnv('STALE_COUNTER_TTL_MS', DEFAULT_CATCH_UP_LIMITS.STALE_COUNTER_TTL_MS),
-    allowedThreadIds: getStringArrayEnv('ALLOWED_THREAD_IDS', DEFAULT_CATCH_UP_LIMITS.ALLOWED_THREAD_IDS)
+    staleCounterTtlMs: getNumberEnv('STALE_COUNTER_TTL_MS', DEFAULT_CATCH_UP_LIMITS.STALE_COUNTER_TTL_MS)
+  },
+
+  // Channel/thread visibility controls
+  visibility: {
+    allowThreadResponses: getBooleanEnv('ALLOW_THREAD_RESPONSES', DEFAULT_VISIBILITY_LIMITS.ALLOW_THREAD_RESPONSES),
+    allowedThreadIds: getStringArrayEnv('ALLOWED_THREAD_IDS', DEFAULT_VISIBILITY_LIMITS.ALLOWED_THREAD_IDS)
   }
+
 } as const;

@@ -14,6 +14,7 @@ RUN npm install
 
 # Bring in the remainder of the landing page source and produce the static dist bundle.
 COPY packages/web/ /app/packages/web/
+COPY packages/ethics-core/ /app/packages/ethics-core/
 RUN npm run build
 
 
@@ -48,10 +49,13 @@ COPY --from=frontend-builder /app/packages/web/dist ./packages/web/dist
 # Copy built bot
 COPY --from=bot-builder /app/packages/discord-bot/dist ./packages/discord-bot/dist
 COPY --from=bot-builder /app/packages/discord-bot/package*.json ./packages/discord-bot/
-COPY --from=bot-builder /app/packages/shared/package.json ./packages/shared/
+COPY --from=bot-builder /app/packages/shared/package*.json ./packages/shared/
 COPY --from=bot-builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
-RUN cd packages/shared && npm install --production
+COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
+COPY --from=bot-builder /app/package.json ./package.json
+COPY --from=bot-builder /app/package-lock.json ./package-lock.json
+RUN npm install --production --ignore-scripts
 RUN cd packages/discord-bot && npm install --production
 
 # Copy the lightweight Node server used to host the static site

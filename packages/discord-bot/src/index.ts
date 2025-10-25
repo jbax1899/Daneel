@@ -1,4 +1,5 @@
 import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
+import type { Message, ButtonInteraction } from 'discord.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { CommandHandler } from './utils/commandHandler.js';
@@ -6,6 +7,7 @@ import { EventManager } from './utils/eventManager.js';
 import { logger } from './utils/logger.js';
 import { config } from './utils/env.js';
 import { OpenAIService } from './utils/openaiService.js';
+import { ResponseHandler } from './utils/response/ResponseHandler.js';
 import { evictFollowUpContext, readFollowUpContext, saveFollowUpContext } from './commands/image/followUpCache.js';
 import { runImageGenerationSession } from './commands/image.js';
 import {
@@ -47,6 +49,25 @@ import {
   describeTokenAvailability,
   refundImageTokens
 } from './utils/imageTokens.js';
+// Alternative lens workflow utilities (session state + interaction handlers)
+import {
+  ALTERNATIVE_LENS_MODAL_PREFIX,
+  ALTERNATIVE_LENS_SELECT_PREFIX,
+  ALTERNATIVE_LENS_SUBMIT_PREFIX,
+  handleAlternativeLensButton,
+  handleAlternativeLensModal,
+  handleAlternativeLensSelect,
+  handleAlternativeLensSubmit,
+  generateExplanationMessage,
+  requestProvenanceOpenAIOptions,
+  resolveMemberDisplayName,
+  buildExplainSessionKey,
+  isExplainInProgress,
+  markExplainInProgress,
+  clearExplainInProgress,
+  recoverFullMessageText,
+  resolveProvenanceMetadata
+} from './utils/response/provenanceInteractions.js';
 //import express from 'express'; // For webhook
 //import bodyParser from "body-parser"; // For webhook
 
@@ -122,7 +143,7 @@ client.handlers = new Collection();
     await client.login(config.token);
     logger.info('Bot is now connected to Discord and ready!');
   } catch (error) {
-    logger.error('Failed to initialize bot:', error);
+    logger.error('Failed to initialize bot:' + error);
     process.exit(1);
   }
 })();
@@ -152,6 +173,24 @@ function buildVariationStatusMessage(userId: string, base?: string): string {
   return base ? `${base}\n\n${summary}` : summary;
 }
 
+const provenanceLogger = typeof logger.child === 'function' ? logger.child({ module: 'provenance' }) : logger;
+
+function buildExplainLogContext(
+  interaction: ButtonInteraction,
+  responseId?: string,
+  extra?: Record<string, unknown>
+): Record<string, unknown> {
+  return {
+    action: 'explain',
+    userId: interaction.user.id,
+    guildId: interaction.guild?.id ?? null,
+    channelId: interaction.channelId ?? null,
+    messageId: interaction.message.id,
+    ...(responseId ? { responseId } : {}),
+    ...extra
+  };
+}
+
 // Slash commands handler
 client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isChatInputCommand()) {
@@ -175,6 +214,13 @@ client.on(Events.InteractionCreate, async interaction => {
 
   if (interaction.isStringSelectMenu()) {
     const { customId, values } = interaction;
+
+    // Alternative lens select menu flow
+    if (customId.startsWith(ALTERNATIVE_LENS_SELECT_PREFIX)) {
+      await handleAlternativeLensSelect(interaction);
+      return;
+    }
+
     const selected = values?.[0];
 
     if (!selected) {
@@ -183,7 +229,10 @@ client.on(Events.InteractionCreate, async interaction => {
     }
 
     const respondWithExpiryNotice = async () => {
-      await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+      await interaction.reply({
+        content: '⚠️ That variation configurator expired. Press the variation button again.',
+        flags: [1 << 6]
+      });
     };
 
     if (customId.startsWith(IMAGE_VARIATION_QUALITY_SELECT_PREFIX)) {
@@ -273,13 +322,22 @@ client.on(Events.InteractionCreate, async interaction => {
   if (interaction.isModalSubmit()) {
     const { customId } = interaction;
 
+    // Alternative lens custom modal submission
+    if (customId.startsWith(ALTERNATIVE_LENS_MODAL_PREFIX)) {
+      await handleAlternativeLensModal(interaction);
+      return;
+    }
+
     if (customId.startsWith(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX)) {
       const responseId = customId.slice(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX.length);
       const rawPrompt = interaction.fields.getTextInputValue(IMAGE_VARIATION_PROMPT_INPUT_ID);
       const trimmedPrompt = rawPrompt?.trim();
 
       if (!trimmedPrompt) {
-        await interaction.reply({ content: '⚠️ The prompt cannot be empty.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ The prompt cannot be empty.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -290,7 +348,10 @@ client.on(Events.InteractionCreate, async interaction => {
       });
 
       if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        await interaction.reply({
+          content: '⚠️ That variation configurator expired. Press the variation button again.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -304,18 +365,186 @@ client.on(Events.InteractionCreate, async interaction => {
           );
         }
       } catch (error) {
-        logger.warn('Failed to refresh variation configurator after prompt update:', error);
+        logger.warn('Failed to refresh variation configurator after prompt update:' + error);
       }
 
-      await interaction.reply({ content: '✅ Prompt updated! Adjust other settings and press **Generate variation** when ready.', ephemeral: true });
+      await interaction.reply({ 
+        content: '✅ Prompt updated! Adjust other settings and press **Generate variation** when ready.', 
+        flags: [1 << 6] // [1 << 6] = EPHEMERAL
+      });
       return;
     }
   }
 
-
-
+  // ====================
+  // Button Interactions
+  // ====================
   if (interaction.isButton()) {
     const { customId } = interaction;
+
+    // Provenance footer: share a reasoning explanation
+    if (customId === 'explain') {
+      const explainKey = buildExplainSessionKey(interaction.message.id);
+      if (isExplainInProgress(explainKey)) {
+        await interaction.reply({
+          content: '⚠️ An explanation is already in progress for this response. Please wait for it to finish.',
+          flags: [1 << 6]
+        });
+        return;
+      }
+
+      markExplainInProgress(explainKey);
+
+      const baseExplainContext = buildExplainLogContext(interaction);
+      let explainLogContext = baseExplainContext;
+      let explainTimeout: NodeJS.Timeout | undefined;
+
+      try {
+        explainTimeout = setTimeout(() => {
+          provenanceLogger.warn('Explain flow auto-cleared after timeout', {
+            ...explainLogContext,
+            phase: 'timeout'
+          });
+          clearExplainInProgress(explainKey);
+        }, 3 * 60_000);
+      } catch (timerError) {
+        provenanceLogger.warn('Explain flow failed to schedule timeout', {
+          ...explainLogContext,
+          phase: 'timer_error',
+          error: timerError
+        });
+      }
+
+      provenanceLogger.info('Explain flow started', { ...explainLogContext, phase: 'start' });
+
+      const requester = resolveMemberDisplayName(interaction.member, interaction.user.username);
+      const progressContent = `⏳ Explanation requested by **${requester}** — compiling reasoning…`;
+      try {
+        await interaction.reply({
+          content: progressContent,
+          allowedMentions: { parse: [] }
+        });
+      } catch (error) {
+        clearExplainInProgress(explainKey);
+        if (explainTimeout) {
+          clearTimeout(explainTimeout);
+        }
+        provenanceLogger.error('Explain flow failed (acknowledgement error)', {
+          ...explainLogContext,
+          phase: 'error',
+          reason: 'ack_failed',
+          error
+        });
+        if (!interaction.replied) {
+          await interaction.followUp({
+            content: 'I could not start the explanation flow. Please try again.',
+            flags: [1 << 6]
+          }).catch(() => undefined);
+        }
+        return;
+      }
+
+      try {
+        const messageText = await recoverFullMessageText(interaction.message);
+        if (!messageText) {
+          provenanceLogger.error('Explain flow failed (missing message text)', {
+            ...explainLogContext,
+            phase: 'error',
+            reason: 'missing_message_text'
+          });
+          await interaction.editReply({
+            content: 'I could not locate the response to explain. Please try again from the original message.'
+          });
+          return;
+        }
+
+        const { responseId, metadata } = await resolveProvenanceMetadata(interaction.message);
+        if (responseId) {
+          explainLogContext = buildExplainLogContext(interaction, responseId);
+        }
+        const plannerOptions = await requestProvenanceOpenAIOptions(openaiService, {
+          kind: 'explain',
+          messageText,
+          metadata
+        });
+        const explanation = await generateExplanationMessage(
+          openaiService,
+          {
+            messageText,
+            confidence: metadata?.confidence,
+            tradeoffCount: metadata?.tradeoffCount,
+            chainHash: metadata?.chainHash
+          },
+          plannerOptions
+        );
+
+        const channel = interaction.channel;
+        if (!channel || !channel.isSendable()) {
+          provenanceLogger.error('Explain flow failed (unsendable channel)', {
+            ...explainLogContext,
+            phase: 'error',
+            reason: 'unsendable_channel'
+          });
+          await interaction.editReply({
+            content: 'I could not post the explanation in this channel.'
+          });
+          return;
+        }
+
+        let targetMessage: Message | null = null;
+        if (channel.isTextBased()) {
+          try {
+            targetMessage = await channel.messages.fetch(interaction.message.id);
+          } catch (fetchError) {
+            logger.warn(`Failed to fetch original message ${interaction.message.id} for explanation reply: ${fetchError}`);
+          }
+        }
+
+        const explanationContent = `**Explanation:**\n\n${explanation.trim()}`;
+        if (targetMessage) {
+          const responseHandler = new ResponseHandler(targetMessage, channel, interaction.user);
+          await responseHandler.sendMessage(explanationContent, [], true, true);
+        } else {
+          const responseHandler = new ResponseHandler(interaction.message as Message, channel, interaction.user);
+          await responseHandler.sendMessage(explanationContent, [], true, true);
+        }
+
+        await interaction.editReply({ content: '✅ Explanation posted.' });
+        provenanceLogger.info('Explain flow completed', {
+          ...explainLogContext,
+          phase: 'success'
+        });
+      } catch (error) {
+        provenanceLogger.error('Explain flow error', {
+          ...explainLogContext,
+          phase: 'error',
+          reason: 'generation_failed',
+          error
+        });
+        await interaction.editReply({
+          content: '⚠️ I could not generate that explanation. Please try again later.'
+        });
+      } finally {
+        clearExplainInProgress(explainKey);
+        if (explainTimeout) {
+          clearTimeout(explainTimeout);
+        }
+      }
+
+      return;
+    }
+
+    // Provenance footer: start alternative lens flow
+    if (customId === 'alternative_lens') {
+      await handleAlternativeLensButton(interaction);
+      return;
+    }
+
+    // Provenance footer: generate reframed response
+    if (customId.startsWith(ALTERNATIVE_LENS_SUBMIT_PREFIX)) {
+      await handleAlternativeLensSubmit(interaction, openaiService);
+      return;
+    }
 
     // Variation buttons all share the same prefix, so handle the specific
     // actions (generate, reset, cancel, prompt modal) before the generic
@@ -324,13 +553,19 @@ client.on(Events.InteractionCreate, async interaction => {
       const responseId = customId.slice(IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX.length);
       const session = getVariationSession(interaction.user.id, responseId);
       if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ That variation configurator expired. Press the variation button again.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
       const cooldownRemaining = session.cooldownUntil ? Math.max(0, Math.ceil((session.cooldownUntil - Date.now()) / 1000)) : 0;
       if (cooldownRemaining > 0) {
-        await interaction.reply({ content: `⚠️ Please wait ${formatRetryCountdown(cooldownRemaining)} before generating another variation.`, ephemeral: true });
+        await interaction.reply({ 
+          content: `⚠️ Please wait ${formatRetryCountdown(cooldownRemaining)} before generating another variation.`, 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -357,11 +592,14 @@ client.on(Events.InteractionCreate, async interaction => {
                 buildVariationConfiguratorView(updatedSession, { statusMessage })
               );
             } catch (error) {
-              logger.warn('Failed to refresh variation configurator after token denial:', error);
+              logger.warn('Failed to refresh variation configurator after token denial: ' + error);
             }
           }
 
-          await interaction.reply({ content: statusMessage, ephemeral: true });
+          await interaction.reply({ 
+            content: statusMessage, 
+            flags: [1 << 6] // [1 << 6] = EPHEMERAL
+          });
           return;
         }
 
@@ -373,7 +611,7 @@ client.on(Events.InteractionCreate, async interaction => {
           await session.messageUpdater({ content: '⏳ Generating variation…', embeds: [], components: [] });
         }
       } catch (error) {
-        logger.warn('Failed to update variation configurator before generation:', error);
+        logger.warn('Failed to update variation configurator before generation:' + error);
       }
 
       await interaction.deferReply();
@@ -400,12 +638,15 @@ client.on(Events.InteractionCreate, async interaction => {
           refundImageTokens(interaction.user.id, tokenSpend.cost);
         }
       } catch (error) {
-        logger.error('Unexpected error while generating variation:', error);
+        logger.error('Unexpected error while generating variation:' + error);
         if (tokenSpend) {
           refundImageTokens(interaction.user.id, tokenSpend.cost);
         }
         if (!interaction.replied && !interaction.deferred) {
-          await interaction.reply({ content: '⚠️ Something went wrong while generating that variation.', ephemeral: true });
+          await interaction.reply({ 
+            content: '⚠️ Something went wrong while generating that variation.', 
+            flags: [1 << 6] // [1 << 6] = EPHEMERAL
+          });
         }
       } finally {
         disposeVariationSession(`${interaction.user.id}:${responseId}`);
@@ -422,7 +663,10 @@ client.on(Events.InteractionCreate, async interaction => {
       });
 
       if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ That variation configurator expired. Press the variation button again.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -446,7 +690,10 @@ client.on(Events.InteractionCreate, async interaction => {
       const responseId = customId.slice(IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX.length);
       const session = getVariationSession(interaction.user.id, responseId);
       if (!session) {
-        await interaction.reply({ content: '⚠️ That variation configurator expired. Press the variation button again.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ That variation configurator expired. Press the variation button again.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -457,7 +704,10 @@ client.on(Events.InteractionCreate, async interaction => {
     if (customId.startsWith(IMAGE_VARIATION_CUSTOM_ID_PREFIX)) {
       const followUpResponseId = customId.slice(IMAGE_VARIATION_CUSTOM_ID_PREFIX.length);
       if (!followUpResponseId) {
-        await interaction.reply({ content: '⚠️ I could not determine which image to vary.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ I could not determine which image to vary.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -471,12 +721,15 @@ client.on(Events.InteractionCreate, async interaction => {
             saveFollowUpContext(followUpResponseId, recovered);
           }
         } catch (error) {
-          logger.error('Failed to recover cached context for variation button:', error);
+          logger.error('Failed to recover cached context for variation button:' + error);
         }
       }
 
       if (!cachedContext) {
-        await interaction.reply({ content: '⚠️ Sorry, I can no longer create a variation for that image. Please run /image again.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ Sorry, I can no longer create a variation for that image. Please run /image again.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -486,7 +739,7 @@ client.on(Events.InteractionCreate, async interaction => {
 
       const session = initialiseVariationSession(interaction.user.id, followUpResponseId, cachedContext);
 
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: [1 << 6] });
       const view = buildVariationConfiguratorView(session, {
         statusMessage: buildVariationStatusMessage(interaction.user.id)
       });
@@ -499,17 +752,32 @@ client.on(Events.InteractionCreate, async interaction => {
       return;
     }
 
+    if (customId === 'report_issue') {
+      logger.info(`Report Issue button clicked by user: ${interaction.user.id} on message: ${interaction.message.id} (${interaction.message.url})`);
+      await interaction.reply({
+        content: "This feature isn't active yet. To report ethical or security issues, please follow the instructions in [SECURITY.md](https://github.com/arete-org/arete/blob/main/SECURITY.md).",
+        flags: [1 << 6] // [1 << 6] = EPHEMERAL
+      });
+      return;
+    }
+
     // Other button handlers fall through to the retry logic below.
     if (customId.startsWith(IMAGE_RETRY_CUSTOM_ID_PREFIX)) {
       const retryKey = interaction.customId.slice(IMAGE_RETRY_CUSTOM_ID_PREFIX.length);
       if (!retryKey) {
-        await interaction.reply({ content: '⚠️ I could not find that image request to retry.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ I could not find that image request to retry.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
       const cachedContext = readFollowUpContext(retryKey);
       if (!cachedContext) {
-        await interaction.reply({ content: '⚠️ Sorry, that retry expired. Please ask me to generate a new image.', ephemeral: true });
+        await interaction.reply({ 
+          content: '⚠️ Sorry, that retry expired. Please ask me to generate a new image.', 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
+        });
         return;
       }
 
@@ -524,7 +792,11 @@ client.on(Events.InteractionCreate, async interaction => {
           try {
             await interaction.update({ content: message, components: retryRow ? [retryRow] : [] });
           } catch {
-            await interaction.reply({ content: message, ephemeral: true, components: retryRow ? [retryRow] : [] });
+            await interaction.reply({ 
+              content: message, 
+              flags: [1 << 6], // [1 << 6] = EPHEMERAL
+              components: retryRow ? [retryRow] : []
+             });
           }
           return;
         }
@@ -540,7 +812,7 @@ client.on(Events.InteractionCreate, async interaction => {
         const artifacts = await executeImageGeneration(cachedContext, {
           user: {
             username: interaction.user.username,
-            nickname: interaction.user.displayName ?? interaction.user.username,
+            nickname: resolveMemberDisplayName(interaction.member, interaction.user.username),
             guildName: interaction.guild?.name ?? `No guild for ${interaction.type} interaction`
           }
         });
@@ -563,11 +835,11 @@ client.on(Events.InteractionCreate, async interaction => {
         if (retrySpend) {
           refundImageTokens(interaction.user.id, retrySpend.cost);
         }
-        logger.error('Unexpected error while handling image retry button:', error);
+        logger.error('Unexpected error while handling image retry button: ' + error);
         try {
           await interaction.editReply({ content: '⚠️ I was unable to generate that image. Please try again later.', components: [] });
         } catch (replyError) {
-          logger.error('Failed to send retry failure message:', replyError);
+          logger.error('Failed to send retry failure message: ' + replyError);
         }
       }
 
@@ -620,3 +892,4 @@ appServer.listen(WEBHOOK_PORT, () => {
   console.log(`GitHub webhook server listening on port ${WEBHOOK_PORT}`);
 });
 */
+

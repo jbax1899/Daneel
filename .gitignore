@@ -22,6 +22,9 @@ packages/ethics-core/dist/
 # Shared build artifacts
 packages/shared/dist/
 
+# Traces
+packages/discord-bot/traces/
+
 # VSCode settings
 .vscode
 

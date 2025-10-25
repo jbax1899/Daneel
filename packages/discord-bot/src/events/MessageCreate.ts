@@ -34,18 +34,18 @@ interface Dependencies {
  * @extends {Event}
  */
 export class MessageCreate extends Event {
-  public readonly name = 'messageCreate' as const;          // The Discord.js event name this handler is registered for
-  public readonly once = false;                             // Whether the event should only be handled once (false for message events)
-  private readonly messageProcessor: MessageProcessor;      // The message processor that handles the actual message processing logic
-  // The catch-up thresholds are surfaced through the shared config so operators can tune them without redeploying.
-  private readonly CATCHUP_AFTER_MESSAGES = config.catchUp.afterMessages;
-  private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = config.catchUp.ifMentionedAfterMessages;
-  private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>(); // Tracks message counts per channel for catch-up logic
-  private readonly STALE_COUNTER_TTL_MS = config.catchUp.staleCounterTtlMs; // Configurable counter expiry
-  private readonly allowedThreadIds = new Set(config.catchUp.allowedThreadIds); // Threads where Daneel is allowed to engage
-  private readonly botConversationStates = new Map<string, BotConversationState>(); // Tracks back-and-forth exchanges with other bots
-  private readonly BOT_CONVERSATION_TTL_MS = config.botInteraction.conversationTtlMs; // How long to remember bot conversations before resetting
-  private readonly BOT_INTERACTION_COOLDOWN_MS = Math.max(config.botInteraction.cooldownMs, 1000); // Cooldown applied after we stop engaging
+  public readonly name = 'messageCreate' as const;                                                      // The Discord.js event name this handler is registered for
+  public readonly once = false;                                                                         // Whether the event should only be handled once (false for message events)
+  private readonly messageProcessor: MessageProcessor;                                                  // The message processor that handles the actual message processing logic
+  private readonly CATCHUP_AFTER_MESSAGES = config.catchUp.afterMessages;                               // Configurable catch-up threshold
+  private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = config.catchUp.ifMentionedAfterMessages;       // Configurable catch-up threshold when mentioned in plaintext
+  private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>();  // Tracks message counts per channel for catch-up logic
+  private readonly STALE_COUNTER_TTL_MS = config.catchUp.staleCounterTtlMs;                             // Configurable counter expiry
+  private readonly ALLOW_THREAD_RESPONSES = config.visibility.allowThreadResponses;                     // Whether responding in threads is allowed
+  private readonly allowedThreadIds = new Set(config.visibility.allowedThreadIds);                      // Threads where Daneel is allowed to engage
+  private readonly botConversationStates = new Map<string, BotConversationState>();                     // Tracks back-and-forth exchanges with other bots
+  private readonly BOT_CONVERSATION_TTL_MS = config.botInteraction.conversationTtlMs;                   // How long to remember bot conversations before resetting
+  private readonly BOT_INTERACTION_COOLDOWN_MS = Math.max(config.botInteraction.cooldownMs, 1000);      // Cooldown applied after we stop engaging
 
   /**
    * Creates an instance of MentionBotEvent
@@ -146,20 +146,32 @@ export class MessageCreate extends Event {
     if (!message.reference?.messageId) return false;
 
     const isSameChannel = message.reference.guildId === message.guildId &&
-                        message.reference.channelId === message.channelId;
+      message.reference.channelId === message.channelId;
     const isReplyingToBot = message.mentions.repliedUser?.id === message.client.user!.id;
 
     return isSameChannel && isReplyingToBot;
   }
 
   /**
-   * Checks if A. the message is in a thread, and B. the thread is in a disallowed thread.
+   * Checks if 
+   * A. the message is in a thread, 
+   * B. if thread responses are disallowed, and 
+   * C. if the thread is not in the allowlist. 
    * @private
    * @param {Message} message - The message to check
    * @returns {boolean} True if the message is in a disallowed thread, false otherwise
    */
   private disallowedThread(message: Message): boolean {
-    return message.channel.isThread() && !this.allowedThreadIds.has(message.channel.id);
+    if (!message.channel.isThread()) {
+      return false; // not a thread
+    }
+
+    if (this.ALLOW_THREAD_RESPONSES) {
+      return false; // globally allowed
+    }
+
+    // globally disallowed; only allow threads present in the allowlist
+    return !this.allowedThreadIds.has(message.channel.id);
   }
 
   private getChannelCounterKey(message: Message): string {

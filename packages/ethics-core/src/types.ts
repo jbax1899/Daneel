@@ -34,14 +34,14 @@ export type Citation = {
  * The complete provenance package for a response.
  */
 export type ResponseMetadata = {
-    responseId: string;           // Unique short ID (e.g., "7K3A")
+    responseId: string;           // Unique short ID
     provenance: Provenance;       // Epistemic origin
     confidence: ConfidenceScore;  // 0.0–1.0 confidence
     riskTier: RiskTier;           // Sensitivity classification
     tradeoffCount: number;        // Number of competing values surfaced
     chainHash: string;            // Cryptographic hash of reasoning chain
     licenseContext: string;       // e.g., "MIT + HL3"
-    modelVersion: string;         // e.g., "gpt-4.1-mini"
+    modelVersion: string;         // e.g., "gpt-5-mini"
     staleAfter: string;           // ISO 8601 timestamp
     citations: Citation[];        // Sources consulted
 }

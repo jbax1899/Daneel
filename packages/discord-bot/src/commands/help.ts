@@ -13,7 +13,7 @@ const helpCommand: Command = {
       if (!commands || commands.size === 0) {
         await interaction.reply({
           content: '⚠️ No commands are currently available.',
-          ephemeral: true
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
         });
         return;
       }
@@ -31,13 +31,13 @@ const helpCommand: Command = {
   
         await interaction.reply({ 
           embeds: [embed],
-          flags: 'Ephemeral' 
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
         });
       } catch (error) {
         console.error('Error in help command:', error);
         await interaction.reply({
           content: '⚠️ An error occurred while displaying the help message.',
-          flags: 'Ephemeral'
+          flags: [1 << 6] // [1 << 6] = EPHEMERAL
         });
       }
     }
