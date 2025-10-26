@@ -5,9 +5,7 @@
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
-ARETE evolved from Daneel, a Discord assistant (see [PHILOSOPHY.md](PHILOSOPHY.md) for the full origin story). The goal is to expand that groundwork into a transparent, ethics-first reasoning assistant.
-
-⚠️ Project Status: Early development. Some components are still prototypes or scaffolding.
+ARETE evolved from Daneel, a Discord assistant (see [PHILOSOPHY.md](PHILOSOPHY.md) for the full origin story).
 
 ## Overview
 ARETE is a transparent reasoning assistant for open reasoning and ethical reflection.
