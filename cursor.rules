@@ -14,6 +14,84 @@
 - Enable and honor strict null checks.
 - Use generics thoughtfully when they clarify intent.
 
+## Commenting Standards
+- **Always include meaningful comments** - AI assistants tend to avoid comments, but they're essential for collaboration and learning.
+- Comments serve as documentation for future maintainers and community contributors.
+- Prioritize comments that explain "why" and "what", not just "how".
+- Write comments for competent developers - focus on knowledge transfer, not basic explanations.
+
+### **Code Comments (// and /* */)**
+- Add comments for complex business logic, non-obvious algorithms, or important decisions.
+- Explain the reasoning behind implementation choices, especially when there are alternatives.
+- Document workarounds, edge cases, and potential gotchas.
+- Include context about external dependencies or API behaviors.
+- Use parenthetical explanations for technical terms: `technicalTerm (plainEnglish)`.
+
+**Good Code Comments:**
+```typescript
+// Reset the counter when we post a message to prevent catch-up loops
+if (message.author.id === message.client.user!.id) {
+    this.resetCounter(channelKey);
+    return;
+}
+
+// Apply catch-up filter to avoid unnecessary LLM calls during message floods (rapid-fire messages)
+const filterDecision = await this.catchupFilter.shouldSkipPlanner(message, recentMessages, channelKey);
+
+// Use fail-open design (don't block execution when uncertain)
+if (!this.config.enabled) {
+    return;
+}
+```
+
+**Avoid Basic Explanations:**
+```typescript
+// Increment the counter by 1
+counter++;
+
+// Set the value to true
+enabled = true;
+```
+
+### **JSDoc Documentation**
+- Apply JSDoc strategically based on context and value, not universally.
+- Use JSDoc for interfaces/types that benefit from hover documentation and AI assistant context.
+- Focus on complex types, public APIs, and interfaces where understanding the "why" matters.
+- Skip JSDoc for simple, self-explanatory types where the property names are clear.
+
+**When to use JSDoc:**
+- Public interfaces that other modules will use
+- Complex types with business logic or non-obvious relationships
+- Types where hover documentation helps developers understand requirements
+- Interfaces that benefit AI assistants for better context understanding
+
+**When to skip JSDoc:**
+- Simple, self-explanatory interfaces where property names are clear
+- Internal types that are obvious from context
+- Types that are just data containers without business meaning
+
+**Good JSDoc Example:**
+```typescript
+/**
+ * Core cost breakdown for any model type
+ * @interface CostBreakdown
+ * @property {number} inputTokens - Tokens consumed from the input prompt (user message, context, etc.)
+ * @property {number} outputTokens - Tokens generated in the AI response
+ * @property {number} inputCost - Cost for processing input tokens (typically cheaper)
+ * @property {number} outputCost - Cost for generating output tokens (typically more expensive)
+ * @property {number} totalCost - Combined cost of input + output processing
+ */
+```
+
+**Skip JSDoc for simple types:**
+```typescript
+export interface SimpleConfig {
+    enabled: boolean;
+    timeout: number;
+    retries: number;
+}
+```
+
 ## ARETE Framework Principles
 - Reuse existing utilities (`logger.ts`, `env.ts`, `pricing.ts`, `openaiService.ts`) before adding new modules.
 - Every LLM interaction must record tokens and cost via `ChannelContextManager.recordLLMUsage()`.
