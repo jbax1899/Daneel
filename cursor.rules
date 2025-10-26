@@ -116,7 +116,7 @@ export interface SimpleConfig {
  * 
  * @impact
  * Risk: <What could break or be compromised if mishandled.>
- * Ethics: <What human or governance effect errors could cause.>
+ * Ethics: <What human or governance impacts errors could cause.>
  */
 ```
 
