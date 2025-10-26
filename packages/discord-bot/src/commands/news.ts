@@ -1,3 +1,17 @@
+/**
+ * @arete-module: NewsCommand
+ * @arete-risk: moderate
+ * @arete-ethics: moderate
+ * @arete-scope: interface
+ *
+ * @description
+ * Fetches and processes news data from external sources.
+ *
+ * @impact
+ * Risk: Handles web search, content filtering, and news summarization. Failures can return stale data or break the command.
+ * Ethics: Presents curated news content to users, affecting information access and potential bias in source selection.
+ */
+
 import { SlashCommandBuilder } from 'discord.js';
 import { ChatInputCommandInteraction } from 'discord.js';
 import { Command } from './BaseCommand.js';
@@ -9,19 +23,6 @@ import { logger } from '../utils/logger.js';
 
 const DEFAULT_MAX_RESULTS = 3;
 const MAX_RESULTS = 5;
-/**
- * @arete-risk: medium
- * @arete-ethics: medium
- * 
- * RISK: Fetches and processes news data from external sources.
- * Currently handles web search, content filtering, and news summarization.
- * News processing failures can provide outdated or inappropriate information.
- * 
- * ETHICS: Controls news content access and information quality.
- * Currently manages news source selection and content filtering.
- * 
- * News command functionality for fetching and summarizing news.
- */
 
 const newsFunction = {
   name: "generate_news_response",

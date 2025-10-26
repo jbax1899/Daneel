@@ -1,17 +1,15 @@
 /**
+ * @arete-module: VoiceSessionManager
  * @arete-risk: high
  * @arete-ethics: critical
- * 
- * RISK: Manages voice session state and coordinates audio event handling.
- * Currently handles session creation, audio chunk forwarding, and cleanup.
- * Session corruption can break voice functionality for multiple users.
- * 
- * ETHICS: Manages voice session data and participant tracking.
- * Currently handles audio event routing and session lifecycle management.
- * 
- * Manages voice sessions and real-time audio processing.
- * Handles session lifecycle, audio pipeline coordination, and user state tracking.
- * All voice sessions are logged and cost-tracked for transparency.
+ * @arete-scope: core
+ *
+ * @description
+ * Manages voice session state and coordinates audio event handling.
+ *
+ * @impact
+ * Risk: Handles session creation, audio chunk forwarding, and cleanup. Failures can cause memory leaks, orphaned sessions, or audio processing errors.
+ * Ethics: Manages the lifecycle of voice interactions, affecting when and how user audio is processed and how AI responses are delivered.
  */
 
 import { VoiceConnection } from '@discordjs/voice';

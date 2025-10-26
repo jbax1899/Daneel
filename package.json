@@ -6,7 +6,8 @@
     ],
     "scripts": {
         "start:dev": "npm run dev -w @arete/backend & npm run dev -w @arete/web",
-        "build": "npm run build --workspaces"
+        "build": "npm run build --workspaces",
+        "validate-arete-tags": "node scripts/validate-arete-tags.js"
     },
     "devDependencies": {
         "@swc/core": "^1.13.5",

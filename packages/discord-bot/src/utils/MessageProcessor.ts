@@ -1,17 +1,15 @@
 /**
+ * @arete-module: MessageProcessor
  * @arete-risk: critical
  * @arete-ethics: critical
- * 
- * RISK: Core message processing and AI response generation.
- * Currently handles message analysis, AI model selection, and response generation.
- * Processing failures can break all user interactions or generate inappropriate content.
- * 
- * ETHICS: Controls AI response generation and content filtering.
- * Currently manages model selection, prompt construction, and response validation.
- * 
- * Core message processing and AI response generation.
- * Handles message analysis, AI model selection, and response generation.
- * All processing is logged and cost-tracked for transparency.
+ * @arete-scope: core
+ *
+ * @description
+ * Core message processing and AI response generation. Handles message analysis, AI model selection, and response generation.
+ *
+ * @impact
+ * Risk: Processing failures can break all user interactions or generate inappropriate content. Orchestrates the entire message-to-response pipeline including context building, planning, and response delivery.
+ * Ethics: Controls AI response generation and content filtering. Manages model selection, prompt construction, response validation, and provenance tracking. All processing is logged and cost-tracked for transparency.
  */
 
 import fs from 'fs';

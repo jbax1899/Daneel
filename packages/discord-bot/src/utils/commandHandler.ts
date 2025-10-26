@@ -1,17 +1,15 @@
 /**
+ * @arete-module: CommandHandler
  * @arete-risk: high
- * @arete-ethics: medium
- * 
- * RISK: Manages Discord slash command deployment and registration.
- * Currently handles command discovery, validation, and API registration.
- * Command deployment failures can break user interactions.
- * 
- * ETHICS: Controls which commands are available to users.
- * Currently manages command loading and Discord API registration.
- * 
- * @file commandHandler.ts
- * @description Handles deployment and registration of slash commands with the Discord API.
- * Manages command discovery, validation, and registration.
+ * @arete-ethics: moderate
+ * @arete-scope: core
+ *
+ * @description
+ * Manages Discord slash command deployment and registration.
+ *
+ * @impact
+ * Risk: Handles command discovery, validation, and API registration. Failures can prevent users from accessing bot features or cause command registration errors.
+ * Ethics: Controls which commands are available to users, affecting the bot's capabilities and user interaction surface.
  */
 
 import { REST, Routes, Collection } from 'discord.js';

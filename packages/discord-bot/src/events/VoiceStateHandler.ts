@@ -1,17 +1,15 @@
 /**
+ * @arete-module: VoiceStateHandler
  * @arete-risk: critical
  * @arete-ethics: critical
- * 
- * RISK: Handles Discord voice state changes and coordinates voice session management.
- * Currently manages voice connections, audio handlers, and realtime session creation.
- * 
- * ETHICS: Controls voice session lifecycle and AI engagement in voice channels.
- * Currently manages when AI joins/leaves voice channels and creates realtime sessions.
- * 
- * 
- * Handles voice state changes and real-time audio processing.
- * Manages voice connections, audio capture/playback, and real-time AI interactions.
- * All voice interactions are logged and cost-tracked for transparency.
+ * @arete-scope: core
+ *
+ * @description
+ * Handles Discord voice state changes and coordinates voice session management.
+ *
+ * @impact
+ * Risk: Manages voice connections, audio handlers, and realtime session creation. Failures can break all voice functionality or leave orphaned connections.
+ * Ethics: Controls when and how the AI participates in voice channels, affecting user privacy and consent in real-time audio interactions.
  */
 
 import { Events, Client, VoiceState, ClientEvents, VoiceBasedChannel, GuildMember } from 'discord.js';

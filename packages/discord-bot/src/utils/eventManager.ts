@@ -1,17 +1,15 @@
 /**
+ * @arete-module: EventManager
  * @arete-risk: high
- * @arete-ethics: medium
- * 
- * RISK: Manages Discord event loading and binding for the entire bot.
- * Currently handles dynamic event loading and dependency injection.
- * Event loading failures can break bot functionality.
- * 
- * ETHICS: Controls which events are loaded and how they're configured.
- * Currently manages event handler initialization and dependency injection.
- * 
- * @file eventManager.ts
- * @description Manages loading and handling Discord.js events.
- * Handles dynamic loading of event handlers and binding them to Discord client events.
+ * @arete-ethics: moderate
+ * @arete-scope: core
+ *
+ * @description
+ * Manages Discord event loading and binding for the entire bot.
+ *
+ * @impact
+ * Risk: Handles dynamic event loading and dependency injection. Failures can prevent event handlers from registering, breaking core bot functionality.
+ * Ethics: Determines which event handlers are active, indirectly affecting how the bot monitors and responds to user actions.
  */
 
 import { Client } from 'discord.js';

@@ -1,20 +1,15 @@
 /**
- * @file MessageCreate.ts
- * @description Handles the 'messageCreate' event from Discord.js, specifically for processing
- * messages that mention the bot or are replies to the bot.
- * 
+ * @arete-module: MessageCreate
  * @arete-risk: high
  * @arete-ethics: critical
- * 
- * RISK: Processes Discord messages and manages bot engagement logic.
- * Currently handles mention detection, catch-up logic, and bot conversation tracking.
- * Message processing failures can break user interactions or create inappropriate responses.
- * 
- * ETHICS: Controls user interaction frequency and AI response behavior.
- * Currently manages engagement thresholds, thread restrictions, and bot-to-bot conversation limits.
- * 
- * This module governs user engagement decision-making and interaction frequency.
- * All user interactions are logged and cost-tracked for transparency.
+ * @arete-scope: core
+ *
+ * @description
+ * Handles the 'messageCreate' event from Discord.js, processing messages that mention the bot or are replies. Manages engagement logic, catch-up thresholds, and bot-to-bot conversation limits.
+ *
+ * @impact
+ * Risk: Message processing failures can break user interactions or create inappropriate responses. Manages mention detection, catch-up logic, and bot conversation tracking.
+ * Ethics: Controls user interaction frequency and AI response behavior. Governs engagement thresholds, thread restrictions, and bot-to-bot conversation limits to prevent spam and ensure respectful interaction.
  */
 
 import { Message } from 'discord.js';

@@ -1,6 +1,15 @@
 /**
- * @file logger.ts
- * @description Winston-based logging utility with console and file transports
+ * @arete-module: Logger
+ * @arete-risk: low
+ * @arete-ethics: moderate
+ * @arete-scope: utility
+ *
+ * @description
+ * Winston-based logging utility with console and file transports. Provides structured logging for all bot operations.
+ *
+ * @impact
+ * Risk: Logging failures can make debugging difficult but won't break core functionality.
+ * Ethics: Logs may contain user data or sensitive information, affecting privacy and auditability.
  */
 
 import { createLogger, format, transports } from 'winston';

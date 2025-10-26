@@ -22,6 +22,34 @@
 - Log every decision at debug level with structured data.
 - Keep all public interfaces serializable for future web UI integration (e.g., Cognitive Budget panel).
 
+## ARETE Module Tagging
+- Every module must include structured ARETE annotations in its JSDoc header.
+- Use this format for consistency and machine-parseability:
+
+```typescript
+/**
+ * @arete-module: <ModuleName>
+ * @arete-risk: <critical|high|moderate|low>
+ * @arete-ethics: <critical|high|moderate|low>
+ * @arete-scope: <core|utility|interface|test>
+ *
+ * @description
+ * <1-3 lines summarizing what this module does.>
+ *
+ * @impact
+ * Risk: <What could break or be compromised if mishandled.>
+ * Ethics: <What human or governance effect errors could cause.>
+ */
+```
+
+- **@arete-risk**: Technical fragility (stability, security, data integrity)
+- **@arete-ethics**: Human/governance impact (privacy, fairness, transparency, social harm)
+- **@arete-scope**: Logical role in the system (helps auto-group modules)
+- Run `pnpm validate-arete-tags` before committing; CI enforces this to guarantee standardized risk/ethics levels.
+- Keep annotations under 10 lines for readability
+- Separate technical risk from ethical sensitivity for clarity
+- Enable future automated audit tools (e.g., `pnpm audit-risk`)
+
 ## Code Changes
 - Prefer small, well-scoped diffs.
 - Preserve provenance comments, cost tracking, and licensing headers.
