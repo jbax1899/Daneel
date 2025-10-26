@@ -49,7 +49,7 @@ DISCORD_TOKEN=your_discord_bot_token
 CLIENT_ID=your_discord_client_id
 OPENAI_API_KEY=your_openai_api_key
 ```
-> Optional settings include rate limits and image generation models (see packages/discord-bot/README.md).
+> See `.env.example` for optional parameters (e.g. rate limitting, engagement rules)
 
 4. Run locally
 (starts the ethics core, Discord bot, and web server in development mode)
