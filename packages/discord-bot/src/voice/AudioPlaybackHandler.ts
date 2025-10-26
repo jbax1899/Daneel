@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Manages AI-generated audio playback to Discord voice channels.
+ * Currently handles audio queuing, pipeline management, and playback coordination.
+ * Playback failures can create poor user experience or expose inappropriate content.
+ * 
+ * ETHICS: Controls AI voice output and user experience quality.
+ * Currently manages audio resource allocation and playback timing.
+ * 
+ * Handles real-time audio playback to Discord voice channels.
+ * Manages AI-generated audio output and playback coordination.
+ * All audio playback events are logged for transparency.
+ */
+
 import { AudioPlayer, VoiceConnection, AudioPlayerStatus, AudioPlayerError, createAudioResource, StreamType } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import { GuildAudioPipeline } from './GuildAudioPipeline.js';

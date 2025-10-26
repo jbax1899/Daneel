@@ -1,3 +1,17 @@
+/**
+ * @arete-risk: medium
+ * @arete-ethics: critical
+ * 
+ * RISK: Manages trace storage and retrieval for AI interactions.
+ * Currently handles metadata persistence and trace management.
+ * Storage failures can break audit trails and transparency features.
+ * 
+ * ETHICS: Controls trace storage and audit trail management.
+ * Currently manages response metadata persistence and trace retrieval.
+ * 
+ * Trace storage utilities for persisting and retrieving response metadata.
+ */
+
 import fs from 'fs/promises';
 import path from 'path';
 import crypto from 'crypto';

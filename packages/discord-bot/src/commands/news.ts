@@ -9,6 +9,20 @@ import { logger } from '../utils/logger.js';
 
 const DEFAULT_MAX_RESULTS = 3;
 const MAX_RESULTS = 5;
+/**
+ * @arete-risk: medium
+ * @arete-ethics: medium
+ * 
+ * RISK: Fetches and processes news data from external sources.
+ * Currently handles web search, content filtering, and news summarization.
+ * News processing failures can provide outdated or inappropriate information.
+ * 
+ * ETHICS: Controls news content access and information quality.
+ * Currently manages news source selection and content filtering.
+ * 
+ * News command functionality for fetching and summarizing news.
+ */
+
 const newsFunction = {
   name: "generate_news_response",
   description: "Generates a structured news response with multiple news items and a summary",

@@ -1,3 +1,18 @@
+/**
+ * @arete-risk: critical
+ * @arete-ethics: critical
+ * 
+ * RISK: Core real-time AI session management and WebSocket coordination.
+ * Session failures can break all real-time AI functionality and waste resources.
+ * 
+ * ETHICS: Controls real-time AI interactions and cost tracking for expensive operations.
+ * Manages the ethical boundaries of AI engagement in real-time conversations.
+ * 
+ * Core real-time AI session management and WebSocket coordination.
+ * Handles OpenAI Realtime API connections, event processing, and session lifecycle.
+ * All real-time interactions are logged and cost-tracked for transparency.
+ */
+
 import { EventEmitter } from 'events';
 import { RealtimeWebSocketManager } from '../realtime/RealtimeWebSocketManager.js';
 import { RealtimeAudioHandler } from '../realtime/RealtimeAudioHandler.js';

@@ -4,15 +4,25 @@ import { ChatInputCommandInteraction, SlashCommandBuilder, ChannelType, VoiceCha
 import { entersState, getVoiceConnection, getVoiceConnections, joinVoiceChannel, VoiceConnection, VoiceConnectionStatus } from '@discordjs/voice';
 import { VoiceStateHandler, cleanupVoiceConnection } from '../events/VoiceStateHandler.js';
 
-/*
-* @name call
-* @description Have a voice conversation with the AI using Discord's voice features
-* @usage /call <voice channel>
-* 1. Check if the bot is already in a voice channel in this server/guild (Discord limitation: only one voice channel at a time per server/guild) - If yes, give the user an error message
-* 2. Try to join the voice channel provided - If it fails, give the user an error message
-* 3. Invite the user to join the voice channel
-* 4. On the target user joining the voice channel, start the realtime conversation
-*/
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Initiates voice conversations with AI using Discord voice channels.
+ * Currently handles voice channel joining, connection management, and realtime session creation.
+ * Voice connection failures can break voice functionality or waste resources.
+ * 
+ * ETHICS: Controls access to voice AI functionality and manages voice session initiation.
+ * Currently handles voice channel permissions and user consent for voice interactions.
+ * 
+ * @name call
+ * @description Have a voice conversation with the AI using Discord's voice features
+ * @usage /call <voice channel>
+ * 1. Check if the bot is already in a voice channel in this server/guild (Discord limitation: only one voice channel at a time per server/guild) - If yes, give the user an error message
+ * 2. Try to join the voice channel provided - If it fails, give the user an error message
+ * 3. Invite the user to join the voice channel
+ * 4. On the target user joining the voice channel, start the realtime conversation
+ */
 const callCommand: Command = {
     data: new SlashCommandBuilder()
         .setName('call')

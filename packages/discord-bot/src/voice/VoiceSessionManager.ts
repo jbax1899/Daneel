@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Manages voice session state and coordinates audio event handling.
+ * Currently handles session creation, audio chunk forwarding, and cleanup.
+ * Session corruption can break voice functionality for multiple users.
+ * 
+ * ETHICS: Manages voice session data and participant tracking.
+ * Currently handles audio event routing and session lifecycle management.
+ * 
+ * Manages voice sessions and real-time audio processing.
+ * Handles session lifecycle, audio pipeline coordination, and user state tracking.
+ * All voice sessions are logged and cost-tracked for transparency.
+ */
+
 import { VoiceConnection } from '@discordjs/voice';
 import { RealtimeSession } from '../utils/realtimeService.js';
 import { logger } from '../utils/logger.js';

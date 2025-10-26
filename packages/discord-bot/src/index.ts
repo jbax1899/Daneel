@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: critical
+ * @arete-ethics: critical
+ * 
+ * RISK: Main orchestration point that controls system initialization, authentication, and error handling.
+ * Changes here can break the entire application or compromise security.
+ * 
+ * ETHICS: Establishes the foundation for all ethical governance and cost tracking systems.
+ * Controls which modules get initialized and how they're configured.
+ * 
+ * 
+ * Main application entry point - orchestrates all bot functionality.
+ * Handles Discord client initialization, command deployment, and event management.
+ * All user interactions and system state changes are logged and cost-tracked.
+ */
+
 import { Client, GatewayIntentBits, Events, Collection } from 'discord.js';
 import type { Message, ButtonInteraction } from 'discord.js';
 import path from 'path';

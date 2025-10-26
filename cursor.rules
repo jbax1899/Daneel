@@ -1,0 +1,34 @@
+# ARETE Development Rules
+# These guide both human contributors and AI tools (Cursor, Traycer)
+# toward traceable, ethics-aligned, maintainable code.
+
+## Code Quality
+- Use the structured logger (`utils/logger.ts`) for all logs.
+- Default to `async/await` for clarity, but use `.then()` or `Promise.all()` when parallelism or lazy chaining improves performance.
+- Wrap risky operations in `try/catch` with informative error messages.
+- Follow existing naming conventions for consistency.
+
+## TypeScript Standards
+- Use explicit types everywhere; avoid `any`.
+- Use `interface` for public or extendable structures; use `type` for unions, aliases, or generics.
+- Enable and honor strict null checks.
+- Use generics thoughtfully when they clarify intent.
+
+## ARETE Framework Principles
+- Reuse existing utilities (`logger.ts`, `env.ts`, `pricing.ts`, `openaiService.ts`) before adding new modules.
+- Every LLM interaction must record tokens and cost via `ChannelContextManager.recordLLMUsage()`.
+- All buffers are RAM-only (no persistence to disk or database).
+- Follow fail-open design: if uncertain, don’t block execution.
+- Log every decision at debug level with structured data.
+- Keep all public interfaces serializable for future web UI integration (e.g., Cognitive Budget panel).
+
+## Code Changes
+- Prefer small, well-scoped diffs.
+- Preserve provenance comments, cost tracking, and licensing headers.
+- Never remove risk annotations or audit metadata without explicit reason.
+- Maintain backward compatibility unless explicitly breaking for a versioned release.
+
+## Testing
+- Add or update tests for any new functionality.
+- Follow existing test utilities and patterns.
+- Tests must be deterministic; mock external services where possible.

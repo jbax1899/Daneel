@@ -1,0 +1,36 @@
+{
+  "commands": {
+    "cost-summary": "pnpm tsx packages/discord-bot/src/utils/logger.ts --cost-summary",
+    "test-discord": "pnpm test packages/discord-bot/test",
+    "test-shared": "pnpm test packages/shared/test",
+    "build-all": "pnpm build",
+    "type-check": "pnpm tsc --noEmit",
+    "lint-check": "pnpm eslint packages/",
+    "format-check": "pnpm prettier --check packages/",
+    "format-fix": "pnpm prettier --write packages/",
+    "risk-audit": "pnpm tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
+    "ethics-audit": "pnpm tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\""
+  },
+  "tasks": {
+    "cost-summary": {
+      "command": "pnpm tsx -e \"import { logLLMCostSummary } from './packages/discord-bot/src/utils/logger.ts'; logLLMCostSummary();\"",
+      "description": "Check LLM cost summary for current session"
+    },
+    "risk-audit": {
+      "command": "pnpm tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
+      "description": "Audit risk tags for accuracy"
+    },
+    "ethics-audit": {
+      "command": "pnpm tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\"",
+      "description": "Audit ethics tags for accuracy"
+    },
+    "format-code": {
+      "command": "pnpm prettier --write packages/",
+      "description": "Format all code with Prettier"
+    },
+    "type-check": {
+      "command": "pnpm tsc --noEmit",
+      "description": "Run TypeScript type checking"
+    }
+  }
+}

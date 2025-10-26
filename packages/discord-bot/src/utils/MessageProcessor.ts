@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: critical
+ * @arete-ethics: critical
+ * 
+ * RISK: Core message processing and AI response generation.
+ * Currently handles message analysis, AI model selection, and response generation.
+ * Processing failures can break all user interactions or generate inappropriate content.
+ * 
+ * ETHICS: Controls AI response generation and content filtering.
+ * Currently manages model selection, prompt construction, and response validation.
+ * 
+ * Core message processing and AI response generation.
+ * Handles message analysis, AI model selection, and response generation.
+ * All processing is logged and cost-tracked for transparency.
+ */
+
 import fs from 'fs';
 import * as path from 'path';
 import { Message } from 'discord.js';

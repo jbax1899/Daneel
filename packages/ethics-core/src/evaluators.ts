@@ -1,3 +1,17 @@
+/**
+ * @arete-risk: medium
+ * @arete-ethics: critical
+ * 
+ * RISK: Contains ethical evaluation logic and risk assessment algorithms.
+ * Evaluation failures can lead to inappropriate AI behavior or missed ethical concerns.
+ * 
+ * ETHICS: Implements core ethical governance and decision-making framework.
+ * Controls how the system evaluates ethical implications of AI interactions.
+ * 
+ * This module contains ethical evaluation logic and risk assessment.
+ * All evaluations must be logged and auditable for transparency.
+ */
+
 import { Provenance, RiskTier } from './types';
 
 /**

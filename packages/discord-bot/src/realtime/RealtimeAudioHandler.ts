@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Manages real-time audio streaming to OpenAI Realtime API.
+ * Currently handles audio buffering, speaker annotation, and commit timing.
+ * Streaming failures can break voice AI functionality or cause data loss.
+ * 
+ * ETHICS: Controls audio data processing and speaker identification.
+ * Currently manages audio transmission to AI services and speaker metadata.
+ * 
+ * Handles real-time audio streaming to OpenAI Realtime API.
+ * Manages audio buffer management, speaker detection, and audio commit timing.
+ * All audio streaming events are logged for transparency and debugging.
+ */
+
 import WebSocket from 'ws';
 import { logger } from '../utils/logger.js';
 import { RealtimeEventHandler } from './RealtimeEventHandler.js';

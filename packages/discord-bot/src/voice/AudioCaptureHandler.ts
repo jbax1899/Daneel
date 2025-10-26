@@ -1,3 +1,19 @@
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Captures and processes real-time user voice data from Discord voice channels.
+ * Currently handles Opus decoding, PCM conversion, and audio chunk emission.
+ * Capture failures can break voice functionality or leak user data.
+ * 
+ * ETHICS: Manages voice data capture and privacy protection for users.
+ * Currently handles audio stream setup, user identification, and data routing.
+ * 
+ * Handles real-time audio capture from Discord voice channels.
+ * Processes user voice data and manages audio streams for AI processing.
+ * All audio capture events are logged for privacy and transparency.
+ */
+
 import { VoiceConnection } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';

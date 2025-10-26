@@ -1,4 +1,14 @@
 /**
+ * @arete-risk: high
+ * @arete-ethics: medium
+ * 
+ * RISK: Manages Discord event loading and binding for the entire bot.
+ * Currently handles dynamic event loading and dependency injection.
+ * Event loading failures can break bot functionality.
+ * 
+ * ETHICS: Controls which events are loaded and how they're configured.
+ * Currently manages event handler initialization and dependency injection.
+ * 
  * @file eventManager.ts
  * @description Manages loading and handling Discord.js events.
  * Handles dynamic loading of event handlers and binding them to Discord client events.

@@ -1,3 +1,17 @@
+/**
+ * @arete-risk: medium
+ * @arete-ethics: critical
+ * 
+ * RISK: Manages prompt templates and rendering for AI interactions.
+ * Currently handles prompt loading, caching, and variable substitution.
+ * Prompt failures can break AI functionality or generate inappropriate content.
+ * 
+ * ETHICS: Controls prompt templates and AI behavior instructions.
+ * Currently manages system prompts and user-facing prompt templates.
+ * 
+ * Prompt registry for managing and rendering AI prompt templates.
+ */
+
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';

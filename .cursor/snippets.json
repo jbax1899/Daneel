@@ -1,0 +1,58 @@
+{
+  "snippets": {
+    "arete-risk-header": {
+      "prefix": "arete-risk",
+      "body": [
+        "/**",
+        " * @arete-risk: ${1|critical,high,medium,low|}",
+        " * @arete-ethics: ${2|critical,high,medium,low|}",
+        " * ",
+        " * RISK: ${3:Description of what makes this risky}",
+        " * Currently handles ${4:what the code actually does}",
+        " * ${5:Consequence of failure}",
+        " * ",
+        " * ETHICS: ${6:Description of ethical implications}",
+        " * Currently manages ${7:what the code actually does}",
+        " * ",
+        " * ${8:Module description}",
+        " */"
+      ],
+      "description": "ARETE risk/ethics header template"
+    },
+    "arete-logger": {
+      "prefix": "arete-log",
+      "body": [
+        "logger.${1|debug,info,warn,error|}('${2:message}', { ${3:context} });"
+      ],
+      "description": "ARETE structured logging"
+    },
+    "arete-cost-tracking": {
+      "prefix": "arete-cost",
+      "body": [
+        "ChannelContextManager.recordLLMUsage(${1:tokens}, ${2:cost});"
+      ],
+      "description": "ARETE cost tracking"
+    },
+    "arete-error-handling": {
+      "prefix": "arete-try",
+      "body": [
+        "try {",
+        "  ${1:// risky operation}",
+        "} catch (error) {",
+        "  logger.error('${2:Operation failed}:', error);",
+        "  ${3:// error handling}",
+        "}"
+      ],
+      "description": "ARETE error handling pattern"
+    },
+    "arete-interface": {
+      "prefix": "arete-interface",
+      "body": [
+        "export interface ${1:InterfaceName} {",
+        "  ${2:property}: ${3:type};",
+        "}"
+      ],
+      "description": "ARETE interface template"
+    }
+  }
+}

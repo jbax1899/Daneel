@@ -1,3 +1,17 @@
+/**
+ * @arete-risk: high
+ * @arete-ethics: critical
+ * 
+ * RISK: Handles all LLM interactions and API calls with high cost/resource impact.
+ * API failures can break AI functionality or cause unexpected costs.
+ * 
+ * ETHICS: Manages cost tracking and API usage transparency.
+ * Controls how AI services are used and ensures responsible resource consumption.
+ * 
+ * This module handles all LLM interactions and cost tracking.
+ * Every API call must be logged and cost-tracked for transparency.
+ */
+
 import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 import fs from 'fs';
