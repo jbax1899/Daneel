@@ -32,10 +32,10 @@
  * @arete-risk: <critical|high|moderate|low>
  * @arete-ethics: <critical|high|moderate|low>
  * @arete-scope: <core|utility|interface|test>
- *
+ * 
  * @description
  * <1-3 lines summarizing what this module does.>
- *
+ * 
  * @impact
  * Risk: <What could break or be compromised if mishandled.>
  * Ethics: <What human or governance effect errors could cause.>
@@ -49,6 +49,28 @@
 - Keep annotations under 10 lines for readability
 - Separate technical risk from ethical sensitivity for clarity
 - Enable future automated audit tools (e.g., `pnpm audit-risk`)
+
+## ARETE Scoped Logger Tagging
+- Every scoped logger must include structured ARETE annotations in its JSDoc header.
+- Use this format for consistency and machine-parseability:
+
+```typescript
+/**
+ * @arete-logger: <loggerName>
+ * 
+ * @logs
+ * <What this scoped logger tracks and logs>
+ * 
+ * @impact
+ * Risk: <Logging-specific risks if any>
+ * Ethics: <Logging-specific ethical impacts if any>
+ */
+const <loggerName>Logger = logger.child({ module: '<loggerName>' });
+```
+
+- **@arete-logger**: Logger module identifier (matches the child logger name)
+- **@logs**: What specific operations, events, or data this logger logs
+- Follow the same formatting standards as module headers for consistency
 
 ## Code Changes
 - Prefer small, well-scoped diffs.
