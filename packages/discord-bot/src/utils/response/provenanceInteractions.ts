@@ -83,7 +83,7 @@ type AlternativeLensAction = 'alt_lens:init' | 'alt_lens:select' | 'alt_lens:sub
 const LENS_DEFINITIONS: AlternativeLensDefinition[] = [
   {
     key: 'DANEEL',
-    label: 'Amiovian (Daneel character)',
+    label: 'Asimovian (Daneel character)',
     description: 'Channel Daneel Olivaw: state clean facts, guard human welfare, and apply Zeroth Law judgment.'
   },
   {
