@@ -41,7 +41,7 @@ flowchart LR
 
 ---
 
-## Phase 2 — ChannelContextManager
+## Phase 2 — ChannelContextManager ✅
 **Goal:** Give the bot a short-term memory per channel/thread so later phases can read metrics instead of raw Discord history.  
 **Key tasks:**  
 - New `ChannelContextManager` with a rolling buffer of `StoredMessage` objects and a `ChannelMetrics` snapshot (counts, token estimates, cost tallies, flags).  
@@ -51,7 +51,26 @@ flowchart LR
   ```json
   {"event":"context_state","channelId":"123","rollingMessageCount":42,"flags":[]}
   ```  
-**Deliverable:** `ChannelContextManager.ts` wired into `MessageCreate.ts`, feeding metrics to the rest of the pipeline while legacy counters stay available for toggling.
+**Implementation Notes:**
+- Created `src/state/ChannelContextManager.ts` with singleton pattern
+- Integrated into `MessageCreate.ts` with feature flag `CONTEXT_MANAGER_ENABLED`
+- Added configuration to `env.ts` following existing patterns
+- Documented environment variables in `.env.example`
+- Automatic eviction prevents memory leaks (runs every 5 minutes by default)
+- All operations fail-open to maintain pipeline stability
+- Legacy counter logic preserved for backward compatibility
+- Structured logs emitted: `context_message_recorded`, `context_llm_usage`, `context_state`, `context_eviction`, `context_channel_reset`
+
+**Files Modified:**
+- `packages/discord-bot/src/state/ChannelContextManager.ts` (new)
+- `packages/discord-bot/src/events/MessageCreate.ts` (integration)
+- `packages/discord-bot/src/utils/env.ts` (configuration)
+- `.env.example` (documentation)
+
+**Ready for Phase 3:**
+The `recordLLMUsage()` method is implemented and ready for Phase 3's `LLMCostEstimator` to call. The interface is stable and won't require changes.
+
+**Deliverable:** ✅ `ChannelContextManager.ts` wired into `MessageCreate.ts`, feeding metrics to the pipeline while legacy counters remain available for toggling.
 
 ---
 

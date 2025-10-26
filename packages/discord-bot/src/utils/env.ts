@@ -90,6 +90,13 @@ const DEFAULT_CATCH_UP_LIMITS = {
   STALE_COUNTER_TTL_MS: 60 * 60_000
 } as const;
 
+const DEFAULT_CONTEXT_MANAGER_CONFIG = {
+  ENABLED: true,
+  MAX_MESSAGES_PER_CHANNEL: 50,
+  MESSAGE_RETENTION_MS: 60 * 60_000,
+  EVICTION_INTERVAL_MS: 5 * 60_000
+} as const;
+
 /**
  * Validates that all required environment variables are set.
  * @throws {Error} If any required environment variable is missing
@@ -301,6 +308,22 @@ export const config = {
   visibility: {
     allowThreadResponses: getBooleanEnv('ALLOW_THREAD_RESPONSES', DEFAULT_VISIBILITY_LIMITS.ALLOW_THREAD_RESPONSES),
     allowedThreadIds: getStringArrayEnv('ALLOWED_THREAD_IDS', DEFAULT_VISIBILITY_LIMITS.ALLOWED_THREAD_IDS)
+  },
+
+  contextManager: {
+    enabled: getBooleanEnv('CONTEXT_MANAGER_ENABLED', DEFAULT_CONTEXT_MANAGER_CONFIG.ENABLED),
+    maxMessagesPerChannel: getNumberEnv(
+      'CONTEXT_MANAGER_MAX_MESSAGES',
+      DEFAULT_CONTEXT_MANAGER_CONFIG.MAX_MESSAGES_PER_CHANNEL
+    ),
+    messageRetentionMs: getNumberEnv(
+      'CONTEXT_MANAGER_RETENTION_MS',
+      DEFAULT_CONTEXT_MANAGER_CONFIG.MESSAGE_RETENTION_MS
+    ),
+    evictionIntervalMs: getNumberEnv(
+      'CONTEXT_MANAGER_EVICTION_INTERVAL_MS',
+      DEFAULT_CONTEXT_MANAGER_CONFIG.EVICTION_INTERVAL_MS
+    )
   }
 
 } as const;
