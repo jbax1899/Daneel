@@ -1,21 +1,20 @@
 # Realtime Engagement System — Field Notes
 
 ## Purpose
-We’re replacing the old “catchup” sweep with a realtime engagement loop that behaves like a considerate teammate. The bot still knows how to stay quiet, but now it can keep lightweight channel memory, track OpenAI spend, and explain why it spoke up. Think of this doc as the single-feature-branch guide for building the stack without getting lost in management overhead.
-
+We’re replacing the old “catchup” sweep with a realtime engagement loop that behaves like a considerate teammate. The bot still knows how to stay quiet, but now it can keep lightweight channel memory, track OpenAI spend, and explain why it spoke up.
 ## Overview Flow
 ```mermaid
 flowchart LR
     DiscordEvent["Discord messageCreate"]
-    MessageCreate["MessageCreate.ts\n(entry point)"]
-    Context["ChannelContextManager\n(Phase 2)"]
-    Cost["LLMCostEstimator\n(Phase 3)"]
-    Filter["RealtimeEngagementFilter\n(Phase 4)"]
-    Compressor["ContextCompressor\n(Phase 5)"]
-    Planner["Planner.ts\nexisting"]
-    OpenAI["OpenAIService.ts\nexisting"]
-    Response["ResponseHandler.ts\nexisting"]
-    MessageCreateConfig["BotConfigManager\n(Phase 6)"]
+    MessageCreate["MessageCreate.ts"]
+    Context["ChannelContextManager (Phase 2)"]
+    Cost["LLMCostEstimator (Phase 3)"]
+    Filter["RealtimeEngagementFilter (Phase 4)"]
+    Compressor["ContextCompressor (Phase 5)"]
+    Planner["Planner.ts"]
+    OpenAI["OpenAIService.ts"]
+    Response["ResponseHandler.ts"]
+    MessageCreateConfig["BotConfigManager (Phase 6)"]
 
     DiscordEvent --> MessageCreate
     MessageCreate --> MessageCreateConfig
@@ -122,29 +121,10 @@ flowchart LR
 **Key tasks:**  
 - Refactor `MessageCreate` to inject the new managers, route messages through context → filter → compression → planner, and use fail-open guards around every hop.  
 - Create a shared `logPipelineEvent()` helper so we output consistent JSON with fields like `event`, `phase`, `channelId`, `latencyMs`, `decisionPath`.  
-- Wire Prometheus (or existing metrics stack) counters/gauges/histograms for: context buffer, cost totals, engagement scores, compression ratio, pipeline latency, fallback count.  
 - Add chaos mode toggles to simulate failures and confirm we gracefully degrade to the legacy path.  
 - Update runbooks with the new logs, metrics, and feature flags.  
 - Feature flag: `PIPELINE_V2_ENABLED` to switch the whole thing on or off.  
 **Deliverable:** One coherent pipeline in `MessageCreate.ts`, with logs and metrics proving fail-open and visibility work end-to-end.
-
----
-
-### Quick Field Reminders
-- **Feature flags:** toggle each phase (`CONTEXT_MANAGER_ENABLED`, `COST_ESTIMATOR_ENABLED`, `REALTIME_FILTER_ENABLED`, `CONTEXT_COMPRESSION_ENABLED`, `BOT_CONFIG_MANAGER_ENABLED`, `PIPELINE_V2_ENABLED`) while keeping legacy paths warm.
-- **Testing habit:** write unit tests for new modules first, then lean on lightweight integration tests that stub Discord messages. Add at least one privacy regression any time log schema changes.
-- **Fallback mantra:** wrap every module call in a try/catch that logs the failure, tags it with the phase, and hands control back to the old path. If you see more than a handful of fallback logs per hour, pause and investigate before proceeding.
-- **Cost sanity check:** cross-check `llm_cost` logs with OpenAI usage once per sprint; a <5% delta means the estimator is healthy.
-- **Human-in-the-loop signals:** keep reasons arrays human readable, because moderators will read them verbatim when deciding whether to tune weights.
-- **Fail-open in practice:**
-  ```ts
-  try {
-    return await realtimeFilter.decide(input);
-  } catch (error) {
-    logger.warn({ event: 'filter_fallback', channelId: input.channelId, error: String(error) });
-    return { shouldRespond: !legacy.skip, score: legacy.skip ? 0 : 1, reasons: ['legacy-fallback', legacy.reason] };
-  }
-  ```
 
 ---
 
@@ -172,6 +152,3 @@ graph TD
     Compress --> Planner --> OpenAI --> Response
     OpenAI --> Cost --> Context
 ```
-
-## Final Note
-Ship each phase like you would a reliable teammate: fail-open when things wobble, speak in structured logs so others can follow along, and aim for that “graceful presence” where the system helps without hogging the room. Ping if anything feels muddy — better to refine together than surprise the channel later.
