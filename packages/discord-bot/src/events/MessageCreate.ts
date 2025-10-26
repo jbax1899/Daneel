@@ -17,6 +17,7 @@ import { Event } from './Event.js';
 import { logger } from '../utils/logger.js';
 import { OpenAIService } from '../utils/openaiService.js';
 import { MessageProcessor } from '../utils/MessageProcessor.js';
+import { CatchupFilter } from '../utils/CatchupFilter.js';
 import { Planner } from '../utils/prompting/Planner.js';
 import { config } from '../utils/env.js';
 import { ResponseHandler } from '../utils/response/ResponseHandler.js';
@@ -45,6 +46,7 @@ export class MessageCreate extends Event {
   public readonly name = 'messageCreate' as const;                                                      // The Discord.js event name this handler is registered for
   public readonly once = false;                                                                         // Whether the event should only be handled once (false for message events)
   private readonly messageProcessor: MessageProcessor;                                                  // The message processor that handles the actual message processing logic
+  private readonly catchupFilter: CatchupFilter;                                                        // Heuristic filter to short-circuit unnecessary planner calls during catchup
   private readonly CATCHUP_AFTER_MESSAGES = config.catchUp.afterMessages;                               // Configurable catch-up threshold
   private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = config.catchUp.ifMentionedAfterMessages;       // Configurable catch-up threshold when mentioned in plaintext
   private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>();  // Tracks message counts per channel for catch-up logic
@@ -70,6 +72,7 @@ export class MessageCreate extends Event {
       openaiService: dependencies.openaiService,
       planner: new Planner(dependencies.openaiService)
     });
+    this.catchupFilter = new CatchupFilter(dependencies.openaiService);
   }
 
   /**
@@ -127,6 +130,34 @@ export class MessageCreate extends Event {
       ) {
         logger.debug(`Catching up in ${channelKey} to message ID: ${message.id}`);
         this.resetCounter(channelKey);
+
+        if (!message.channel.isTextBased()) {
+          logger.debug(`Catchup filter bypassed for ${channelKey}; channel not text-based.`);
+          return;
+        }
+
+        try {
+          const recentMessagesCollection = await message.channel.messages.fetch({
+            limit: this.catchupFilter.RECENT_MESSAGE_WINDOW,
+            before: message.id
+          });
+          const recentMessages = Array.from(recentMessagesCollection.values()).sort(
+            (first, second) => first.createdTimestamp - second.createdTimestamp
+          );
+          const filterDecision = await this.catchupFilter.shouldSkipPlanner(message, recentMessages, channelKey);
+
+          if (filterDecision.skip) {
+            logger.debug(`Catchup filter skipped planner for ${channelKey}: ${filterDecision.reason}`);
+            return;
+          }
+
+          logger.debug(`Catchup filter passed for ${channelKey}, proceeding to planner`);
+        } catch (filterError) {
+          logger.error(
+            `Catchup filter encountered an error for ${channelKey}: ${(filterError as Error)?.message ?? filterError}`
+          );
+        }
+
         await this.messageProcessor.processMessage(message, false, 'enough messages have passed since Daneel last replied'); // Do not direct-reply to anyone when catching up
       }
     } catch (error) {
