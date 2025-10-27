@@ -119,6 +119,16 @@ const DEFAULT_COST_ESTIMATOR_CONFIG = {
 } as const;
 
 /**
+ * Default bot mention names for engagement detection
+ * @type {string[]}
+ * @property {string[]} BOT_MENTION_NAMES - Comma-separated list of names the bot responds to (default: "arete,ari")
+ */
+const DEFAULT_BOT_MENTION_NAMES = [
+  'arete',
+  'ari'
+] as const;
+
+/**
  * Default engagement scoring weights (0-1 range, higher = more influence)
  * @type {Object}
  * @property {number} MENTION - Weight for direct mentions/questions (default 0.3)
@@ -333,6 +343,9 @@ export const config = {
   openaiApiKey: process.env.OPENAI_API_KEY!,
   promptConfigPath,
   webBaseUrl,
+  
+  // Bot mention names for engagement detection
+  botMentionNames: getStringArrayEnv('BOT_MENTION_NAMES', DEFAULT_BOT_MENTION_NAMES),
   
   // Environment
   env: process.env.NODE_ENV || 'development',
