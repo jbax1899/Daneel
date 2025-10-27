@@ -31,6 +31,7 @@ const ThemeToggle = (): JSX.Element => {
   const handleMouseDown = () => {
     mouseDownTimeRef.current = Date.now();
     hasToggledRef.current = false; // Reset toggle flag
+    playClickSound(); // Play first sound on mouse down
   };
 
   const handleMouseUp = () => {
@@ -42,7 +43,7 @@ const ThemeToggle = (): JSX.Element => {
       hasToggledRef.current = true;
     }
     
-    // Only delay sound if needed, but don't delay theme change
+    // Play second sound with minimum delay between sounds
     if (timeSinceMouseDown < minClickInterval) {
       setTimeout(() => {
         playClickSound();
