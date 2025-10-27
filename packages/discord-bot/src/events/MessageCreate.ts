@@ -303,8 +303,7 @@ export class MessageCreate extends Event {
             try {
               // Gather context for realtime filter
               const channelMetrics = this.contextManager?.getMetrics(channelKey) ?? null;
-              const channelId = message.channelId;
-              const costTotals = this.costEstimator?.getChannelTotals(channelId) ?? null;
+              const costTotals = this.costEstimator?.getChannelTotals(channelKey) ?? null;
 
               const engagementContext: EngagementContext = {
                 message,

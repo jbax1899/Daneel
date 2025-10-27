@@ -121,8 +121,11 @@ export class LLMCostEstimator {
 
       if (this.config.contextManager && breakdown.channelId) {
         try {
+          // Use the same channel key format as MessageCreate: ${guildId ?? 'DM'}:${channelId}
+          const channelKey = breakdown.guildId ? `${breakdown.guildId}:${breakdown.channelId}` : `DM:${breakdown.channelId}`;
+          
           this.config.contextManager.recordLLMUsage(
-            breakdown.channelId,
+            channelKey,
             breakdown.model,
             breakdown.inputTokens,
             breakdown.outputTokens,
