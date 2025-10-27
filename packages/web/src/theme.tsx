@@ -81,8 +81,21 @@ export const ThemeProvider = ({ children }: PropsWithChildren): JSX.Element => {
   }, [applyTheme]);
 
   const toggleTheme = useCallback(() => {
-    applyTheme(theme === 'light' ? 'dark' : 'light');
-  }, [applyTheme, theme]);
+    setThemeState(currentTheme => {
+      const nextTheme = currentTheme === 'light' ? 'dark' : 'light';
+      
+      // Apply theme immediately
+      if (supportsLocalStorage()) {
+        window.localStorage.setItem(STORAGE_KEY, nextTheme);
+      }
+
+      if (typeof document !== 'undefined') {
+        document.documentElement.setAttribute('data-theme', nextTheme);
+      }
+      
+      return nextTheme;
+    });
+  }, []);
 
   const value = useMemo<ThemeContextValue>(() => ({
     theme,

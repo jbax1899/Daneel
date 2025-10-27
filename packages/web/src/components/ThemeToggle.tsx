@@ -7,6 +7,7 @@ const ThemeToggle = (): JSX.Element => {
   const label = theme === 'light' ? '💡 Dark' : '💡 Light';
   const emojiOnly = theme === 'light' ? '💡' : '💡';
   const mouseDownTimeRef = useRef(0);
+  const hasToggledRef = useRef(false);
   const minClickInterval = 150; // Minimum time between clicks in milliseconds
 
   const playClickSound = () => {
@@ -29,14 +30,17 @@ const ThemeToggle = (): JSX.Element => {
 
   const handleMouseDown = () => {
     mouseDownTimeRef.current = Date.now();
-    // Remove playClickSound() from here - only play on mouse up
+    hasToggledRef.current = false; // Reset toggle flag
   };
 
   const handleMouseUp = () => {
     const timeSinceMouseDown = Date.now() - mouseDownTimeRef.current;
     
-    // Always toggle theme immediately for responsive UX
-    toggleTheme();
+    // Only toggle theme if we haven't already toggled it
+    if (!hasToggledRef.current) {
+      toggleTheme();
+      hasToggledRef.current = true;
+    }
     
     // Only delay sound if needed, but don't delay theme change
     if (timeSinceMouseDown < minClickInterval) {
@@ -50,7 +54,11 @@ const ThemeToggle = (): JSX.Element => {
 
   const handleClick = () => {
     // Handle keyboard (Enter/Space) and touch events
-    toggleTheme();
+    // Only toggle if mouse events haven't already handled it
+    if (!hasToggledRef.current) {
+      toggleTheme();
+      hasToggledRef.current = true;
+    }
     playClickSound();
   };
 
