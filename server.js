@@ -467,10 +467,9 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         console.log('Skipping CAPTCHA verification in development mode');
         logRequest(req, res, `reflect captcha-skipped-dev-mode ip=${clientIp}`);
       } else {
-        // Debug: Log CAPTCHA token info
+        // Debug: Log CAPTCHA verification info (without exposing sensitive data)
         console.log('CAPTCHA verification debug:');
         console.log('Token length:', turnstileToken?.length || 0);
-        console.log('Token preview:', turnstileToken?.substring(0, 20) + '...');
         console.log('Secret key is set:', !!process.env.TURNSTILE_SECRET_KEY);
         
         const formData = new URLSearchParams();
