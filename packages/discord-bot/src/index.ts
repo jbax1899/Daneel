@@ -108,6 +108,11 @@ if (config.costEstimator.enabled) {
 // Initialize OpenAI service
 export const openaiService = new OpenAIService(config.openaiApiKey, costEstimator); // Exported for use in other files, like /news command
 
+// Re-export modules needed by server.js
+export { OpenAIService } from './utils/openaiService.js';
+export { buildResponseMetadata } from './utils/response/metadata.js';
+export { RateLimiter } from './utils/RateLimiter.js';
+
 // ====================
 // Client Configuration
 // ====================

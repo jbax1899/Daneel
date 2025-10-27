@@ -67,7 +67,7 @@ const callCommand: Command = {
         // If we have debug options, activate them
         if (debugOption) {
             switch (debugOption) {
-                case 'exit':
+                case 'exit': {
                     const existingVoiceConnection = getVoiceConnection(interaction.guild!.id) as VoiceConnection;
                     if (existingVoiceConnection) {
                         cleanupVoiceConnection(existingVoiceConnection, interaction.client);
@@ -79,7 +79,8 @@ const callCommand: Command = {
                         await safeReply(interaction, 'I was unable to exit the voice connection. I am not in a voice channel.');
                     }
                     return;
-                case 'exit_all':
+                }
+                case 'exit_all': {
                     const existingVoiceConnections: Map<string, VoiceConnection> = getVoiceConnections();
                     if (existingVoiceConnections) {
                         existingVoiceConnections.forEach((existingVoiceConnection, guildid) => {
@@ -94,6 +95,7 @@ const callCommand: Command = {
                         await safeReply(interaction, 'I was unable to exit all voice connections. I am not in any voice channels.');
                     }
                     return;
+                }
             }
         }
 

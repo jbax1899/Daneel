@@ -10,8 +10,7 @@ const createStubbedOpenAIService = () => {
     // @ts-expect-error overriding private field for testing
     service.openai = {
         responses: {
-            // eslint-disable-next-line @typescript-eslint/no-unused-vars
-            create: async (_payload: unknown) => ({
+        create: async (_payload: unknown) => ({
                 output: [
                     {
                         type: 'message',
@@ -29,9 +28,9 @@ const createStubbedOpenAIService = () => {
                     input_tokens: 10,
                     output_tokens: 5
                 }
-            })
+            }) as any
         }
-    };
+    } as any;
 
     return service;
 };

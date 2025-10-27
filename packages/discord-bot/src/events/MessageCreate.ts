@@ -663,7 +663,7 @@ export class MessageCreate extends Event {
    * @param {string} channelKey - The channel identifier
    * @returns {ChannelEngagementOverrides | undefined} Channel-specific overrides or undefined
    */
-  private resolveChannelOverrides(channelKey: string): ChannelEngagementOverrides | undefined {
+  private resolveChannelOverrides(_channelKey: string): ChannelEngagementOverrides | undefined {
     // TODO: Implement channel-specific override resolution
     
     // For now, return undefined to use global configuration

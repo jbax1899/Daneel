@@ -23,7 +23,12 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["./packages/*/src"],
-      "@shared/*": ["./packages/shared/src/*"]
+      "@shared/*": ["./packages/shared/src/*"],
+      "@components/*": ["./packages/web/src/components/*"],
+      "@pages/*": ["./packages/web/src/pages/*"],
+      "@styles/*": ["./packages/web/src/styles/*"],
+      "@theme": ["./packages/web/src/theme"],
+      "@types/*": ["./packages/web/src/types/*"]
     }
   },
   "include": ["packages/**/*.ts", "packages/**/*.tsx", "mcp/**/*.ts", "mcp/**/types/*.d.ts"],

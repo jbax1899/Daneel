@@ -10,36 +10,21 @@ const ThemeToggle = (): JSX.Element => {
   const minClickInterval = 150; // Minimum time between clicks in milliseconds
 
   const playClickSound = () => {
-    // Create a mechanical click sound using Web Audio API
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    // Play one of the two .ogg files randomly
+    const audioFiles = ['/assets/click_mouse_down.ogg', '/assets/click_mouse_up.ogg'];
+    const randomFile = audioFiles[Math.floor(Math.random() * audioFiles.length)];
     
-    // Create noise for the mechanical click
-    const bufferSize = audioContext.sampleRate * 0.1; // 0.1 seconds
-    const buffer = audioContext.createBuffer(1, bufferSize, audioContext.sampleRate);
-    const output = buffer.getChannelData(0);
+    const audio = new Audio(randomFile);
+    audio.volume = 0.7; // Adjust volume as needed
     
-    // Generate white noise
-    for (let i = 0; i < bufferSize; i++) {
-      output[i] = Math.random() * 2 - 1;
-    }
+    // Add event listeners for debugging
+    audio.addEventListener('loadstart', () => console.log('Audio loading started'));
+    audio.addEventListener('canplay', () => console.log('Audio can play'));
+    audio.addEventListener('error', (e) => console.error('Audio error:', e));
     
-    const noise = audioContext.createBufferSource();
-    noise.buffer = buffer;
-    
-    const filter = audioContext.createBiquadFilter();
-    filter.type = 'highpass';
-    filter.frequency.setValueAtTime(1000, audioContext.currentTime);
-    
-    const gainNode = audioContext.createGain();
-    gainNode.gain.setValueAtTime(0.15, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.05);
-    
-    noise.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    
-    noise.start(audioContext.currentTime);
-    noise.stop(audioContext.currentTime + 0.05);
+    audio.play().catch(error => {
+      console.warn('Could not play click sound:', error);
+    });
   };
 
   const handleMouseDown = () => {

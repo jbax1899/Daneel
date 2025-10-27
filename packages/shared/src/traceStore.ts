@@ -25,7 +25,7 @@ const LOCK_RETRY_DELAY_MS = 25;
 const LOCK_STALE_THRESHOLD_MS = 2 * 60 * 1000; // Two minutes.
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-const traceStoreJsonReplacer = (_key: string, value: unknown) => {
+export const traceStoreJsonReplacer = (_key: string, value: unknown) => {
   if (value instanceof URL) {
     return value.toString();
   }
@@ -254,12 +254,8 @@ export class TraceStore {
                 // If removal fails we'll surface the subsequent rename error.
               });
 
-              try {
-                await fs.rename(tempFilePath, filePath);
-                break;
-              } catch (retryError) {
-                throw retryError;
-              }
+              await fs.rename(tempFilePath, filePath);
+              break;
             }
 
             renameAttempt += 1;

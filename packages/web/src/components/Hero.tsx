@@ -14,7 +14,7 @@ const Hero = (): JSX.Element => (
     <header className="site-header">
       <div className="site-title-group">
         <p className="site-mark">ARETE</p>
-        <p className="site-tagline">Ethics-first AI assistant, open source, self-hosted</p>
+        <p className="site-tagline">Ethics-first AI, open source, self-hosted</p>
       </div>
       <ThemeToggle />
     </header>

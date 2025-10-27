@@ -93,7 +93,7 @@ export class EmbedBuilder {
   public setColor(color: EmbedColor): this {
     try {
       this.embed.setColor(color as ColorResolvable);
-    } catch (error) {
+    } catch {
       logger.warn(`[EmbedBuilder] Invalid color provided: ${color}`);
     }
     return this;
