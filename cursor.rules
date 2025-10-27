@@ -156,6 +156,50 @@ const <loggerName>Logger = logger.child({ module: '<loggerName>' });
 - Never remove risk annotations or audit metadata without explicit reason.
 - Maintain backward compatibility unless explicitly breaking for a versioned release.
 
+## Pre-Review Analysis with Cursor
+- **Use Cursor for structural pre-review** before human code review to catch complexity, inconsistencies, and missing documentation.
+- This augments human review by focusing on mechanical thoroughness while preserving human judgment for logic, ethics, and integration decisions.
+- **Prerequisites**: Always run `npm run pre-review` first to ensure ARETE-specific validation passes before Cursor analysis.
+
+### Complexity Triage
+- Prompt Cursor to identify functions that do too many things, deep conditionals, or unclear data flow.
+- Flag areas that need human scrutiny versus easy cleanup opportunities.
+- Use Cursor's Bugbot (Review PR) or Explain Changes features to get structural analysis.
+- Use inline chat (`Ctrl+K`) to ask specific questions about complex code sections.
+
+### Comment Scaffolding
+- Prompt Cursor to "add comments where a new contributor would hesitate."
+- Focus on teachability and knowledge transfer for open-source collaboration.
+- Ensure comments explain "why" and "what", not just "how" (see Commenting Standards above).
+
+### Future-Thinking Analysis
+- Use Cursor's inline chat to explore forward-compatibility questions:
+  - "Would this API boundary survive a modular ethics-core refactor?"
+  - "Can this function be generalized for multi-lens reasoning?"
+  - "How would this scale with additional model providers?"
+- Seed lightweight architectural review before merge decisions.
+
+### Consistency Enforcement
+- Ensure doc comments and logging consistently follow ARETE provenance schema (risk tiers, license context, etc.).
+- Verify ARETE module tagging compliance across new code.
+- Check that structured logging patterns are maintained.
+
+### Recommended Workflow
+1. **Complete implementation**
+2. **Run automated validation**: `npm run pre-review` (validates ARETE tags, types, linting)
+3. **Use Cursor's Bugbot (Review PR)** for automated code quality analysis
+4. **Use inline chat (`Ctrl+K`)** with ARETE-specific prompts (see `.cursor/arete-prompts.md`)
+5. **Run ethics/risk audits**: `npm run ethics-check && npm run risk-check`
+6. **Accept suggested simplifications or comments** in-place
+7. **Open human PR review** for logic, ethics, and integration focus
+
+### Integration with Existing Tools
+- **Pre-review pipeline**: `npm run pre-review` → `npm run full-pre-review`
+- **ARETE validation**: `npm run validate-arete-tags` (enforced by CI)
+- **Cursor tasks**: Use `.cursor/tasks.json` commands for quick access
+- **Checklist**: Follow `.cursor/pre-review-checklist.md` before Cursor analysis
+- **Prompts**: Use `.cursor/arete-prompts.md` for consistent, effective Cursor interactions
+
 ## Testing
 - Add or update tests for any new functionality.
 - Follow existing test utilities and patterns.
