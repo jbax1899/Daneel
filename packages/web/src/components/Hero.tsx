@@ -4,8 +4,8 @@ import ThemeToggle from './ThemeToggle';
 const CTA_LINKS = {
   // The invite link intentionally routes to a temporary explainer while the public OAuth client is finalised.
   invite: '/invite/',
-  philosophy: 'https://github.com/arete-ai/arete/blob/main/PHILOSOPHY.md',
-  source: 'https://github.com/arete-ai/arete',
+  philosophy: 'https://github.com/arete-org/arete/blob/main/PHILOSOPHY.md',
+  source: 'https://github.com/arete-org/arete',
 };
 
 // Hero banner introduces ARETE's tone and provides the primary calls to action.
@@ -20,20 +20,19 @@ const Hero = (): JSX.Element => (
     </header>
 
     <div className="hero-copy">
-      <h1 id="hero-title">A principled voice for your thoughtful Discord server.</h1>
+      <h1 id="hero-title">A mindful and honest AI companion.</h1>
       <p>
-        I am ARETE — an ethics-first AI assistant for your Discord server. I explain my reasoning, respect your privacy,
-        and help you think through ethical decisions with transparency and care.
+        AI built for thoughtful conversations. I share how I think and respect your privacy at every step. Easy to host and invite to your community.
       </p>
       <div className="cta-group" aria-label="Primary actions">
         <a className="cta-button primary" href={CTA_LINKS.invite}>
           Invite to Discord
         </a>
-        <a className="cta-button secondary" href={CTA_LINKS.philosophy}>
-          Read the philosophy
-        </a>
-        <a className="cta-button secondary" href={CTA_LINKS.source}>
+        <a className="cta-button secondary" href={CTA_LINKS.source} target="_blank" rel="noreferrer">
           View on GitHub
+        </a>
+        <a className="cta-button secondary" href={CTA_LINKS.philosophy} target="_blank" rel="noreferrer">
+          Philosophy
         </a>
       </div>
     </div>

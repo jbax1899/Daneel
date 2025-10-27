@@ -11,32 +11,32 @@ const FEATURES: ServiceFeature[] = [
   {
     id: 'chat',
     title: 'Chat',
-    description: 'Ethical reasoning with transparent explanations, helping you think through complex decisions.',
-    quote: '"Let me explain my reasoning and help you consider the ethical implications."',
+    description: 'Ask me to unpack my reasoning, explore ideas, or help guide conversations — always with transparency.',
+    quote: '“Here\'s how I\'m thinking about that. See if my reasoning makes sense to you.”',
   },
   {
     id: 'realtime',
     title: 'Realtime search',
     description: 'Fetch cited updates from the web and respond with context-aware summaries.',
-    quote: '"Here is what changed — and what ethical considerations this raises."',
+    quote: '“I found a few reliable updates on that. Let\'s look at what\'s changed — and why it matters.”',
   },
   {
     id: 'call',
     title: '/call',
-    description: 'Join a voice channel and speak to ARETE in realtime — with summaries, memory, and ethical guidance.',
-    quote: '"I hear you - Let me help you think through this."',
+    description: 'Join a voice channel and speak to ARETE in realtime.',
+    quote: '“I\'m listening — Take your time.”',
   },
   {
     id: 'understanding',
     title: 'Image understanding',
     description: 'When images are shared, I analyze them for meaning and context. No command needed.',
-    quote: '"I see this image raises questions about representation. Shall we discuss it?"',
+    quote: '“I notice some interesting themes in this image.”',
   },
   {
     id: 'image',
     title: '/image',
-    description: 'Transform prompts into reflective or illustrative artwork, complete with ethical captions.',
-    quote: '"I\'ve created an image that reflects the values we discussed — transparency and care."',
+    description: 'Turn prompts into reflective or illustrative artwork, complete with thoughtful captions.',
+    quote: '“Here\'s what I imagined — an image shaped by the ideas we talked about.”',
     variant: 'wide',
   },
 ];
@@ -44,7 +44,7 @@ const FEATURES: ServiceFeature[] = [
 // Feature spread showing present-day capabilities with gentle supporting quotes.
 const Services = (): JSX.Element => (
   <section className="services" aria-labelledby="services-title">
-    <h2 id="services-title">How I serve you</h2>
+    <h2 id="services-title">What I can do for you</h2>
     <div className="services-grid">
       {FEATURES.map((feature) => (
         <article

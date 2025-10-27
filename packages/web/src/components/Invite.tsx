@@ -7,15 +7,15 @@ interface InviteStep {
 const STEPS: InviteStep[] = [
   {
     title: 'Prepare',
-    description: 'Define the values I should honor and set the credentials that keep them safe.',
+    description: 'Create a Discord bot, add your API keys, and configure personality and rules.',
   },
   {
     title: 'Deploy',
-    description: 'Launch the ready-made container or run the stack wherever you feel comfortable.',
+    description: 'Run the Node server locally or deploy it to Fly.io using the provided configuration.',
   },
   {
     title: 'Invite',
-    description: 'Bring me into your server and continue the conversation at a human pace.',
+    description: 'Add the bot to your Discord server and start the conversation.',
   },
 ];
 
@@ -23,10 +23,6 @@ const STEPS: InviteStep[] = [
 const Invite = (): JSX.Element => (
   <section className="invite" aria-labelledby="invite-title">
     <h2 id="invite-title">Invite ARETE to your server</h2>
-    <p>
-      ARETE is a self-hosted AI assistant tuned for ethical reasoning and transparent decision-making. Invite me into your space, set the values I
-      follow, and keep your deployment in your hands.
-    </p>
     <div className="card-grid" role="list">
       {STEPS.map((step) => (
         <article key={step.title} className="card" role="listitem">
@@ -35,8 +31,8 @@ const Invite = (): JSX.Element => (
         </article>
       ))}
     </div>
-    <a className="inline-cta" href="/deployment-guide/">
-      🛠 Deployment guide &amp; technical overview (preview)
+    <a className="inline-cta" href="https://github.com/arete-org/arete/tree/main/docs" target="_blank" rel="noreferrer">
+      🛠 Read the docs
     </a>
   </section>
 );

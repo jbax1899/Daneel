@@ -8,17 +8,17 @@ const PRINCIPLES: Principle[] = [
   {
     title: 'Open source',
     description:
-      'Every decision lives in the open repository. Fork it, study it, and change it to match your community.',
+      'Everything\'s in the open. Explore the code, learn from it, or make it your own.',
   },
   {
     title: 'Self-hosted first',
     description:
-      'Keep your keys and choose the deployment path. Steward the conversations that flow through your spaces.',
+      'You own the keys and decide where Ari lives. Your server, your rules.',
   },
   {
     title: 'Dual license',
     description:
-      'MIT + Hippocratic License v3 licensing keeps ARETE adaptable while ensuring ethical use. Freedom with responsibility.',
+      'MIT + Hippocratic — open for everyone, grounded in ethics.',
   },
 ];
 
