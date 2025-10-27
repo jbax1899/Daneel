@@ -15,6 +15,11 @@ RUN npm install
 # Bring in the remainder of the landing page source and produce the static dist bundle.
 COPY packages/web/ /app/packages/web/
 COPY packages/ethics-core/ /app/packages/ethics-core/
+
+# Build argument for Turnstile site key (public, safe to expose in frontend)
+ARG TURNSTILE_SITE_KEY
+ENV VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
+
 RUN npm run build
 
 
@@ -44,6 +49,7 @@ FROM node:22.14.0-slim
 WORKDIR /app
 
 # Copy built frontend assets from the Vite build stage
+# Note: TURNSTILE_SITE_KEY is baked into the frontend build (public, safe to expose)
 COPY --from=frontend-builder /app/packages/web/dist ./packages/web/dist
 
 # Copy built bot
@@ -60,6 +66,10 @@ RUN cd packages/discord-bot && npm install --production
 
 # Copy the lightweight Node server used to host the static site
 COPY server.js ./server.js
+
+# Note: TURNSTILE_SECRET_KEY must be provided at runtime via environment variables
+# This secret key is used for server-side verification and must never be committed
+# For Fly.io deployment, use: fly secrets set TURNSTILE_SECRET_KEY=...
 
 # Simple startup script to run the bot alongside the static site host
 RUN echo '#!/bin/sh\n\

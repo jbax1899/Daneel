@@ -5,86 +5,43 @@
  */
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import type { Citation, ResponseMetadata } from '@ethics-core';
+// Define the actual server response metadata structure
+interface ServerMetadata {
+  id: string;
+  timestamp: string;
+  model: string;
+  reasoningEffort: string;
+  runtimeContext: {
+    modelVersion: string;
+    conversationSnapshot: string;
+  };
+  usage?: {
+    input_tokens: number;
+    output_tokens: number;
+    total_tokens: number;
+  };
+  finishReason?: string;
+  staleAfter: string;
+}
 
 // Reuse the shared provenance contracts, but model the transport layer differences so the
 // React page can consume the JSON payload without re-defining the entire schema.
 
-type CitationExtras = {
-  sourceType?: string;
-  summary?: string;
-};
+type LoadingState = 'loading' | 'success' | 'error' | 'not-found';
 
-type SerializableCitation = (Omit<Citation, 'url'> & { url: string }) & CitationExtras;
-
-type SerializableResponseMetadata = Omit<ResponseMetadata, 'citations'> & {
-  citations: SerializableCitation[];
-  tradeoffs?: unknown[];
-};
-
-type LoadingState = 'loading' | 'success' | 'error' | 'stale' | 'hash-mismatch' | 'not-found';
-
-// Keep the color encoding in a single map so both styling and legends stay consistent.
+// Risk tier colors matching the server constants
 const RISK_TIER_COLORS: Record<string, string> = {
-  low: '#00FF00',
-  medium: '#FFFF00',
-  high: '#FF0000',
-};
-
-const formatDomain = (rawUrl: string): string => {
-  try {
-    const parsed = new URL(rawUrl);
-    return parsed.hostname.replace(/^www\./, '');
-  } catch {
-    return rawUrl;
-  }
-};
-
-const formatConfidence = (confidence?: number): string => {
-  if (typeof confidence !== 'number' || Number.isNaN(confidence)) {
-    return 'N/A';
-  }
-  const percentage = Math.round(confidence * 100);
-  return `${Math.min(100, Math.max(0, percentage))}%`;
-};
-
-// Some endpoints bundle the metadata under a top-level `metadata` key, so we unwrap in a
-// defensive helper to preserve compatibility with earlier worker builds.
-const extractPayload = (data: unknown): SerializableResponseMetadata | null => {
-  if (!data || typeof data !== 'object') {
-    return null;
-  }
-
-  if ('metadata' in data && data.metadata && typeof data.metadata === 'object') {
-    return data.metadata as SerializableResponseMetadata;
-  }
-
-  return data as SerializableResponseMetadata;
-};
-
-const getSourceType = (citation: SerializableCitation): string | undefined => {
-  const rawSourceType = citation.sourceType;
-  return typeof rawSourceType === 'string' && rawSourceType.length > 0 ? rawSourceType : undefined;
-};
-
-const getSummary = (citation: SerializableCitation): string | undefined => {
-  if (typeof citation.summary === 'string' && citation.summary.length > 0) {
-    return citation.summary;
-  }
-  if (typeof citation.snippet === 'string' && citation.snippet.length > 0) {
-    return citation.snippet;
-  }
-  return undefined;
+  low: '#7FDCA4',    // Low reasoning effort - sage green
+  medium: '#F8E37C', // Medium reasoning effort - warm gold  
+  high: '#E27C7C'    // High reasoning effort - soft coral
 };
 
 const TracePage = (): JSX.Element => {
   const { responseId } = useParams<{ responseId: string }>();
   const [loadingState, setLoadingState] = useState<LoadingState>('loading');
-  const [traceData, setTraceData] = useState<SerializableResponseMetadata | null>(null);
+  const [traceData, setTraceData] = useState<ServerMetadata | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // Fetch the persisted trace whenever the response identifier changes. The handler accounts
-  // for all server status codes so we can present purpose-built UI states to the user.
   useEffect(() => {
     if (!responseId) {
       setLoadingState('error');
@@ -104,9 +61,11 @@ const TracePage = (): JSX.Element => {
 
         if (response.status === 200) {
           const payload = (await response.json()) as SerializableResponseMetadata;
+
           if (!isMounted) {
             return;
           }
+
           setTraceData(payload);
           setLoadingState('success');
           return;
@@ -116,18 +75,22 @@ const TracePage = (): JSX.Element => {
           if (!isMounted) {
             return;
           }
+
           setLoadingState('not-found');
           return;
         }
 
         if (response.status === 410) {
           const payload = extractPayload(await response.json().catch(() => null));
+
           if (!isMounted) {
             return;
           }
+
           if (payload) {
             setTraceData(payload);
           }
+
           setLoadingState('stale');
           return;
         }
@@ -136,20 +99,25 @@ const TracePage = (): JSX.Element => {
           if (!isMounted) {
             return;
           }
+
           setLoadingState('hash-mismatch');
           return;
         }
 
         const message = await response.text();
+
         if (!isMounted) {
           return;
         }
+
         setErrorMessage(message || 'Failed to load trace.');
         setLoadingState('error');
+
       } catch (error) {
         if (!isMounted) {
           return;
         }
+
         setErrorMessage(error instanceof Error ? error.message : 'Failed to load trace.');
         setLoadingState('error');
       }
@@ -201,54 +169,23 @@ const TracePage = (): JSX.Element => {
     );
   }
 
-  if (loadingState === 'hash-mismatch') {
-    return (
-      <section className="site-section">
-        <div className="note-from-daneel" role="alert" style={{ borderTopColor: '#FF0000' }}>
-          <h1>Integrity Check Failed</h1>
-          <p>
-            The provided trace hash does not match the stored value. Please confirm the link and try
-            again from a trusted source.
-          </p>
-          <Link to="/" className="button-link">
-            Back to home
-          </Link>
-        </div>
-      </section>
-    );
-  }
 
-  const riskTier = traceData?.riskTier ?? '';
-  const riskColor = RISK_TIER_COLORS[riskTier.toLowerCase()] ?? '#6b7280';
-  const confidence = formatConfidence(traceData?.confidence);
-  const tradeoffCount =
-    // Older traces persisted the raw tradeoff array; newer ones expose a count. Support both.
-    typeof traceData?.tradeoffCount === 'number'
-      ? traceData.tradeoffCount
-      : Array.isArray(traceData?.tradeoffs)
-        ? traceData?.tradeoffs.length ?? 0
-        : 0;
+  const riskTier = traceData?.reasoningEffort ?? 'low';
+  const riskColor = RISK_TIER_COLORS[riskTier] ?? '#6b7280';
+  const confidence = 'Confidence data unavailable';
+  const tradeoffCount = 0;
   const staleAfter = traceData?.staleAfter
     ? new Date(traceData.staleAfter).toLocaleString()
     : 'N/A';
-  const provenance = traceData?.provenance ?? 'Unknown';
+  const provenance = traceData?.reasoningEffort ?? 'Unknown';
 
   return (
     <section className="site-section">
-      {loadingState === 'stale' && (
-        <div className="note-from-daneel" role="note" style={{ borderTopColor: '#FFA500' }}>
-          <h2>Trace Expired</h2>
-          <p>
-            This trace is past its freshness window. Review the details below for historical
-            reference, but request a fresh response if you need the most current analysis.
-          </p>
-        </div>
-      )}
 
       <header className="site-header" aria-live="polite">
         <div className="site-mark">
           <h1>Response Trace</h1>
-          <code>{traceData?.responseId ?? responseId}</code>
+          <code>{traceData?.id ?? responseId}</code>
         </div>
         <Link to="/" className="button-link">
           Back to home
@@ -279,37 +216,14 @@ const TracePage = (): JSX.Element => {
           </span>
         </p>
         <p>
-          <strong>Model:</strong> {traceData?.modelVersion || 'Unspecified'}
+          <strong>Model:</strong> {traceData?.model || 'Unspecified'}
         </p>
       </article>
 
-      {traceData?.citations && traceData.citations.length > 0 && (
-        <article className="card" aria-label="Citations">
-          <h2>Citations</h2>
-          <ul>
-            {traceData.citations.map((citation, index) => {
-              const domain = formatDomain(citation.url);
-              const sourceType = getSourceType(citation);
-              const summary = getSummary(citation);
-
-              // Citations may point to internal docs or public sources; surface whatever
-              // metadata we have so analysts can verify provenance quickly.
-              return (
-                <li key={`${citation.url}-${citation.title}-${index}`}>
-                  <a href={citation.url} target="_blank" rel="noopener noreferrer">
-                    {citation.title}
-                  </a>
-                  <p className="meta">
-                    {domain}
-                    {sourceType ? ` - ${sourceType}` : ''}
-                  </p>
-                  {summary && <p>{summary}</p>}
-                </li>
-              );
-            })}
-          </ul>
-        </article>
-      )}
+      <article className="card" aria-label="Citations">
+        <h2>Citations</h2>
+        <p>No citations available for this response.</p>
+      </article>
 
       <article className="card" aria-label="Technical details">
         <h2>Technical Details</h2>
@@ -321,7 +235,7 @@ const TracePage = (): JSX.Element => {
           <div>
             <dt>Chain Hash</dt>
             <dd>
-              <code>{traceData?.chainHash || 'Unavailable'}</code>
+              <code>Unavailable</code>
             </dd>
           </div>
           <div>
@@ -331,11 +245,7 @@ const TracePage = (): JSX.Element => {
           <div>
             <dt>License Context</dt>
             <dd>
-              {traceData?.licenseContext ? (
-                <span>{traceData.licenseContext}</span>
-              ) : (
-                <span>See license strategy for reuse details.</span>
-              )}{' '}
+              <span>See license strategy for reuse details.</span>{' '}
               <a
                 href="https://github.com/arete-org/arete/blob/main/LICENSE_STRATEGY.md"
                 target="_blank"

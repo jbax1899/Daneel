@@ -8,17 +8,17 @@ const PRINCIPLES: Principle[] = [
   {
     title: 'Open source',
     description:
-      'Every decision lives in the open repository. Fork it, study it, and change it to match your community.',
+      'Everything\'s in the open. Explore the code, learn from it, or make it your own.',
   },
   {
     title: 'Self-hosted first',
     description:
-      'Keep your keys and choose the deployment path. Steward the conversations that flow through your spaces.',
+      'You own the keys and decide where Ari lives. Your server, your rules.',
   },
   {
-    title: 'Permissive license',
+    title: 'Dual license',
     description:
-      'The MIT license keeps Daneel adaptable. Carry forward what helps, share discoveries back when you can.',
+      'MIT + Hippocratic — open for everyone, grounded in ethics.',
   },
 ];
 

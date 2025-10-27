@@ -543,7 +543,7 @@ export class OpenAIService {
               ? citationRecord.snippet
               : undefined
           });
-        } catch (error) {
+        } catch {
           logger.warn(`Skipping invalid citation URL "${citationRecord.url}" from metadata payload.`);
         }
       }
@@ -636,7 +636,7 @@ export class OpenAIService {
     filename: string, 
     format: 'mp3' | 'opus' | 'aac' | 'flac' | 'wav' | 'pcm') {
     //https://platform.openai.com/docs/guides/text-to-speech
-    if (!filename || !/^[\w\-]+$/.test(filename)) {
+    if (!filename || !/^[\w-]+$/.test(filename)) {
       throw new Error('Invalid filename. Only alphanumeric characters, hyphens, and underscores are allowed.');
     }
     

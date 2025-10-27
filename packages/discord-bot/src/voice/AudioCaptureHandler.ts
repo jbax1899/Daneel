@@ -118,10 +118,14 @@ export class AudioCaptureHandler extends EventEmitter {
             decoder.removeAllListeners();
             try {
                 decoder.unpipe(resampler);
-            } catch {}
+            } catch {
+                // Ignore errors during cleanup
+            }
             try {
                 opusStream.unpipe(decoder);
-            } catch {}
+            } catch {
+                // Ignore errors during cleanup
+            }
             opusStream.removeAllListeners();
             this.activeReceivers.delete(captureKey);
             this.emitSpeakerSilence(guildId, userId);

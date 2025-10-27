@@ -18,9 +18,15 @@ packages/discord-bot/src/output/
 
 # Ethics core build artifacts
 packages/ethics-core/dist/
+packages/ethics-core/src/**/*.js
+packages/ethics-core/src/**/*.js.map
+packages/ethics-core/src/**/*.d.ts
 
 # Shared build artifacts
 packages/shared/dist/
+packages/shared/src/**/*.js
+packages/shared/src/**/*.js.map
+packages/shared/src/**/*.d.ts
 
 # Traces
 packages/discord-bot/traces/

@@ -52,7 +52,9 @@ export class VoiceStateHandler extends Event {
             if (anyClient && anyClient.handlers && typeof anyClient.handlers.set === 'function') {
                 anyClient.handlers.set('voiceState', this);
             }
-        } catch {}
+        } catch {
+          // Ignore errors during cleanup
+        }
     }
 
     async execute(oldState: VoiceState, newState: VoiceState): Promise<void> {

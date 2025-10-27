@@ -9,12 +9,24 @@
     "format-check": "pnpm prettier --check packages/",
     "format-fix": "pnpm prettier --write packages/",
     "risk-audit": "pnpm tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
-    "ethics-audit": "pnpm tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\""
+    "ethics-audit": "pnpm tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\"",
+    "pre-review": "npm run pre-review",
+    "ethics-check": "npm run ethics-check",
+    "risk-check": "npm run risk-check",
+    "full-pre-review": "npm run full-pre-review"
   },
   "tasks": {
     "cost-summary": {
       "command": "pnpm tsx -e \"import { logLLMCostSummary } from './packages/discord-bot/src/utils/logger.ts'; logLLMCostSummary();\"",
       "description": "Check LLM cost summary for current session"
+    },
+    "pre-review": {
+      "command": "npm run pre-review",
+      "description": "Run automated validation pipeline (ARETE tags, types, linting)"
+    },
+    "full-pre-review": {
+      "command": "npm run full-pre-review",
+      "description": "Complete pre-review analysis including ethics and risk audits"
     },
     "risk-audit": {
       "command": "pnpm tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",

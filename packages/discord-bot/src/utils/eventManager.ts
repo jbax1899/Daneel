@@ -104,7 +104,9 @@ export class EventManager {
               this.events.push(event);
               instantiated = true;
               logger.debug(`Successfully loaded event (deps ctor): ${file}`);
-            } catch {}
+            } catch {
+              // Ignore errors during event instantiation
+            }
 
             // Try (client)
             if (!instantiated) {
@@ -113,7 +115,9 @@ export class EventManager {
                 this.events.push(event);
                 instantiated = true;
                 logger.debug(`Successfully loaded event (client ctor): ${file}`);
-              } catch {}
+              } catch {
+                // Ignore errors during event instantiation
+              }
             }
 
             // Try () no-arg

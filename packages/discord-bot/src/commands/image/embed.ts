@@ -8,7 +8,7 @@ import {
 } from './constants.js';
 
 export function sanitizeForEmbed(value: string): string {
-    return value.replace(/\u0000/g, '');
+    return value.replace(/\0/g, '');
 }
 
 export function truncateForEmbed(

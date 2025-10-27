@@ -40,7 +40,6 @@ import type {
   ImageBackgroundType,
   ImageQualityType,
   ImageRenderModel,
-  ImageSizeType,
   ImageStylePreset,
   ImageTextModel
 } from '../commands/image/types.js';
@@ -359,7 +358,7 @@ export class MessageProcessor {
         return;
       }
 
-      case 'message':
+      case 'message': {
         logger.debug(`Generating response for message (risk tier: ${plannerRiskTier}): ${message.content.slice(0, 100)}...`);
 
         await responseHandler.startTyping(); // Start persistent typing indicator
@@ -557,6 +556,7 @@ export class MessageProcessor {
           responseHandler.stopTyping(); // Stop typing indicator
         }
         return;
+      }
       //
       // React with emoji (one or more) using Discord's built-in reaction feature
       //

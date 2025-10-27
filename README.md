@@ -44,8 +44,29 @@ npm install
 DISCORD_TOKEN=your_discord_bot_token
 CLIENT_ID=your_discord_client_id
 OPENAI_API_KEY=your_openai_api_key
+TURNSTILE_SITE_KEY=your_turnstile_site_key
+TURNSTILE_SECRET_KEY=your_turnstile_secret_key
+VITE_TURNSTILE_SITE_KEY=your_turnstile_site_key
 ```
 > See `.env.example` for optional parameters (e.g. rate limitting, engagement rules)
+
+**Required Services:**
+- Discord Bot Token and Client ID
+- OpenAI API Key
+- Cloudflare Turnstile CAPTCHA keys (for web API security)
+
+**Cloudflare Turnstile Setup:**
+1. Navigate to the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?to=/:account/turnstile)
+2. Create a new site (or use an existing one)
+3. Copy the Site Key and Secret Key
+4. Add them to your `.env` file as `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`
+
+**Development Testing:**
+For local development, you can use Cloudflare's test keys:
+- Test site key: `1x00000000000000000000AA` (always passes)
+- Test secret key: `1x0000000000000000000000000000000AA` (always passes)
+
+⚠️ **Never use test keys in production!**
 
 4. Run locally
 (starts the ethics core, Discord bot, and web server in development mode)
@@ -55,9 +76,16 @@ npm run dev
 5. Deploy to Fly.io (optional)
 ```
 flyctl launch
+flyctl secrets set TURNSTILE_SITE_KEY=your_turnstile_site_key
+flyctl secrets set TURNSTILE_SECRET_KEY=your_turnstile_secret_key
 flyctl deploy
 ```
 This launches ARETE as a self-contained service in the cloud.
+
+**Fly.io Deployment Notes:**
+- The Turnstile site key is baked into the frontend build during Docker build
+- The Turnstile secret key must be set as a Fly.io secret for runtime verification
+- Use `flyctl secrets set` to configure sensitive environment variables
 
 ## Monorepo Structure
 This repository houses all major packages:

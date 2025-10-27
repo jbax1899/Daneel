@@ -2,18 +2,20 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "jsx": "react-jsx",
-    "types": ["vite/client"],
+    "typeRoots": ["./node_modules/@types", "./src/types"],
     "baseUrl": "./src",
+    "noEmit": true,
     "paths": {
       "@components/*": ["components/*"],
       "@pages/*": ["pages/*"],
       "@ethics-core": ["../../ethics-core/src/index.ts"],
+      "ethics-core": ["../../ethics-core/src/index.ts"],
       "@styles/*": ["styles/*"],
       "@theme": ["theme"],
       "@types/*": ["types/*"]
     }
   },
-  "include": ["src", "../ethics-core/src/**/*.ts"],
+  "include": ["src", "src/types"],
   "references": [
     { "path": "../ethics-core" }
   ]

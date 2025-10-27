@@ -91,7 +91,9 @@ export class GuildAudioPipeline {
         if (this.pcmBuffer.length > 0) {
             try {
                 await this.writePCM(Buffer.alloc(0)); // flush remaining frames
-            } catch {}
+            } catch {
+                // Ignore errors during cleanup
+            }
         }
     
         try {

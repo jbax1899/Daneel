@@ -137,16 +137,14 @@ export interface ChannelEngagementOverrides {
 export class RealtimeEngagementFilter {
   private readonly weights: EngagementWeights;
   private readonly preferences: EngagementPreferences;
-  private readonly openaiService?: OpenAIService;
 
   constructor(
     weights: EngagementWeights,
     preferences: EngagementPreferences,
-    openaiService?: OpenAIService
+    _openaiService?: OpenAIService
   ) {
     this.weights = weights;
     this.preferences = preferences;
-    this.openaiService = openaiService;
     
     engagementLogger.debug('RealtimeEngagementFilter initialized', {
       weights: this.weights,
@@ -401,7 +399,7 @@ export class RealtimeEngagementFilter {
     }
 
     // Calculate cost velocity (USD per minute) over recent window
-    const now = Date.now();
+    // const _now = Date.now();
     const timeWindowMs = 5 * 60 * 1000; // 5 minutes
     const timeWindowMinutes = timeWindowMs / (1000 * 60);
     
@@ -494,7 +492,7 @@ export class RealtimeEngagementFilter {
    * @param {EngagementContext} context - The context for the engagement decision
    * @returns {Promise<number>} The refined score
    */
-  private async refineLLM(score: number, context: EngagementContext): Promise<number> {
+  private async refineLLM(score: number, _context: EngagementContext): Promise<number> {
     engagementLogger.debug('LLM refinement disabled - returning original score');
     return score;
   }

@@ -100,7 +100,7 @@ export class CatchupFilter {
   public readonly MIN_RELEVANCE_SCORE = 0.2;
 
   // Reserved for future enhancements that may use the OpenAI service for richer heuristics.
-  constructor(private readonly openaiService?: OpenAIService) {}
+  constructor(_openaiService?: OpenAIService) {}
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -225,7 +225,7 @@ export class CatchupFilter {
 
     // Collapse whitespace to evaluate pure emoji sequences.
     const squashed = trimmed.replace(/\s+/g, '');
-    const emojiRegex = /^(?:[\p{Extended_Pictographic}\u200D\uFE0F]+)$/u;
+    const emojiRegex = /^(?:[\p{Extended_Pictographic}][\u{200D}\u{FE0F}]*)+$/u;
     if (emojiRegex.test(squashed)) {
       return true;
     }

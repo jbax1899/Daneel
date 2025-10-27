@@ -1,15 +1,15 @@
 /**
  * @file RateLimiter.ts
- * @description Handles rate limiting for Discord interactions.
- * Provides per-user, per-channel, and per-guild rate limiting with configurable windows.
+ * @description Handles rate limiting for Discord interactions and web API contexts.
+ * Provides per-user, per-channel, per-guild, and per-session rate limiting with configurable windows.
  */
 
-type RateLimitScope = 'user' | 'channel' | 'guild';
+type RateLimitScope = 'user' | 'channel' | 'guild' | 'session';
 
 interface RateLimitOptions {
   limit: number; // Max requests per time window
   window: number; // Time window in milliseconds
-  scope: RateLimitScope; // Scope of the rate limit (user, channel, or guild)
+  scope: RateLimitScope; // Scope of the rate limit (user, channel, guild, or session)
   errorMessage?: string; // Optional custom error message when rate limited
 }
 
@@ -19,8 +19,8 @@ interface RateLimitRecord {
 }
 
 /**
- * Handles rate limiting for Discord interactions.
- * Supports different scopes (user, channel, guild) with configurable limits and time windows.
+ * Handles rate limiting for Discord interactions and web API contexts.
+ * Supports different scopes (user, channel, guild, session) with configurable limits and time windows.
  * @class RateLimiter
  */
 export class RateLimiter {
@@ -100,6 +100,8 @@ export class RateLimiter {
           throw new Error('Guild ID is required for guild-level rate limiting');
         }
         return guildId;
+      case 'session':
+        return userId; // For session scope, userId parameter contains the sessionId
       default:
         throw new Error(`Unsupported scope: ${this.options.scope}`);
     }

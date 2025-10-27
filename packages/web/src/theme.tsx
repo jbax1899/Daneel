@@ -22,7 +22,7 @@ interface ThemeContextValue {
 const supportsLocalStorage = (): boolean => typeof window !== 'undefined' && !!window.localStorage;
 
 // Dedicate a storage key so the preference persists between visits.
-const STORAGE_KEY = 'daneel-theme-preference';
+const STORAGE_KEY = 'arete-theme-preference';
 
 const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 

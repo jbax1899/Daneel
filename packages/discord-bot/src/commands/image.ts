@@ -22,7 +22,6 @@ import type {
     ImageBackgroundType,
     ImageQualityType,
     ImageRenderModel,
-    ImageSizeType,
     ImageStylePreset,
     ImageTextModel
 } from './image/types.js';
@@ -176,11 +175,7 @@ export async function runImageGenerationSession(
         prompt,
         textModel,
         imageModel,
-        size,
-        aspectRatioLabel,
-        quality,
-        background,
-        style
+        size
     } = context;
 
     logger.debug(
