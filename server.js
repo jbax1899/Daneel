@@ -471,7 +471,7 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         console.log('CAPTCHA verification debug:');
         console.log('Token length:', turnstileToken?.length || 0);
         console.log('Token preview:', turnstileToken?.substring(0, 20) + '...');
-        console.log('Secret key preview:', process.env.TURNSTILE_SECRET_KEY?.substring(0, 10) + '...');
+        console.log('Secret key is set:', !!process.env.TURNSTILE_SECRET_KEY);
         
         const formData = new URLSearchParams();
         formData.append('secret', process.env.TURNSTILE_SECRET_KEY);
