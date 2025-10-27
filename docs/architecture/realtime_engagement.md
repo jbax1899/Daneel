@@ -111,19 +111,46 @@ The `recordLLMUsage()` method is implemented and ready for Phase 3's `LLMCostEst
 
 ---
 
-## Phase 4 — RealtimeEngagementFilter
+## Phase 4 — RealtimeEngagementFilter ✅
 **Goal:** Replace heuristic-only decisions with a weighted score that understands context, cost, and preferences.  
 **Key tasks:**  
 - Define `EngagementWeights`, `EngagementPreferences`, and `EngagementDecision`. Use defaults from config while allowing per-channel overrides.  
 - Scoring inputs: direct mentions, question marks, technical keywords, recent human exchanges, cost saturation, bot noise, DM boost, manual overrides.  
-- Optional LLM “refinement” when scores land in the grey zone — keep it off by default but ready.  
+- Optional LLM "refinement" when scores land in the grey zone — keep it off by default but ready.  
 - Integrate in `MessageCreate.ts`: fetch metrics from Phase 2, costs from Phase 3, preferences from Phase 6, then decide to respond or skip.  
 - Log decisions as compact JSON. Example:
   ```json
   {"event":"engagement_decision","channelId":"123","score":0.72,"shouldRespond":true,"reasons":["mention","question"]}
   ```  
 - Feature flag: `REALTIME_FILTER_ENABLED`. CatchupFilter remains the fallback.  
-**Deliverable:** `RealtimeEngagementFilter.ts` returning transparent decisions so Planner knows whether to speak.
+
+**Implementation Notes:**
+
+- Created `src/engagement/RealtimeEngagementFilter.ts` with weighted scoring algorithm
+- Defined `EngagementWeights`, `EngagementPreferences`, `EngagementDecision`, `EngagementContext` interfaces
+- Integrated into `MessageCreate.ts` catchup logic with feature flag `REALTIME_FILTER_ENABLED`
+- Added comprehensive configuration to `env.ts` with per-weight environment variables
+- Documented all configuration in `.env.example` with clear descriptions
+- Scoring inputs: mentions (0.3), questions (0.2), technical keywords (0.15), human activity (0.15), cost saturation (0.1 negative), bot noise (0.05 negative), DM boost (1.5x)
+- Threshold-based decision with optional reaction mode (emoji acknowledgment)
+- LLM refinement interface stubbed but disabled by default (future enhancement)
+- All operations fail-open to maintain pipeline stability
+- CatchupFilter remains as fallback when realtime filter is disabled
+- Structured logs emitted: `engagement_decision` with score, reasons, and breakdown
+- Engagement scores tracked in ChannelContextManager for historical analysis
+
+**Files Modified:**
+
+- `packages/discord-bot/src/engagement/RealtimeEngagementFilter.ts` (new)
+- `packages/discord-bot/src/events/MessageCreate.ts` (integration)
+- `packages/discord-bot/src/utils/env.ts` (configuration)
+- `.env.example` (documentation)
+
+**Ready for Phase 5:**
+
+The engagement filter provides context-aware decisions. Phase 5's `ContextCompressor` can now use engagement scores and cost data to optimize context window sizes before planner calls.
+
+**Deliverable:** ✅ `RealtimeEngagementFilter.ts` integrated into `MessageCreate.ts`, returning transparent decisions with weighted scoring. CatchupFilter remains as fallback. Reaction mode and LLM refinement interfaces ready for future enhancements.
 
 ---
 

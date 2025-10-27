@@ -66,7 +66,7 @@ const NON_SUBSTANTIVE_EXPRESSIONS = new Set([
 ]);
 
 // Keywords that suggest the speakers are asking for help or discussing work.
-const TECHNICAL_KEYWORDS = [
+export const TECHNICAL_KEYWORDS = [
   'error',
   'issue',
   'fix',

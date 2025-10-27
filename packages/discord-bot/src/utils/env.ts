@@ -119,6 +119,58 @@ const DEFAULT_COST_ESTIMATOR_CONFIG = {
 } as const;
 
 /**
+ * Default engagement scoring weights (0-1 range, higher = more influence)
+ * @type {Object}
+ * @property {number} MENTION - Weight for direct mentions/questions (default 0.3)
+ * @property {number} QUESTION - Weight for question marks and interrogatives (default 0.2)
+ * @property {number} TECHNICAL - Weight for technical keywords (default 0.15)
+ * @property {number} HUMAN_ACTIVITY - Weight for recent human message ratio (default 0.15)
+ * @property {number} COST_SATURATION - Weight for cost velocity concerns (default 0.1, negative signal)
+ * @property {number} BOT_NOISE - Weight for bot message ratio (default 0.05, negative signal)
+ * @property {number} DM_BOOST - Multiplier for DM contexts (default 1.5)
+ * @property {number} DECAY - Time decay factor for message recency (default 0.05)
+ */
+const DEFAULT_ENGAGEMENT_WEIGHTS = {
+  MENTION: 0.3,
+  QUESTION: 0.2,
+  TECHNICAL: 0.15,
+  HUMAN_ACTIVITY: 0.15,
+  COST_SATURATION: 0.1,
+  BOT_NOISE: 0.05,
+  DM_BOOST: 1.5,
+  DECAY: 0.05
+} as const;
+
+/**
+ * Default engagement behavior preferences
+ * @type {Object}
+ * @property {string} IGNORE_MODE - How to acknowledge when skipping: 'silent' or 'react'
+ * @property {string} REACTION_EMOJI - Emoji to use when ignoreMode=react
+ * @property {number} MIN_ENGAGE_THRESHOLD - Minimum score to engage (0-1)
+ * @property {number} PROBABILISTIC_BAND_LOW - Lower bound of grey zone for LLM refinement
+ * @property {number} PROBABILISTIC_BAND_HIGH - Upper bound of grey zone for LLM refinement
+ * @property {boolean} ENABLE_LLM_REFINEMENT - Whether to use LLM to refine scores in grey zone
+ */
+const DEFAULT_ENGAGEMENT_PREFERENCES = {
+  IGNORE_MODE: 'silent' as const,
+  REACTION_EMOJI: '👍',
+  MIN_ENGAGE_THRESHOLD: 0.5,
+  PROBABILISTIC_BAND_LOW: 0.4,
+  PROBABILISTIC_BAND_HIGH: 0.6,
+  ENABLE_LLM_REFINEMENT: false
+} as const;
+
+/**
+ * Default realtime filter configuration
+ * Enabled by default, but we provide a feature flag to disable it if desired.
+ * @type {Object}
+ * @property {boolean} ENABLED - Whether the realtime filter is enabled
+ */
+const DEFAULT_REALTIME_FILTER_CONFIG = {
+  ENABLED: true
+} as const;
+
+/**
  * Validates that all required environment variables are set.
  * @throws {Error} If any required environment variable is missing
  */
@@ -350,6 +402,35 @@ export const config = {
   // Cost estimator configuration
   costEstimator: {
     enabled: getBooleanEnv('COST_ESTIMATOR_ENABLED', DEFAULT_COST_ESTIMATOR_CONFIG.ENABLED)
+  },
+
+  // Realtime engagement filter configuration
+  realtimeFilter: {
+    enabled: getBooleanEnv('REALTIME_FILTER_ENABLED', DEFAULT_REALTIME_FILTER_CONFIG.ENABLED)
+  },
+
+  // Engagement scoring weights
+  engagementWeights: {
+    mention: getNumberEnv('ENGAGEMENT_WEIGHT_MENTION', DEFAULT_ENGAGEMENT_WEIGHTS.MENTION),
+    question: getNumberEnv('ENGAGEMENT_WEIGHT_QUESTION', DEFAULT_ENGAGEMENT_WEIGHTS.QUESTION),
+    technical: getNumberEnv('ENGAGEMENT_WEIGHT_TECHNICAL', DEFAULT_ENGAGEMENT_WEIGHTS.TECHNICAL),
+    humanActivity: getNumberEnv('ENGAGEMENT_WEIGHT_HUMAN_ACTIVITY', DEFAULT_ENGAGEMENT_WEIGHTS.HUMAN_ACTIVITY),
+    costSaturation: getNumberEnv('ENGAGEMENT_WEIGHT_COST_SATURATION', DEFAULT_ENGAGEMENT_WEIGHTS.COST_SATURATION),
+    botNoise: getNumberEnv('ENGAGEMENT_WEIGHT_BOT_NOISE', DEFAULT_ENGAGEMENT_WEIGHTS.BOT_NOISE),
+    dmBoost: getNumberEnv('ENGAGEMENT_WEIGHT_DM_BOOST', DEFAULT_ENGAGEMENT_WEIGHTS.DM_BOOST),
+    decay: getNumberEnv('ENGAGEMENT_WEIGHT_DECAY', DEFAULT_ENGAGEMENT_WEIGHTS.DECAY)
+  },
+
+  // Engagement behavior preferences
+  engagementPreferences: {
+    ignoreMode: (process.env.ENGAGEMENT_IGNORE_MODE?.trim().toLowerCase() === 'react' ? 'react' : 'silent') as 'silent' | 'react',
+    reactionEmoji: process.env.ENGAGEMENT_REACTION_EMOJI?.trim() || DEFAULT_ENGAGEMENT_PREFERENCES.REACTION_EMOJI,
+    minEngageThreshold: getNumberEnv('ENGAGEMENT_MIN_THRESHOLD', DEFAULT_ENGAGEMENT_PREFERENCES.MIN_ENGAGE_THRESHOLD),
+    probabilisticBand: [
+      getNumberEnv('ENGAGEMENT_PROBABILISTIC_LOW', DEFAULT_ENGAGEMENT_PREFERENCES.PROBABILISTIC_BAND_LOW),
+      getNumberEnv('ENGAGEMENT_PROBABILISTIC_HIGH', DEFAULT_ENGAGEMENT_PREFERENCES.PROBABILISTIC_BAND_HIGH)
+    ] as [number, number],
+    enableLLMRefinement: getBooleanEnv('ENGAGEMENT_ENABLE_LLM_REFINEMENT', DEFAULT_ENGAGEMENT_PREFERENCES.ENABLE_LLM_REFINEMENT)
   }
 
 } as const;

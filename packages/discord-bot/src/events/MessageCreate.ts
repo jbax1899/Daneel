@@ -22,7 +22,21 @@ import { Planner } from '../utils/prompting/Planner.js';
 import { config } from '../utils/env.js';
 import { ResponseHandler } from '../utils/response/ResponseHandler.js';
 import { ChannelContextManager } from '../state/ChannelContextManager.js';
+import { RealtimeEngagementFilter } from '../engagement/RealtimeEngagementFilter.js';
 import type { LLMCostEstimator } from '../utils/LLMCostEstimator.js';
+import type { EngagementContext, ChannelEngagementOverrides } from '../engagement/RealtimeEngagementFilter.js';
+
+/**
+ * @arete-logger: messageCreate
+ * 
+ * @logs
+ * Message processing events, engagement decisions, catchup triggers, bot conversation tracking, and error conditions
+ * 
+ * @impact
+ * Risk - Message processing failures can break user interactions or create inappropriate responses. Manages mention detection, catch-up logic, and bot conversation tracking.
+ * Ethics - Controls user interaction frequency and AI response behavior. Governs engagement thresholds, thread restrictions, and bot-to-bot conversation limits to prevent spam and ensure respectful interaction.
+ */
+const messageLogger = logger.child({ module: 'messageCreate' });
 
 /**
  * Dependencies required for the MentionBotEvent
@@ -60,6 +74,7 @@ type BotConversationState = {
  * - Tracks bot conversations and applies cooldowns to prevent spam or feedback cycles.
  * - Manages channel-scoped context (if enabled) for memory, metrics, and engagement quality.
  * - Integrates with injected services (LLMs, planners, response handlers) for response generation.
+ * - Uses weighted engagement scoring (RealtimeEngagementFilter) for context-aware catchup decisions.
  * - Adds observability (logging, metrics, self-auditing) for failure, risk, and diagnostic insight.
  *
  * Extends `Event` with layered logic for engagement, context, mention/intent detection,
@@ -67,25 +82,46 @@ type BotConversationState = {
  *
  * @class MessageCreate
  * @extends {Event}
+ * @property {string} name - The Discord.js event name this handler is registered for
+ * @property {boolean} once - Whether the event should only be handled once (false for message events)
+ * @property {MessageProcessor} messageProcessor - The message processor that handles the actual message processing logic
+ * @property {CatchupFilter} catchupFilter - The heuristic filter to short-circuit unnecessary planner calls during catchup
+ * @property {number} CATCHUP_AFTER_MESSAGES - The configurable catch-up threshold
+ * @property {number} CATCHUP_IF_MENTIONED_AFTER_MESSAGES - The configurable catch-up threshold when mentioned in plaintext
+ * @property {Map<string, { count: number; lastUpdated: number }>} channelMessageCounters - Tracks message counts per channel for catch-up logic
+ * @property {number} STALE_COUNTER_TTL_MS - Configurable counter expiry
+ * @property {boolean} ALLOW_THREAD_RESPONSES - Whether responding in threads is allowed
+ * @property {Set<string>} allowedThreadIds - Threads where the bot is allowed to engage
+ * @property {Map<string, BotConversationState>} botConversationStates - Tracks back-and-forth exchanges with other bots
+ * @property {number} BOT_CONVERSATION_TTL_MS - How long to remember bot conversations before resetting
+ * @property {number} BOT_INTERACTION_COOLDOWN_MS - Cooldown applied after we stop engaging
+ * @property {ChannelContextManager | null} contextManager - The channel context manager that manages the channel-scoped context
+ * @property {number} CONTEXT_STATE_LOG_THROTTLE_MS - Throttle context_state logs per channel (ms)
+ * @property {number} CONTEXT_STATE_LOG_RETENTION_MS - Maximum age before pruning context_state entries
+ * @property {Map<string, number>} contextStateLogTimestamps - Track last context_state log per channel
+ * @property {RealtimeEngagementFilter | null} realtimeFilter - The weighted scoring filter for catchup engagement decisions (null if disabled)
+ * @property {LLMCostEstimator | null} costEstimator - The LLM cost tracker for budget enforcement and transparency (null if disabled)
  */
 export class MessageCreate extends Event {
-  public readonly name = 'messageCreate' as const;                                                      // The Discord.js event name this handler is registered for
-  public readonly once = false;                                                                         // Whether the event should only be handled once (false for message events)
-  private readonly messageProcessor: MessageProcessor;                                                  // The message processor that handles the actual message processing logic
-  private readonly catchupFilter: CatchupFilter;                                                        // Heuristic filter to short-circuit unnecessary planner calls during catchup
-  private readonly CATCHUP_AFTER_MESSAGES = config.catchUp.afterMessages;                               // Configurable catch-up threshold
-  private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = config.catchUp.ifMentionedAfterMessages;       // Configurable catch-up threshold when mentioned in plaintext
-  private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>();  // Tracks message counts per channel for catch-up logic
-  private readonly STALE_COUNTER_TTL_MS = config.catchUp.staleCounterTtlMs;                             // Configurable counter expiry
-  private readonly ALLOW_THREAD_RESPONSES = config.visibility.allowThreadResponses;                     // Whether responding in threads is allowed
-  private readonly allowedThreadIds = new Set(config.visibility.allowedThreadIds);                      // Threads where the bot is allowed to engage
-  private readonly botConversationStates = new Map<string, BotConversationState>();                     // Tracks back-and-forth exchanges with other bots
-  private readonly BOT_CONVERSATION_TTL_MS = config.botInteraction.conversationTtlMs;                   // How long to remember bot conversations before resetting
-  private readonly BOT_INTERACTION_COOLDOWN_MS = Math.max(config.botInteraction.cooldownMs, 1000);      // Cooldown applied after we stop engaging
+  public readonly name = 'messageCreate' as const;
+  public readonly once = false;
+  private readonly messageProcessor: MessageProcessor;
+  private readonly catchupFilter: CatchupFilter;
+  private readonly CATCHUP_AFTER_MESSAGES = config.catchUp.afterMessages;
+  private readonly CATCHUP_IF_MENTIONED_AFTER_MESSAGES = config.catchUp.ifMentionedAfterMessages;
+  private readonly channelMessageCounters = new Map<string, { count: number; lastUpdated: number }>();
+  private readonly STALE_COUNTER_TTL_MS = config.catchUp.staleCounterTtlMs;
+  private readonly ALLOW_THREAD_RESPONSES = config.visibility.allowThreadResponses;
+  private readonly allowedThreadIds = new Set(config.visibility.allowedThreadIds);
+  private readonly botConversationStates = new Map<string, BotConversationState>();
+  private readonly BOT_CONVERSATION_TTL_MS = config.botInteraction.conversationTtlMs;
+  private readonly BOT_INTERACTION_COOLDOWN_MS = Math.max(config.botInteraction.cooldownMs, 1000);
   private readonly contextManager: ChannelContextManager | null;
-  private readonly CONTEXT_STATE_LOG_THROTTLE_MS = 15_000;                                              // Throttle context_state logs per channel (ms)
-  private readonly CONTEXT_STATE_LOG_RETENTION_MS = this.CONTEXT_STATE_LOG_THROTTLE_MS * 10;            // Maximum age before pruning context_state entries
-  private readonly contextStateLogTimestamps = new Map<string, number>();                               // Track last context_state log per channel
+  private readonly CONTEXT_STATE_LOG_THROTTLE_MS = 15_000;
+  private readonly CONTEXT_STATE_LOG_RETENTION_MS = this.CONTEXT_STATE_LOG_THROTTLE_MS * 10;
+  private readonly contextStateLogTimestamps = new Map<string, number>();
+  private readonly realtimeFilter: RealtimeEngagementFilter | null;
+  private readonly costEstimator: LLMCostEstimator | null;
 
   /**
    * Creates an instance of MentionBotEvent
@@ -113,22 +149,36 @@ export class MessageCreate extends Event {
         messageRetentionMs: config.contextManager.messageRetentionMs,
         evictionIntervalMs: config.contextManager.evictionIntervalMs
       });
-      logger.info('ChannelContextManager enabled');
+      messageLogger.info('ChannelContextManager enabled');
       if (estimator) {
         estimator.setContextManager(this.contextManager);
-        logger.debug('Connected cost estimator to context manager');
+        messageLogger.debug('Connected cost estimator to context manager');
       }
     } else {
       this.contextManager = null;
-      logger.debug('ChannelContextManager disabled');
+      messageLogger.debug('ChannelContextManager disabled');
       if (estimator) {
         estimator.setContextManager(null);
       }
     }
 
-    logger.info(
-      `MessageCreate initialized with context manager: ${this.contextManager ? 'enabled' : 'disabled'}`
-    );
+    // Store cost estimator reference
+    this.costEstimator = estimator;
+
+    // Initialize realtime engagement filter if enabled
+    if (config.realtimeFilter.enabled) {
+      this.realtimeFilter = new RealtimeEngagementFilter(
+        config.engagementWeights,
+        config.engagementPreferences,
+        dependencies.openaiService
+      );
+      messageLogger.info('RealtimeEngagementFilter enabled');
+    } else {
+      this.realtimeFilter = null;
+      messageLogger.debug('RealtimeEngagementFilter disabled - using CatchupFilter fallback');
+    }
+
+    messageLogger.info(`MessageCreate initialized with context manager: ${this.contextManager ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -154,7 +204,7 @@ export class MessageCreate extends Event {
         this.contextManager.recordMessage(channelKey, message);
       } catch (error) {
         // Fail open - log but don't break message processing
-        logger.error(`Context manager failed to record message: ${(error as Error)?.message ?? error}`);
+        messageLogger.error(`Context manager failed to record message: ${(error as Error)?.message ?? error}`);
       }
     }
 
@@ -163,7 +213,7 @@ export class MessageCreate extends Event {
       this.resetCounter(channelKey);
       this.markBotMessageSent(channelKey);
 
-      logger.debug(`Reset message count for ${channelKey}: 0`);
+      messageLogger.debug(`Reset message count for ${channelKey}: 0`);
       return;
     }
 
@@ -189,7 +239,7 @@ export class MessageCreate extends Event {
           const metrics = this.contextManager.getMetrics(channelKey);
           if (metrics) {
             this.contextStateLogTimestamps.set(channelKey, now);
-            logger.debug(
+            messageLogger.debug(
               JSON.stringify({
                 event: 'context_state',
                 channelId: channelKey,
@@ -202,7 +252,7 @@ export class MessageCreate extends Event {
         }
       } catch (error) {
         // Fail open - log but don't break message processing
-        logger.debug(`Context manager state logging failed: ${(error as Error)?.message ?? error}`);
+        messageLogger.debug(`Context manager state logging failed: ${(error as Error)?.message ?? error}`);
       }
     }
 
@@ -217,12 +267,12 @@ export class MessageCreate extends Event {
       // Do not ignore if the message mentions the bot with @, or is a direct Discord reply
       // If the message is a direct mention of the bot, process it.
       if (this.isBotMentioned(message)) {
-        logger.debug(`Responding to mention in message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
+        messageLogger.debug(`Responding to mention in message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
         await this.messageProcessor.processMessage(message, true, `Mentioned with a direct ping`);
       }
       // If the message is a direct reply to the bot, process it.
       else if (this.isReplyToBot(message)) {
-        logger.debug(`Responding to reply with message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
+        messageLogger.debug(`Responding to reply with message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
         await this.messageProcessor.processMessage(message, true, `Replied to with a direct reply`);
       }
       // If we are within the catchup threshold, catch up.
@@ -230,19 +280,15 @@ export class MessageCreate extends Event {
         (messageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
         || (messageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
       ) {
-        logger.debug(`Catching up in ${channelKey} to message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
+        messageLogger.debug(`Catching up in ${channelKey} to message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
         this.resetCounter(channelKey); // Reset the counter for this channel
 
         if (!message.channel.isTextBased()) {
-          logger.debug(`Catchup filter bypassed for ${channelKey}; channel not text-based.`);
+          messageLogger.debug(`Catchup filter bypassed for ${channelKey}; channel not text-based.`);
           return;
         }
 
-        /**
-         * Apply the catchup filter to the message.
-         * - If the filter decides to skip the planner, return.
-         * - If the filter decides to proceed to the planner, process the message.
-         */
+        // Fetch recent messages for filter analysis
         try {
           const recentMessagesCollection = await message.channel.messages.fetch({
             limit: this.catchupFilter.RECENT_MESSAGE_WINDOW,
@@ -251,16 +297,86 @@ export class MessageCreate extends Event {
           const recentMessages = Array.from(recentMessagesCollection.values()).sort(
             (first, second) => first.createdTimestamp - second.createdTimestamp
           );
-          const filterDecision = await this.catchupFilter.shouldSkipPlanner(message, recentMessages, channelKey);
 
-          if (filterDecision.skip) {
-            logger.debug(`Catchup filter skipped planner for ${channelKey}: ${filterDecision.reason}`);
-            return;
+          // Use realtime filter if enabled, otherwise fall back to catchup filter
+          if (this.realtimeFilter) {
+            try {
+              // Gather context for realtime filter
+              const channelMetrics = this.contextManager?.getMetrics(channelKey) ?? null;
+              const channelId = message.channelId;
+              const costTotals = this.costEstimator?.getChannelTotals(channelId) ?? null;
+
+              const engagementContext: EngagementContext = {
+                message,
+                channelKey,
+                recentMessages,
+                channelMetrics,
+                costTotals
+              };
+
+              // Resolve channel-specific overrides if available
+              const channelOverrides = this.resolveChannelOverrides(channelKey);
+
+              // Get engagement decision with optional overrides
+              const decision = await this.realtimeFilter.decide(engagementContext, channelOverrides);
+
+              // Update engagement score in context manager if available
+              if (this.contextManager) {
+                try {
+                  this.contextManager.updateEngagementScore(channelKey, decision.score);
+                } catch (scoreError) {
+                  messageLogger.debug(`Failed to update engagement score: ${(scoreError as Error)?.message ?? scoreError}`);
+                }
+              }
+
+              // Log decision
+              messageLogger.debug(
+                JSON.stringify({
+                  event: 'engagement_decision',
+                  channelId: channelKey,
+                  score: decision.score,
+                  shouldRespond: decision.engage,
+                  reasons: decision.reasons,
+                  breakdown: decision.breakdown
+                })
+              );
+
+              // Handle decision
+              if (!decision.engage) {
+                // If preferences indicate reaction mode, react with emoji
+                if (config.engagementPreferences.ignoreMode === 'react') {
+                  try {
+                    const responseHandler = new ResponseHandler(message, message.channel, message.author);
+                    await responseHandler.addReaction(config.engagementPreferences.reactionEmoji);
+                    messageLogger.debug(`Reacted with ${config.engagementPreferences.reactionEmoji} for ${channelKey}: ${decision.reason}`);
+                  } catch (reactionError) {
+                    messageLogger.debug(`Failed to add reaction: ${(reactionError as Error)?.message ?? reactionError}`);
+                  }
+                } else {
+                  messageLogger.debug(`Realtime filter skipped engagement for ${channelKey}: ${decision.reason}`);
+                }
+                return;
+              }
+
+              messageLogger.debug(`Realtime filter passed for ${channelKey}, proceeding to planner`);
+            } catch (filterError) {
+              // Fail open - log error and proceed to planner
+              messageLogger.error(`Realtime engagement filter encountered an error for ${channelKey}: ${(filterError as Error)?.message ?? filterError}`);
+              messageLogger.debug(`Falling back to planner after realtime filter error`);
+            }
+          } else {
+            // Fall back to catchup filter (Phase 1)
+            const filterDecision = await this.catchupFilter.shouldSkipPlanner(message, recentMessages, channelKey);
+            if (filterDecision.skip) {
+              messageLogger.debug(`Catchup filter skipped planner for ${channelKey}: ${filterDecision.reason}`);
+              return;
+            }
+            messageLogger.debug(`Catchup filter passed for ${channelKey}, proceeding to planner`);
           }
-
-          logger.debug(`Catchup filter passed for ${channelKey}, proceeding to planner`);
-        } catch (filterError) {
-          logger.error(`Catchup filter encountered an error for ${channelKey}: ${(filterError as Error)?.message ?? filterError}`);
+        } catch (fetchError) {
+          // Fail open - if we can't fetch messages, proceed to planner
+          messageLogger.error(`Failed to fetch recent messages for filter analysis in ${channelKey}: ${(fetchError as Error)?.message ?? fetchError}`);
+          messageLogger.debug(`Proceeding to planner after message fetch error`);
         }
 
         // Process the message using the message processor.
@@ -388,7 +504,7 @@ export class MessageCreate extends Event {
    * @returns {Promise<void>}
    */
   private async handleError(error: unknown, message: Message): Promise<void> {
-    logger.error('Error in MentionBotEvent:', error);
+    messageLogger.error('Error in MentionBotEvent:', error);
 
     // Attempt to send an error reply to the user
     try {
@@ -397,7 +513,7 @@ export class MessageCreate extends Event {
         await message.reply(response);
       }
     } catch (replyError) {
-      logger.error('Failed to send error reply:', replyError);
+      messageLogger.error('Failed to send error reply:', replyError);
     }
   }
 
@@ -438,7 +554,7 @@ export class MessageCreate extends Event {
         state.lastUpdated = now;
         state.lastDirection = 'other';
         await this.reactToSuppressedBotMessage(message);
-        logger.debug(`Suppressed response to bot ${message.author.id} in ${channelKey} (cooldown active).`);
+        messageLogger.debug(`Suppressed response to bot ${message.author.id} in ${channelKey} (cooldown active).`);
         return true;
       }
 
@@ -457,7 +573,7 @@ export class MessageCreate extends Event {
     if (state.exchanges >= config.botInteraction.maxBackAndForth) {
       state.blockedUntil = now + this.BOT_INTERACTION_COOLDOWN_MS;
       await this.reactToSuppressedBotMessage(message);
-      logger.info(`Reached bot conversation limit with ${message.author.id} in ${channelKey}; suppressing replies.`);
+      messageLogger.info(`Reached bot conversation limit with ${message.author.id} in ${channelKey}; suppressing replies.`);
       return true;
     }
 
@@ -483,7 +599,7 @@ export class MessageCreate extends Event {
       const responseHandler = new ResponseHandler(message, message.channel, message.author);
       await responseHandler.addReaction(config.botInteraction.reactionEmoji);
     } catch (error) {
-      logger.warn('Failed to add reaction while suppressing bot conversation:', error);
+      messageLogger.warn('Failed to add reaction while suppressing bot conversation:', error);
     }
   }
 
@@ -513,5 +629,20 @@ export class MessageCreate extends Event {
         this.botConversationStates.delete(key);
       }
     }
+  }
+
+  /**
+   * Resolves channel-specific engagement overrides if available.
+   * For example, we might adjust rules for a "general" channel with more human activity.
+   * Currently returns undefined (no overrides), but can be extended to read
+   * from a database, configuration file, or environment variables.
+   * @param {string} channelKey - The channel identifier
+   * @returns {ChannelEngagementOverrides | undefined} Channel-specific overrides or undefined
+   */
+  private resolveChannelOverrides(channelKey: string): ChannelEngagementOverrides | undefined {
+    // TODO: Implement channel-specific override resolution
+    
+    // For now, return undefined to use global configuration
+    return undefined;
   }
 }
