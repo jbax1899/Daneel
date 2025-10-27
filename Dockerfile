@@ -5,11 +5,12 @@ WORKDIR /app
 # Provide the base tsconfig so the workspace's config extension resolves correctly.
 COPY tsconfig.json ./tsconfig.json
 
-# Copy only the package manifest first to leverage Docker layer caching for node_modules.
+# Copy package manifests first to leverage Docker layer caching for node_modules.
+COPY package.json ./package.json
 COPY packages/web/package.json packages/web/package.json
+COPY packages/ethics-core/package.json packages/ethics-core/package.json
 
-# Install frontend dependencies in isolation to keep the image lean.
-WORKDIR /app/packages/web
+# Install dependencies using workspace support
 RUN npm install
 
 # Bring in the remainder of the landing page source and produce the static dist bundle.
@@ -20,7 +21,7 @@ COPY packages/ethics-core/ /app/packages/ethics-core/
 ARG TURNSTILE_SITE_KEY
 ENV VITE_TURNSTILE_SITE_KEY=$TURNSTILE_SITE_KEY
 
-RUN npm run build
+RUN npm run build --workspace=@arete/web
 
 
 # Stage 2: Build the Discord bot
@@ -31,6 +32,7 @@ WORKDIR /app
 COPY package*.json ./
 COPY packages/discord-bot/package*.json packages/discord-bot/
 COPY packages/shared/package.json packages/shared/
+COPY packages/ethics-core/package.json packages/ethics-core/
 
 # Install dependencies (includes @discordjs/opus build)
 RUN npm install --include=dev
@@ -62,7 +64,6 @@ COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
 COPY --from=bot-builder /app/package.json ./package.json
 COPY --from=bot-builder /app/package-lock.json ./package-lock.json
 RUN npm install --production --ignore-scripts
-RUN cd packages/discord-bot && npm install --production
 
 # Copy the lightweight Node server used to host the static site
 COPY server.js ./server.js

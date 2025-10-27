@@ -20,7 +20,7 @@
     "watch": "tsc -w"
   },
   "dependencies": {
-    "@arete/shared": "file:../shared",
+    "@arete/shared": "^1.0.0",
     "ethics-core": "file:../ethics-core",
     "@openai/agents": "^0.1.8",
     "@pinecone-database/pinecone": "^6.1.2",
