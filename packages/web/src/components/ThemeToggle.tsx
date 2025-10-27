@@ -10,15 +10,40 @@ const ThemeToggle = (): JSX.Element => {
   const hasToggledRef = useRef(false);
   const minClickInterval = 150; // Minimum time between clicks in milliseconds
 
+  const playClickSoundDown = () => {
+    const audio = new Audio('/assets/click_mouse_down.ogg');
+    audio.volume = 0.7;
+    
+    audio.addEventListener('loadstart', () => console.log('Audio loading started'));
+    audio.addEventListener('canplay', () => console.log('Audio can play'));
+    audio.addEventListener('error', (e) => console.error('Audio error:', e));
+    
+    audio.play().catch(error => {
+      console.warn('Could not play click sound:', error);
+    });
+  };
+
+  const playClickSoundUp = () => {
+    const audio = new Audio('/assets/click_mouse_up.ogg');
+    audio.volume = 0.7;
+    
+    audio.addEventListener('loadstart', () => console.log('Audio loading started'));
+    audio.addEventListener('canplay', () => console.log('Audio can play'));
+    audio.addEventListener('error', (e) => console.error('Audio error:', e));
+    
+    audio.play().catch(error => {
+      console.warn('Could not play click sound:', error);
+    });
+  };
+
   const playClickSound = () => {
-    // Play one of the two .ogg files randomly
+    // For keyboard/touch events, play a random sound
     const audioFiles = ['/assets/click_mouse_down.ogg', '/assets/click_mouse_up.ogg'];
     const randomFile = audioFiles[Math.floor(Math.random() * audioFiles.length)];
     
     const audio = new Audio(randomFile);
-    audio.volume = 0.7; // Adjust volume as needed
+    audio.volume = 0.7;
     
-    // Add event listeners for debugging
     audio.addEventListener('loadstart', () => console.log('Audio loading started'));
     audio.addEventListener('canplay', () => console.log('Audio can play'));
     audio.addEventListener('error', (e) => console.error('Audio error:', e));
@@ -31,7 +56,7 @@ const ThemeToggle = (): JSX.Element => {
   const handleMouseDown = () => {
     mouseDownTimeRef.current = Date.now();
     hasToggledRef.current = false; // Reset toggle flag
-    playClickSound(); // Play first sound on mouse down
+    playClickSoundDown(); // Always play down sound on mouse down
   };
 
   const handleMouseUp = () => {
@@ -43,13 +68,13 @@ const ThemeToggle = (): JSX.Element => {
       hasToggledRef.current = true;
     }
     
-    // Play second sound with minimum delay between sounds
+    // Always play up sound on mouse up with minimum delay between sounds
     if (timeSinceMouseDown < minClickInterval) {
       setTimeout(() => {
-        playClickSound();
+        playClickSoundUp();
       }, minClickInterval - timeSinceMouseDown);
     } else {
-      playClickSound();
+      playClickSoundUp();
     }
   };
 
@@ -59,8 +84,9 @@ const ThemeToggle = (): JSX.Element => {
     if (!hasToggledRef.current) {
       toggleTheme();
       hasToggledRef.current = true;
+      playClickSound(); // Only play sound if mouse events didn't handle it
     }
-    playClickSound();
+    // If mouse events already handled it, don't play sound to avoid double sound
   };
 
   return (
