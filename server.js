@@ -554,6 +554,17 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
 
     // Generate AI response
     try {
+      // Check if openaiService is available before making API calls
+      if (!openaiService) {
+        res.statusCode = 503;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ 
+          error: 'Service temporarily unavailable. Please try again later.' 
+        }));
+        logRequest(req, res, 'reflect service-unavailable');
+        return;
+      }
+
       const systemPrompt = `You are Arete, an AI assistant that helps people think through tough questions while staying honest and fair. You explore multiple ethical perspectives, trace your sources, and show how you reach your conclusions. Be helpful, thoughtful, and transparent in your responses.`;
 
       const messages = [

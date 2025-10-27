@@ -225,7 +225,7 @@ export class CatchupFilter {
 
     // Collapse whitespace to evaluate pure emoji sequences.
     const squashed = trimmed.replace(/\s+/g, '');
-    const emojiRegex = /^(?:[\p{Extended_Pictographic}]|[\u{200D}]|[\u{FE0F}])+$/u;
+    const emojiRegex = /^(?:[\p{Extended_Pictographic}][\u{200D}\u{FE0F}]*)+$/u;
     if (emojiRegex.test(squashed)) {
       return true;
     }

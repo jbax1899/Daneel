@@ -29,22 +29,22 @@ const ThemeToggle = (): JSX.Element => {
 
   const handleMouseDown = () => {
     mouseDownTimeRef.current = Date.now();
-    playClickSound(); // Play immediately on mouse down
+    // Remove playClickSound() from here - only play on mouse up
   };
 
   const handleMouseUp = () => {
     const timeSinceMouseDown = Date.now() - mouseDownTimeRef.current;
     
-    // If mouse up happens too quickly after mouse down, delay the second click
+    // Always toggle theme immediately for responsive UX
+    toggleTheme();
+    
+    // Only delay sound if needed, but don't delay theme change
     if (timeSinceMouseDown < minClickInterval) {
       setTimeout(() => {
         playClickSound();
-        toggleTheme();
       }, minClickInterval - timeSinceMouseDown);
     } else {
-      // If enough time has passed, play immediately
       playClickSound();
-      toggleTheme();
     }
   };
 
