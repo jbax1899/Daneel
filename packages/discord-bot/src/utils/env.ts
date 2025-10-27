@@ -82,7 +82,11 @@ const DEFAULT_BOT_INTERACTION_LIMITS = {
 };
 
 /**
- * Default thresholds for the channel catch-up logic
+ * Default configuration for the channel catch-up logic
+ * @type {Object}
+ * @property {number} AFTER_MESSAGES - The number of messages to send after the last message
+ * @property {number} IF_MENTIONED_AFTER_MESSAGES - The number of messages to send if the user is mentioned
+ * @property {number} STALE_COUNTER_TTL_MS - The time to live for the stale counter
  */
 const DEFAULT_CATCH_UP_LIMITS = {
   AFTER_MESSAGES: 10,
@@ -90,11 +94,28 @@ const DEFAULT_CATCH_UP_LIMITS = {
   STALE_COUNTER_TTL_MS: 60 * 60_000
 } as const;
 
+/**
+ * Default configuration for the channel context manager
+ * @type {Object}
+ * @property {boolean} ENABLED - Whether the channel context manager is enabled
+ * @property {number} MAX_MESSAGES_PER_CHANNEL - The maximum number of messages to keep per channel
+ * @property {number} MESSAGE_RETENTION_MS - The time to keep messages per channel
+ * @property {number} EVICTION_INTERVAL_MS - The interval to evict messages per channel
+ */
 const DEFAULT_CONTEXT_MANAGER_CONFIG = {
   ENABLED: true,
   MAX_MESSAGES_PER_CHANNEL: 50,
   MESSAGE_RETENTION_MS: 60 * 60_000,
   EVICTION_INTERVAL_MS: 5 * 60_000
+} as const;
+
+/**
+ * Default configuration for the cost estimator
+ * @type {Object}
+ * @property {boolean} ENABLED - Whether the cost estimator is enabled
+ */
+const DEFAULT_COST_ESTIMATOR_CONFIG = {
+  ENABLED: true
 } as const;
 
 /**
@@ -115,9 +136,8 @@ function validateEnvironment() {
 // Validate environment variables on startup
 validateEnvironment();
 
-// Resolve the optional prompt override configuration path. Operators may point
-// this to a custom YAML file in production to tweak Daneel's behaviour without
-// redeploying code.
+// Resolve the optional prompt override configuration path. 
+// Allows pointing to a custom YAML file to tweak the bot's behavior.
 const rawPromptConfigPath = process.env.PROMPT_CONFIG_PATH;
 const promptConfigPath = rawPromptConfigPath
   ? path.isAbsolute(rawPromptConfigPath)
@@ -310,6 +330,7 @@ export const config = {
     allowedThreadIds: getStringArrayEnv('ALLOWED_THREAD_IDS', DEFAULT_VISIBILITY_LIMITS.ALLOWED_THREAD_IDS)
   },
 
+  // Channel context manager configuration
   contextManager: {
     enabled: getBooleanEnv('CONTEXT_MANAGER_ENABLED', DEFAULT_CONTEXT_MANAGER_CONFIG.ENABLED),
     maxMessagesPerChannel: getNumberEnv(
@@ -324,6 +345,11 @@ export const config = {
       'CONTEXT_MANAGER_EVICTION_INTERVAL_MS',
       DEFAULT_CONTEXT_MANAGER_CONFIG.EVICTION_INTERVAL_MS
     )
+  },
+
+  // Cost estimator configuration
+  costEstimator: {
+    enabled: getBooleanEnv('COST_ESTIMATOR_ENABLED', DEFAULT_COST_ESTIMATOR_CONFIG.ENABLED)
   }
 
 } as const;

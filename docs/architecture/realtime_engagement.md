@@ -74,7 +74,7 @@ The `recordLLMUsage()` method is implemented and ready for Phase 3's `LLMCostEst
 
 ---
 
-## Phase 3 — LLMCostEstimator
+## Phase 3 — LLMCostEstimator ✅
 **Goal:** Track OpenAI usage precisely so we can enforce cognitive budgets and keep an honest ledger.  
 **Key tasks:**  
 - Extend `pricing.ts` with typed model rate tables and helpers for prompt vs completion costs.  
@@ -85,7 +85,29 @@ The `recordLLMUsage()` method is implemented and ready for Phase 3's `LLMCostEst
   {"event":"llm_cost","requestId":"abc","channelId":"123","totalCostUsd":0.018,"budgetRemainingUsd":4.7}
   ```  
 - Feature flag: `COST_ESTIMATOR_ENABLED`.  
-**Deliverable:** Cost breakdowns stored in memory and logged for every OpenAI request, with budget math ready for later phases.
+**Implementation Notes:**
+- Created `src/utils/LLMCostEstimator.ts` with singleton pattern
+- Extended `pricing.ts` with `CostBreakdown` and `CumulativeTotals` types plus helper to attach metadata
+- Injected estimator into `OpenAIService` with optional `channelContext` so MessageProcessor/news/provenance can pass channel info
+- Cost tracking calls `ChannelContextManager.recordLLMUsage()` when both features are enabled
+- Added `COST_ESTIMATOR_ENABLED` flag in `env.ts` and documented in `.env.example`
+- Structured logs emitted: `llm_cost`, `llm_cost_reset`
+- Estimator fails open on errors and exposes getters/reset helpers for future phases
+- Per-channel tracking wired for primary chat flows; planner/context reduction log to global totals
+
+**Files Modified:**
+- `packages/discord-bot/src/utils/LLMCostEstimator.ts`
+- `packages/discord-bot/src/utils/pricing.ts`
+- `packages/discord-bot/src/utils/env.ts`
+- `packages/discord-bot/src/utils/openaiService.ts`
+- `packages/discord-bot/src/index.ts`
+- `packages/discord-bot/src/events/MessageCreate.ts`
+- `packages/discord-bot/src/utils/MessageProcessor.ts`
+- `packages/discord-bot/src/commands/news.ts`
+- `packages/discord-bot/src/utils/response/provenanceInteractions.ts`
+- `.env.example`
+
+**Deliverable:** ✅ Cost breakdowns stored in memory and logged for every OpenAI request. Per-channel, per-guild, and global totals maintained with ChannelContextManager integration complete.
 
 ---
 

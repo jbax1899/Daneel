@@ -193,7 +193,11 @@ const newsCommand: Command = {
           {
             ...openAIOptions,
             functions: [newsFunction],
-            function_call: { name: "generate_news_response" }
+            function_call: { name: "generate_news_response" },
+            channelContext: {
+              channelId: interaction.channelId ?? 'unknown',
+              guildId: interaction.guildId ?? undefined
+            }
           }
         ),
         timeoutPromise

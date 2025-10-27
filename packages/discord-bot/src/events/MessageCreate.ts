@@ -22,6 +22,7 @@ import { Planner } from '../utils/prompting/Planner.js';
 import { config } from '../utils/env.js';
 import { ResponseHandler } from '../utils/response/ResponseHandler.js';
 import { ChannelContextManager } from '../state/ChannelContextManager.js';
+import type { LLMCostEstimator } from '../utils/LLMCostEstimator.js';
 
 /**
  * Dependencies required for the MentionBotEvent
@@ -35,6 +36,7 @@ interface Dependencies {
     apiKey: string;
   };
   openaiService: OpenAIService;
+  costEstimator?: LLMCostEstimator | null;
 }
 
 /**
@@ -102,6 +104,8 @@ export class MessageCreate extends Event {
     });
     this.catchupFilter = new CatchupFilter(dependencies.openaiService);
 
+    const estimator = dependencies.costEstimator ?? null;
+
     if (config.contextManager.enabled) {
       this.contextManager = new ChannelContextManager({
         enabled: true,
@@ -110,9 +114,16 @@ export class MessageCreate extends Event {
         evictionIntervalMs: config.contextManager.evictionIntervalMs
       });
       logger.info('ChannelContextManager enabled');
+      if (estimator) {
+        estimator.setContextManager(this.contextManager);
+        logger.debug('Connected cost estimator to context manager');
+      }
     } else {
       this.contextManager = null;
       logger.debug('ChannelContextManager disabled');
+      if (estimator) {
+        estimator.setContextManager(null);
+      }
     }
 
     logger.info(
