@@ -41,3 +41,40 @@ Cursor and Traycer are configured to follow the project's ethical and technical 
 - `@arete-scope`: Logical role (core, utility, interface, test)
 - `@description`: 1-3 line summary of module purpose
 - `@impact`: Separate Risk and Ethics impact statements
+
+**Formatting Standards:**
+```typescript
+/**
+ * @arete-module: <ModuleName>
+ * @arete-risk: <critical|high|moderate|low>
+ * @arete-ethics: <critical|high|moderate|low>
+ * @arete-scope: <core|utility|interface|test>
+ * 
+ * @description
+ * <1-3 lines summarizing what this module does.>
+ * 
+ * @impact
+ * Risk: <What could break or be compromised if mishandled.>
+ * Ethics: <What human or governance effect errors could cause.>
+ */
+```
+
+### ARETE Scoped Logger Tagging
+- `@arete-logger`: Logger module identifier (matches the child logger name)
+- `@logs`: What specific operations, events, or data this logger logs
+- `@impact`: Separate Risk and Ethics impact statements for logging concerns
+
+**Formatting Standards:**
+```typescript
+/**
+ * @arete-logger: <loggerName>
+ * 
+ * @logs
+ * <What this scoped logger tracks and logs>
+ * 
+ * @impact
+ * Risk: <Logging-specific risks if any>
+ * Ethics: <Logging-specific ethical impacts if any>
+ */
+const <loggerName>Logger = logger.child({ module: '<loggerName>' });
+```

@@ -20,7 +20,8 @@ import fetch from 'node-fetch';
 import { logger } from './logger.js';
 import { renderPrompt } from './env.js';
 import { ActivityOptions } from 'discord.js';
-import { estimateTextCost, formatUsd, type GPT5ModelType } from './pricing.js';
+import { estimateTextCost, formatUsd, createCostBreakdown, type GPT5ModelType, type ModelCostBreakdown, type TextModelPricingKey } from './pricing.js';
+import type { LLMCostEstimator } from './LLMCostEstimator.js';
 
 // ====================
 // Type Declarations
@@ -30,11 +31,13 @@ export type { GPT5ModelType } from './pricing.js';
 export type SupportedModel = GPT5ModelType;
 export type EmbeddingModelType = 'text-embedding-3-small'; // Dimensions: 1546
 
+// Defines the structure of a message to be sent to the OpenAI API
 export interface OpenAIMessage {
   role: 'user' | 'assistant' | 'system' | 'developer';
   content: string;
 }
 
+// Defines the options for text-to-speech
 export type TTSOptions = {
   model: 'tts-1' | 'tts-1-hd' | 'gpt-4o-mini-tts';
   voice: 'alloy' | 'ash' | 'ballad' | 'coral' | 'echo' | 'fable' | 'nova' | 'onyx' | 'sage' | 'shimmer';
@@ -46,6 +49,9 @@ export type TTSOptions = {
   styleNote?: string;
 }
 
+/**
+ * Expands on the OpenAIMessage interface to include additional options.
+ */ 
 export interface OpenAIOptions {
   reasoningEffort?: 'minimal' | 'low' | 'medium' | 'high';
   verbosity?: 'low' | 'medium' | 'high';
@@ -72,8 +78,15 @@ export interface OpenAIOptions {
     type: 'function' | 'web_search';
     function: { name: string };
   } | 'none' | 'auto' | null;
+  channelContext?: {
+    channelId: string;
+    guildId?: string;
+  };
 }
 
+/**
+ * Expands on the OpenAIResponse interface to include additional options.
+ */
 export interface OpenAIResponse {
   normalizedText?: string | null;
   message?: {
@@ -97,21 +110,48 @@ export interface OpenAIResponse {
   metadata?: AssistantMetadataPayload | null; // Parsed footer metadata emitted via <ARETE_METADATA>{...}
 }
 
+/**
+ * Defines the structure of a citation from the OpenAI API.
+ * @interface AssistantMetadataCitation
+ * @property {string} title - The human-readable source name
+ * @property {URL} url - The normalized URL instance for downstream rendering
+ * @property {string} snippet - The optional short excerpt from the cited content
+ */
 export interface AssistantMetadataCitation {
-  title: string;           // Human-readable source name
-  url: URL;                // Normalized URL instance for downstream rendering
-  snippet?: string;        // Optional short excerpt from the cited content
+  title: string;
+  url: URL;
+  snippet?: string;
 }
 
+/**
+ * Allowed provenance values for assistant metadata.
+ * @type {ProvenanceValue}
+ * @property {string} Retrieved - The response was retrieved from a source
+ * @property {string} Inferred - The response was inferred from the context
+ * @property {string} Speculative - The response was speculative
+ */
+export type ProvenanceValue = 'Retrieved' | 'Inferred' | 'Speculative';
+
+/**
+ * Defines the structure of a payload from the OpenAI API.
+ * @interface AssistantMetadataPayload
+ * @property {ProvenanceValue} provenance - The provenance of the response
+ * @property {number} confidence - The confidence of the response
+ * @property {number} tradeoffCount - The number of value tradeoffs the model noted
+ * @property {AssistantMetadataCitation[]} citations - The citations from the response
+ * @property {unknown} rawPayload - The original JSON blob for diagnostics/fallback handling
+ */
 export interface AssistantMetadataPayload {
-  provenance?: string;     // Raw provenance flag (Retrieved/Inferred/Speculative)
-  confidence?: number;     // 0.0–1.0 certainty estimate
-  tradeoffCount?: number;  // Number of value tradeoffs the model noted
-  citations: AssistantMetadataCitation[]; // Fully parsed citation set
-  rawPayload: unknown;     // Original JSON blob for diagnostics/fallback handling
+  provenance?: ProvenanceValue;
+  confidence?: number;
+  tradeoffCount?: number;
+  citations: AssistantMetadataCitation[];
+  rawPayload: unknown;
 }
 
-// Extended interface for OpenAI Responses output items
+/**
+ * Extended interface for OpenAI Responses output items.
+ */
 interface ResponseOutputItemExtended {
   type?: string; // "reasoning", "function_call", "message", "image_generation_call", etc.
   role?: 'user' | 'assistant' | 'system' | 'developer';
@@ -164,23 +204,51 @@ export const TTS_DEFAULT_OPTIONS: TTSOptions = {
 // OpenAI Service Class
 // ====================
 
+/**
+ * Handles LLM interactions and API calls with the OpenAI API.
+ * @param {string} apiKey - The API key for the OpenAI API
+ * @param {LLMCostEstimator | undefined} costEstimator - The cost estimator to use
+ * @returns {OpenAIService} - The OpenAI service instance
+ */
 export class OpenAIService {
   private openai: OpenAI;
   public defaultModel: SupportedModel = DEFAULT_MODEL;
+  private costEstimator: LLMCostEstimator | null = null;
 
-  constructor(apiKey: string) {
+  constructor(apiKey: string, costEstimator?: LLMCostEstimator) {
     this.openai = new OpenAI({ apiKey });
+    this.costEstimator = costEstimator ?? null;
+    if (this.costEstimator) {
+      logger.debug('OpenAIService initialized with cost estimator');
+    }
     ensureDirectories();
   }
 
+  /**
+   * Generates a response from the OpenAI API.
+   * Entry point for unspecified model types.
+   * @param {SupportedModel} model - The model to use
+   * @param {OpenAIMessage[]} messages - The messages to send to the OpenAI API
+   * @param {OpenAIOptions} options - The options for the OpenAI API
+   * @returns {Promise<OpenAIResponse>} - The response from the OpenAI API
+   */
   public async generateResponse(
     model: SupportedModel = this.defaultModel,
     messages: OpenAIMessage[],
     options: OpenAIOptions = {}
   ): Promise<OpenAIResponse> {
+    // Currently only GPT-5 models are supported, as they are the most current and cost-effective.
+    //TODO: Add support for other model types
     return this.generateGPT5Response(model as GPT5ModelType, messages, options);
   }
 
+  /**
+   * Generates a response from the OpenAI API using GPT-5 models.
+   * @param {GPT5ModelType} model - The GPT-5 model to use
+   * @param {OpenAIMessage[]} messages - The messages to send to the OpenAI API
+   * @param {OpenAIOptions} options - The options for the OpenAI API
+   * @returns {Promise<OpenAIResponse>} - The response from the OpenAI API
+   */
   private async generateGPT5Response(
     model: GPT5ModelType,
     messagesInput: OpenAIMessage[],
@@ -259,7 +327,7 @@ export class OpenAIService {
             content: `The planner instructed you to perform a web search for: ${options.webSearch?.query}`
           }] : []),
           //...(options.ttsOptions ? [{ role: 'system' as const, content: `This message will be read as TTS. If appropriate, add a little emphasis with italics (wrap with *), bold (wrap with **), and/or UPPERCASE (shouting).` }] : []) 
-          //TODO: Always apppended, even if not tts
+          // TODO: This system message is always appended, even when TTS is not enabled. Consider adding logic to only include it if TTS options are present.
         ],
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
         ...(verbosity && { text: { verbosity } }),
@@ -375,6 +443,23 @@ export class OpenAIService {
         responsePayload.metadata = assistantMetadata;
       }
 
+      if (this.costEstimator && response.usage) {
+        try {
+          const breakdown: ModelCostBreakdown = createCostBreakdown(
+            model,
+            response.usage.input_tokens ?? 0,
+            response.usage.output_tokens ?? 0,
+            options.channelContext?.channelId,
+            options.channelContext?.guildId
+          );
+          this.costEstimator.recordCost(breakdown);
+        } catch (error) {
+          logger.error(
+            `Cost estimator failed in generateGPT5Response: ${(error as Error)?.message ?? error}`
+          );
+        }
+      }
+
       return responsePayload;
 
     } catch (error) {
@@ -386,6 +471,8 @@ export class OpenAIService {
   /**
    * Splits the assistant's raw reply into the human-facing body and the optional `<ARETE_METADATA>{...}` payload.
    * If parsing fails we drop the marker so users never see stray debug text.
+   * @param {string} rawOutputText - The raw output text from the OpenAI API
+   * @returns {text: string; metadata: AssistantMetadataPayload | null} - The text and metadata from the OpenAI API
    */
   private extractTextAndMetadata(rawOutputText: string): { text: string; metadata: AssistantMetadataPayload | null } {
     if (!rawOutputText) {
@@ -420,7 +507,10 @@ export class OpenAIService {
   }
 
   /**
-   * Validates the JSON metadata payload, coercing citation URLs into `URL` objects and discarding malformed entries.
+   * Validates the JSON metadata payload.
+   * Coerces citation URLs into `URL` objects and discards malformed entries.
+   * @param {unknown} candidate - The candidate metadata payload to normalize
+   * @returns {AssistantMetadataPayload | null} - The normalized metadata payload
    */
   private normalizeAssistantMetadata(candidate: unknown): AssistantMetadataPayload | null {
     if (!candidate || typeof candidate !== 'object') {
@@ -461,11 +551,11 @@ export class OpenAIService {
 
     // Tighten and coerce fields according to verification notes
     // Allowed provenance values
-    const allowedProvenance = new Set(['Retrieved', 'Inferred', 'Speculative']);
+    const allowedProvenance: Set<ProvenanceValue> = new Set(['Retrieved', 'Inferred', 'Speculative']);
 
     // Provenance: accept only allowed values
-    const provenance = typeof record.provenance === 'string' && allowedProvenance.has(record.provenance)
-      ? record.provenance
+    const provenance: ProvenanceValue | undefined = typeof record.provenance === 'string' && allowedProvenance.has(record.provenance as ProvenanceValue)
+      ? (record.provenance as ProvenanceValue)
       : undefined;
 
     // Confidence: clamp numeric values to [0,1]
@@ -532,6 +622,14 @@ export class OpenAIService {
     return s;
   }
 
+  /**
+   * Generates a speech file using the OpenAI API.
+   * @param {string} input - The input text to convert to speech
+   * @param {TTSOptions} instructions - The instructions for the TTS
+   * @param {string} filename - The name of the output file
+   * @param {string} format - The format of the output file
+   * @returns {Promise<string>} - The path to the generated speech file
+   */
   public async generateSpeech(
     input: string, 
     instructions: TTSOptions,
@@ -573,9 +671,17 @@ export class OpenAIService {
     }
   }
 
+  /**
+   * Generates a description of an image using the OpenAI API.
+   * @param {string} imageUrl - The URL of the image to describe
+   * @param {string} context - The context to use for the description
+   * @param channelContext - Optional channel attribution for cost tracking
+   * @returns {Promise<OpenAIResponse>} - The response from the OpenAI API
+   */
   public async generateImageDescription(
     imageUrl: string, // URL from Discord attachment
-    context?: string
+    context?: string,
+    channelContext?: { channelId: string; guildId?: string }
   ): Promise<OpenAIResponse> {
     try {
       // Download the image from the URL
@@ -636,6 +742,22 @@ export class OpenAIService {
           };
         })() : undefined
       };
+      if (this.costEstimator && chatResponse.usage) {
+        try {
+          const breakdown: ModelCostBreakdown = createCostBreakdown(
+            IMAGE_DESCRIPTION_MODEL as GPT5ModelType,
+            chatResponse.usage.prompt_tokens || 0,
+            chatResponse.usage.completion_tokens || 0,
+            channelContext?.channelId,
+            channelContext?.guildId
+          );
+          this.costEstimator.recordCost(breakdown);
+        } catch (error) {
+          logger.error(
+            `Cost estimator failed in generateImageDescription: ${(error as Error)?.message ?? error}`
+          );
+        }
+      }
       logger.debug(`Image description generated: ${imageDescriptionResponse.message?.content}${imageDescriptionResponse.usage ? ` (Cost: ${imageDescriptionResponse.usage.cost})` : ''}`);
       return imageDescriptionResponse;
     } catch (error) {
@@ -655,6 +777,25 @@ export class OpenAIService {
       input: text,
       dimensions
     });
+
+    if (this.costEstimator) {
+      try {
+        const promptTokens =
+          embedding.usage?.prompt_tokens ??
+          Math.max(1, Math.ceil(text.length / 4)); // Rough heuristic when API omits usage; ~4 chars per token.
+        const breakdown = createCostBreakdown(
+          DEFAULT_EMBEDDING_MODEL as TextModelPricingKey,
+          promptTokens,
+          0,
+          undefined,
+          undefined
+        );
+        this.costEstimator.recordCost(breakdown);
+      } catch (error) {
+        logger.error(`Cost estimator failed in embedText: ${(error as Error)?.message ?? error}`);
+      }
+    }
+
     return embedding.data[0].embedding;
   }
 
@@ -747,6 +888,22 @@ export class OpenAIService {
             response.usage?.completion_tokens || 0
           );
           logger.debug(`Estimated cost of reduction: ${formatUsd(reductionCost.totalCost)}`);
+          if (this.costEstimator && response.usage) {
+            try {
+              const breakdown: ModelCostBreakdown = createCostBreakdown(
+                REDUCTION_MODEL as GPT5ModelType,
+                response.usage.prompt_tokens || 0,
+                response.usage.completion_tokens || 0,
+                undefined,
+                undefined
+              );
+              this.costEstimator.recordCost(breakdown);
+            } catch (error) {
+              logger.error(
+                `Cost estimator failed in reduceContext: ${(error as Error)?.message ?? error}`
+              );
+            }
+          }
         }
       } catch (error) {
         logger.error('Error reducing context:', error);
@@ -759,6 +916,10 @@ export class OpenAIService {
   }
 }
 
+/**
+ * Ensures that the output directories exist.
+ * @returns {Promise<void>} - A promise that resolves when the directories are created
+ */
 async function ensureDirectories(): Promise<void> {
   if (isDirectoryInitialized) return;
   

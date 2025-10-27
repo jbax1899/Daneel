@@ -28,10 +28,11 @@ The `cursor.dictionary` file contains ARETE-specific terms to prevent auto-corre
 - Technical terms (RealtimeAudioHandler, ChannelContextManager, etc.)
 
 ### Code Patterns
-- Structured logging with `logger.ts`
+- Structured logging with `logger.ts` and scoped loggers
 - Cost tracking with `ChannelContextManager.recordLLMUsage()`
 - Error handling with try/catch and informative messages
 - Risk/ethics tags in module headers
+- Scoped logger tagging with `@arete-logger` and `@logs`
 - Async/await over promises
 
 ### Available Tasks
@@ -47,5 +48,6 @@ Cursor will automatically use these configurations when working in the ARETE pro
 - Understand ARETE's ethical framework and principles
 - Maintain risk/ethics tags when making changes
 - Follow established code patterns and conventions
-- Use appropriate logging and error handling
+- Use appropriate logging and error handling with scoped loggers
 - Respect the domain-specific vocabulary
+- Apply proper formatting standards for module and logger headers

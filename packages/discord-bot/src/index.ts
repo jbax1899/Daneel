@@ -63,6 +63,8 @@ import {
   describeTokenAvailability,
   refundImageTokens
 } from './utils/imageTokens.js';
+import { LLMCostEstimator } from './utils/LLMCostEstimator.js';
+import type { ChannelContextManager } from './state/ChannelContextManager.js';
 // Alternative lens workflow utilities (session state + interaction handlers)
 import {
   ALTERNATIVE_LENS_MODAL_PREFIX,
@@ -91,8 +93,20 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Set up cost estimator if enabled, to track OpenAI API usage and costs
+let costEstimator: LLMCostEstimator | undefined = undefined;
+if (config.costEstimator.enabled) {
+  costEstimator = new LLMCostEstimator({
+    enabled: true,
+    contextManager: null as ChannelContextManager | null
+  });
+  logger.info('LLMCostEstimator initialized');
+} else {
+  logger.debug('LLMCostEstimator disabled by configuration');
+}
+
 // Initialize OpenAI service
-export const openaiService = new OpenAIService(config.openaiApiKey); // Exported for use in other files, like /news command
+export const openaiService = new OpenAIService(config.openaiApiKey, costEstimator); // Exported for use in other files, like /news command
 
 // ====================
 // Client Configuration
@@ -114,7 +128,8 @@ const client = new Client({
 const commandHandler = new CommandHandler();
 const eventManager = new EventManager(client, {
   openai: { apiKey: config.openaiApiKey },
-  openaiService
+  openaiService,
+  costEstimator
 });
 
 // Initialize client handlers
@@ -487,7 +502,8 @@ client.on(Events.InteractionCreate, async interaction => {
             messageText,
             confidence: metadata?.confidence,
             tradeoffCount: metadata?.tradeoffCount,
-            chainHash: metadata?.chainHash
+            chainHash: metadata?.chainHash,
+            channelId: interaction.channelId ?? undefined
           },
           plannerOptions
         );

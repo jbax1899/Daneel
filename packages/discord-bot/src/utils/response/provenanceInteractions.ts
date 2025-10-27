@@ -291,6 +291,7 @@ export function buildLensPayload(session: AlternativeLensSession): {
 export interface AlternativeLensGenerationContext {
   messageText: string;
   metadata: ResponseMetadata | null;
+  channelId?: string;
 }
 
 export interface AlternativeLensPayload {
@@ -305,6 +306,7 @@ export interface ExplanationContext {
   tradeoffCount?: number;
   chainHash?: string;
   reasoningTrace?: string;
+  channelId?: string;
 }
 
 const DEFAULT_ALT_LENS_MODEL: SupportedModel = 'gpt-5-mini';
@@ -348,7 +350,18 @@ export async function generateAlternativeLensMessage(
     ...(openaiOptions ?? {})
   };
 
-  const response = await openaiService.generateResponse(DEFAULT_ALT_LENS_MODEL, messages, requestOptions);
+  const response = await openaiService.generateResponse(
+    DEFAULT_ALT_LENS_MODEL,
+    messages,
+    {
+      ...requestOptions,
+      channelContext:
+        requestOptions.channelContext ??
+        (context.channelId
+          ? { channelId: context.channelId, guildId: undefined }
+          : undefined)
+    }
+  );
 
   const text = response.message?.content?.trim();
   if (!text) {
@@ -408,7 +421,18 @@ export async function generateExplanationMessage(
     ...(openaiOptions ?? {})
   };
 
-  const response = await openaiService.generateResponse(DEFAULT_ALT_LENS_MODEL, messages, requestOptions);
+  const response = await openaiService.generateResponse(
+    DEFAULT_ALT_LENS_MODEL,
+    messages,
+    {
+      ...requestOptions,
+      channelContext:
+        requestOptions.channelContext ??
+        (context.channelId
+          ? { channelId: context.channelId, guildId: undefined }
+          : undefined)
+    }
+  );
 
   const text = response.message?.content?.trim();
   if (!text) {
@@ -898,7 +922,8 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
       openaiService,
       {
         messageText: session.context.messageText,
-        metadata: session.context.metadata
+        metadata: session.context.metadata,
+        channelId: session.context.channelId
       },
       lens,
       plannerOptions
