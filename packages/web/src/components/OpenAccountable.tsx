@@ -16,9 +16,9 @@ const PRINCIPLES: Principle[] = [
       'Keep your keys and choose the deployment path. Steward the conversations that flow through your spaces.',
   },
   {
-    title: 'Permissive license',
+    title: 'Dual license',
     description:
-      'The MIT license keeps Daneel adaptable. Carry forward what helps, share discoveries back when you can.',
+      'MIT + Hippocratic License v3 licensing keeps ARETE adaptable while ensuring ethical use. Freedom with responsibility.',
   },
 ];
 

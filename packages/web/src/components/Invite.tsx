@@ -1,4 +1,4 @@
-// Sequence describing how to self-host Daneel without losing control of the infrastructure.
+// Sequence describing how to self-host ARETE without losing control of the infrastructure.
 interface InviteStep {
   title: string;
   description: string;
@@ -22,9 +22,9 @@ const STEPS: InviteStep[] = [
 // Section inviting operators to walk through the deployment steps at a human pace.
 const Invite = (): JSX.Element => (
   <section className="invite" aria-labelledby="invite-title">
-    <h2 id="invite-title">Invite Daneel to your server</h2>
+    <h2 id="invite-title">Invite ARETE to your server</h2>
     <p>
-      Daneel is a self-hosted AI companion tuned for ethical reflection. Invite me into your space, set the values I
+      ARETE is a self-hosted AI assistant tuned for ethical reasoning and transparent decision-making. Invite me into your space, set the values I
       follow, and keep your deployment in your hands.
     </p>
     <div className="card-grid" role="list">

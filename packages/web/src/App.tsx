@@ -1,11 +1,10 @@
 import { Routes, Route } from 'react-router-dom';
 import Hero from '@components/Hero';
-import MeetDaneel from '@components/MeetDaneel';
+import MeetArete from '@components/MeetArete';
 import Invite from '@components/Invite';
 import Services from '@components/Services';
 import Arete from '@components/Arete';
 import OpenAccountable from '@components/OpenAccountable';
-import EthicsNote from '@components/EthicsNote';
 import Footer from '@components/Footer';
 import TracePage from '@pages/TracePage';
 
@@ -18,10 +17,9 @@ const App = (): JSX.Element => (
         element={(
           <main>
             <Hero />
-            <MeetDaneel />
+            <MeetArete />
             <Services />
             <OpenAccountable />
-            <EthicsNote />
             <Invite />
             <Arete />
             <Footer />

@@ -2,11 +2,11 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 // Provide a stable fallback response in case the backend is unavailable so the space stays welcoming.
 const FALLBACK_REFLECTION =
-  'Even without a live connection, remember: quiet consistency is the soil where trust grows.';
+  'Even without a live connection, remember: ethical reasoning requires patience, transparency, and care for others.';
 
-const MeetDaneel = (): JSX.Element => {
+const MeetArete = (): JSX.Element => {
   const [question, setQuestion] = useState('');
-  const [status, setStatus] = useState('Offer a question about values, choices, or change — and I’ll return a short note.');
+  const [status, setStatus] = useState('Offer a thoughtful question, and I\'ll return a short reflection.');
   const [answer, setAnswer] = useState('');
   const [displayedAnswer, setDisplayedAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -70,7 +70,7 @@ const MeetDaneel = (): JSX.Element => {
       setStatus('A brief reflection:');
       setAnswer(
         reflection?.trim() ||
-          'I would begin by inviting patience, then consider what kindness requires.',
+          'I would begin by examining the ethical principles involved, then consider what transparency and care require.',
       );
     } catch (error) {
       if ((error as Error).name === 'AbortError') {
@@ -97,7 +97,7 @@ const MeetDaneel = (): JSX.Element => {
       <div className="bio-wrapper">
         <div className="profile-placeholder" aria-describedby="portrait-caption">
           <div className="profile-inner" aria-hidden="true">
-            <span className="profile-initial">D</span>
+            <span className="profile-initial">A</span>
           </div>
           <p id="portrait-caption" className="profile-caption">
             {portraitLabel.caption}
@@ -105,15 +105,15 @@ const MeetDaneel = (): JSX.Element => {
         </div>
 
         <div className="meet-copy">
-          <h2 id="meet-title">Meet Daneel</h2>
+          <h2 id="meet-title">Meet ARETE</h2>
           <p>
-            I keep a quiet presence within the principles you choose, staying composed when conversations quicken and
-            gentle when decisions feel heavy.
+            I maintain ethical principles while helping you reason through complex decisions. I explain my thinking,
+            respect your privacy, and provide transparent assistance for thoughtful communities.
           </p>
 
           <div className="interaction">
-            <p className="interaction-subtitle">Daneel runs here, too.</p>
-            <strong className="interaction-heading">Offer a thoughtful question</strong>
+            <p className="interaction-subtitle">ARETE runs here, too.</p>
+            <strong className="interaction-heading">Ask an ethical question</strong>
             <form className="interaction-form" onSubmit={onSubmit}>
               <input
                 id="question-input"
@@ -121,7 +121,7 @@ const MeetDaneel = (): JSX.Element => {
                 name="question"
                 value={question}
                 onChange={(event) => setQuestion(event.target.value)}
-                placeholder="How do I stay true to my values?"
+                placeholder="How do I make good choices?"
                 autoComplete="off"
                 ref={inputRef}
               />
@@ -143,4 +143,4 @@ const MeetDaneel = (): JSX.Element => {
   );
 };
 
-export default MeetDaneel;
+export default MeetArete;
