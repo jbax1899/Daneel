@@ -42,7 +42,6 @@ const TracePage = (): JSX.Element => {
   const [traceData, setTraceData] = useState<ServerMetadata | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
-  // For now, show a placeholder since the server doesn't have trace endpoints yet
   useEffect(() => {
     if (!responseId) {
       setLoadingState('error');
@@ -50,29 +49,85 @@ const TracePage = (): JSX.Element => {
       return;
     }
 
-    // Simulate loading and then show placeholder data
-    const timer = setTimeout(() => {
-      setLoadingState('success');
-      setTraceData({
-        id: responseId,
-        timestamp: new Date().toISOString(),
-        model: 'gpt-5-mini',
-        reasoningEffort: 'low',
-        runtimeContext: {
-          modelVersion: 'gpt-5-mini',
-          conversationSnapshot: 'Placeholder conversation data'
-        },
-        usage: {
-          input_tokens: 0,
-          output_tokens: 0,
-          total_tokens: 0
-        },
-        finishReason: 'stop',
-        staleAfter: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-      });
-    }, 1000);
+    let isMounted = true;
 
-    return () => clearTimeout(timer);
+    const loadTrace = async () => {
+      setLoadingState('loading');
+      setErrorMessage('');
+      setTraceData(null);
+
+      try {
+        const response = await fetch(`/trace/${responseId}.json`);
+
+        if (response.status === 200) {
+          const payload = (await response.json()) as SerializableResponseMetadata;
+
+          if (!isMounted) {
+            return;
+          }
+
+          setTraceData(payload);
+          setLoadingState('success');
+          return;
+        }
+
+        if (response.status === 404) {
+          if (!isMounted) {
+            return;
+          }
+
+          setLoadingState('not-found');
+          return;
+        }
+
+        if (response.status === 410) {
+          const payload = extractPayload(await response.json().catch(() => null));
+
+          if (!isMounted) {
+            return;
+          }
+
+          if (payload) {
+            setTraceData(payload);
+          }
+
+          setLoadingState('stale');
+          return;
+        }
+
+        if (response.status === 409) {
+          if (!isMounted) {
+            return;
+          }
+
+          setLoadingState('hash-mismatch');
+          return;
+        }
+
+        const message = await response.text();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(message || 'Failed to load trace.');
+        setLoadingState('error');
+
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setErrorMessage(error instanceof Error ? error.message : 'Failed to load trace.');
+        setLoadingState('error');
+      }
+    };
+
+    void loadTrace();
+
+    return () => {
+      isMounted = false;
+    };
   }, [responseId]);
 
   if (loadingState === 'loading') {

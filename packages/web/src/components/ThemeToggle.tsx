@@ -48,12 +48,19 @@ const ThemeToggle = (): JSX.Element => {
     }
   };
 
+  const handleClick = () => {
+    // Handle keyboard (Enter/Space) and touch events
+    toggleTheme();
+    playClickSound();
+  };
+
   return (
     <button 
       type="button" 
       className="theme-toggle" 
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
+      onClick={handleClick}
       aria-label={label}
     >
       <span className="theme-toggle-text">{label}</span>

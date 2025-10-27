@@ -44,6 +44,7 @@
         "class-variance-authority": "^0.7.1",
         "clsx": "^2.1.1",
         "crypto": "^1.0.1",
+        "dotenv": "^16.4.5",
         "js-yaml": "^4.1.0",
         "langchain": "^0.3.34",
         "lucide-react": "^0.539.0",
