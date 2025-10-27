@@ -275,9 +275,10 @@ export class MessageCreate extends Event {
         messageLogger.debug(`Responding to reply with message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
         await this.messageProcessor.processMessage(message, true, `Replied to with a direct reply`);
       }
-      // If we are within the catchup threshold, catch up.
+      // Check engagement filter for all messages (if enabled), or use catchup threshold for legacy fallback
       else if (
-        (messageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
+        this.realtimeFilter // if realtime filter is enabled, check every message
+        || (messageCount >= this.CATCHUP_AFTER_MESSAGES) // if we are within the -regular- catchup threshold, catch up
         || (messageCount >= this.CATCHUP_IF_MENTIONED_AFTER_MESSAGES && message.content.toLowerCase().includes(message.client.user!.username.toLowerCase())) // if we were mentioned by name (plaintext), and are within the -mention- catchup threshold, catch up
       ) {
         messageLogger.debug(`Catching up in ${channelKey} to message ID ${message.id} from ${message.author.id} in channel ${message.channel.id} (${message.channel.type})`);
@@ -328,15 +329,27 @@ export class MessageCreate extends Event {
                 }
               }
 
-              // Log decision
+              // Log decision with enhanced context
               messageLogger.debug(
                 JSON.stringify({
                   event: 'engagement_decision',
                   channelId: channelKey,
                   score: decision.score,
+                  threshold: config.engagementPreferences.minEngageThreshold,
+                  thresholdMet: decision.score >= config.engagementPreferences.minEngageThreshold,
                   shouldRespond: decision.engage,
                   reasons: decision.reasons,
-                  breakdown: decision.breakdown
+                  breakdown: decision.breakdown,
+                  messageContent: message.content?.substring(0, 100) + (message.content?.length > 100 ? '...' : ''),
+                  messageAuthor: message.author.username,
+                  messageId: message.id,
+                  recentMessageCount: recentMessages.length,
+                  channelMetrics: channelMetrics ? {
+                    totalMessages: channelMetrics.totalMessages,
+                    humanMessages: channelMetrics.humanMessages,
+                    botMessages: channelMetrics.botMessages,
+                    lastEngagementScore: channelMetrics.lastEngagementScore
+                  } : null
                 })
               );
 
@@ -366,6 +379,18 @@ export class MessageCreate extends Event {
           } else {
             // Fall back to catchup filter (Phase 1)
             const filterDecision = await this.catchupFilter.shouldSkipPlanner(message, recentMessages, channelKey);
+            messageLogger.debug(
+              JSON.stringify({
+                event: 'catchup_filter_decision',
+                channelId: channelKey,
+                shouldSkip: filterDecision.skip,
+                reason: filterDecision.reason,
+                messageContent: message.content?.substring(0, 100) + (message.content?.length > 100 ? '...' : ''),
+                messageAuthor: message.author.username,
+                messageId: message.id,
+                recentMessageCount: recentMessages.length
+              })
+            );
             if (filterDecision.skip) {
               messageLogger.debug(`Catchup filter skipped planner for ${channelKey}: ${filterDecision.reason}`);
               return;

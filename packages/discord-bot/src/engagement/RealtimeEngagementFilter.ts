@@ -307,10 +307,10 @@ export class RealtimeEngagementFilter {
    * Score based on question marks and interrogatives (words that indicate a question)
    * Normalized to [0, 1], ranging from low to high engagement.
    * How it works:
-   * - If the message contains a question mark, the score is 0.2.
-   * - If the message contains an interrogative word, the score is 0.3.
-   * - If the message contains a question pattern, the score is 0.2.
-   * - If the message does not contain a question mark, interrogative word, or question pattern, the score is 0.0.
+   * - If the message contains a question mark, the score is 0.2 per mark.
+   * - If the message contains an interrogative word (including contractions), the score is 0.3.
+   * - If the message contains a common question phrase, the score is 0.4.
+   * - If the message does not contain any question indicators, the score is 0.0.
    * @param {EngagementContext} context - The context for the engagement decision
    * @returns {number} The score for the question
    */
@@ -325,16 +325,16 @@ export class RealtimeEngagementFilter {
     const questionMarks = (content.match(/\?/g) || []).length;
     score += Math.min(0.5, questionMarks * 0.2);
 
-    // Check for interrogative words
-    const interrogatives = /\b(who|what|where|when|why|how|can|could|should|would|is|are|do|does|did|will|would|have|has|had)\b/;
+    // Check for interrogative words (including contractions)
+    const interrogatives = /\b(who|what|where|when|why|how|can|could|should|would|is|are|do|does|did|will|would|have|has|had|whats|wheres|whens|whys|hows|whos)\b/;
     if (interrogatives.test(lower)) {
       score += 0.3;
     }
 
-    // Check for question patterns
-    const questionPatterns = /\b(please|anyone|someone|anybody|somebody)\b/;
-    if (questionPatterns.test(lower)) {
-      score += 0.2;
+    // Check for common question phrases
+    const questionPhrases = /\b(whats up|how are you|how is it|how goes|what about|how about|what do you|how do you|can you|could you|would you|should you|will you|do you|are you|is it|was it|were you|have you|has it|had you)\b/;
+    if (questionPhrases.test(lower)) {
+      score += 0.4; // Higher score for complete question phrases
     }
 
     return this.normalizeScore(score, 0, 1);
@@ -551,8 +551,13 @@ export class RealtimeEngagementFilter {
       channelId: context.channelKey,
       score: decision.score,
       engage: decision.engage,
+      threshold: preferences.minEngageThreshold,
+      thresholdMet: decision.score >= preferences.minEngageThreshold,
       reasons: decision.reasons,
-      breakdown: decision.breakdown
+      breakdown: decision.breakdown,
+      messageContent: context.message.content?.substring(0, 100) + (context.message.content?.length > 100 ? '...' : ''),
+      messageAuthor: context.message.author.username,
+      messageId: context.message.id
     });
 
     return decision;
