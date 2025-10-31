@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import ThemeToggle from '@components/ThemeToggle';
 import Footer from '@components/Footer';
+import Breadcrumb from '@components/Breadcrumb';
 
 const InvitePage: React.FC = () => {
   const [cloneToast, setCloneToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -12,6 +13,12 @@ const InvitePage: React.FC = () => {
   const [deployToast, setDeployToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [requiredToast, setRequiredToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
   const [optionalToast, setOptionalToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+
+  // Breadcrumb items for invite page
+  const breadcrumbItems = [
+    { label: 'Home', path: '/' },
+    { label: 'Self-Hosting Setup' }
+  ];
 
   const showToast = (setter: any, message: string) => {
     setter({ message, visible: true });
@@ -24,9 +31,9 @@ const InvitePage: React.FC = () => {
       <header className="site-header" aria-label="Site header">
         <div className="site-title-group">
           <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <h1 className="site-mark">ARETE</h1>
+            <p className="site-mark">ARETE</p>
           </Link>
-          <p className="site-tagline">Self-Hosting Setup Guide</p>
+          <Breadcrumb items={breadcrumbItems} />
         </div>
         <ThemeToggle />
       </header>
@@ -37,8 +44,7 @@ const InvitePage: React.FC = () => {
           <div className="hero-copy">
             <h1 id="hero-title">Self-Host ARETE</h1>
             <p>
-              ARETE cannot be directly invited to Discord servers. Instead, you need to set up your own instance 
-              with your Discord bot token and API keys. Follow this guide to get started.
+              Ethics-first AI built for thoughtful conversations. I share how I think and respect your privacy at every step. Open-source, easy to host and invite to your Discord community.
             </p>
           </div>
         </section>

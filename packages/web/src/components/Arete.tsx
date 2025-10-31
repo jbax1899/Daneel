@@ -32,9 +32,6 @@ const Arete = (): JSX.Element => (
         <p>
           I'm built for privacy and easy self-hosting, tying Discord and AI together to create a natural conversation experience that anyone can participate in.
         </p>
-        <a className="inline-cta" href="https://github.com/arete-org/arete" target="_blank" rel="noreferrer">
-          Learn more about ARETE's development
-        </a>
       </div>
     </div>
   </section>

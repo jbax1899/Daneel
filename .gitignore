@@ -6,6 +6,10 @@ node_modules/
 .env.*
 !.env.example
 
+# GitHub App private keys
+keys/
+*.pem
+
 # Discord bot logs
 packages/discord-bot/logs/
 

@@ -1,11 +1,8 @@
-/*
- * Simplified Node server for the web frontend API.
- * This is a minimal implementation that provides the /api/reflect endpoint
- * without the complex discord-bot dependencies.
- */
 const http = require('node:http');
 const fs = require('node:fs/promises');
+const fsPromises = require('node:fs/promises');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 // Load environment variables from .env file
 require('dotenv').config();
@@ -55,6 +52,92 @@ function extractTextAndMetadata(rawOutputText) {
   } catch (error) {
     console.warn('Failed to parse assistant metadata payload:', error);
     return { normalizedText: conversationalPortion, metadata: null };
+  }
+}
+
+/**
+ * Verifies GitHub webhook signature using HMAC-SHA256
+ */
+function verifyGitHubSignature(secret, body, signature) {
+  try {
+    const expectedSignature = 'sha256=' + crypto.createHmac('sha256', secret).update(body).digest('hex');
+    
+    // Convert both signatures to buffers
+    const expectedBuffer = Buffer.from(expectedSignature, 'utf8');
+    const receivedBuffer = Buffer.from(signature, 'utf8');
+    
+    // Check if buffers have the same length before comparison
+    if (expectedBuffer.length !== receivedBuffer.length) {
+      return false;
+    }
+    
+    return crypto.timingSafeEqual(expectedBuffer, receivedBuffer);
+  } catch (error) {
+    console.error('Error verifying GitHub signature:', error);
+    return false;
+  }
+}
+
+/**
+ * Writes a blog post to the file system based on GitHub discussion data
+ */
+async function writeBlogPost(discussion) {
+  const BLOG_POSTS_DIR = path.join(__dirname, 'packages', 'web', 'public', 'blog-posts');
+  
+  try {
+    await fsPromises.mkdir(BLOG_POSTS_DIR, { recursive: true });
+    
+    const postObject = {
+      number: discussion.number,
+      title: discussion.title,
+      body: discussion.body,
+      author: {
+        login: discussion.user.login,
+        avatarUrl: discussion.user.avatar_url,
+        profileUrl: discussion.user.html_url
+      },
+      createdAt: discussion.created_at,
+      updatedAt: discussion.updated_at,
+      discussionUrl: discussion.html_url,
+      commentCount: discussion.comments || 0
+    };
+    
+    const postFilePath = path.join(BLOG_POSTS_DIR, `${discussion.number}.json`);
+    await fsPromises.writeFile(postFilePath, JSON.stringify(postObject, null, 2));
+    
+    const indexFilePath = path.join(BLOG_POSTS_DIR, 'index.json');
+    let indexArray = [];
+    try {
+      const indexContent = await fsPromises.readFile(indexFilePath, 'utf8');
+      indexArray = JSON.parse(indexContent);
+    } catch (error) {
+      // If file doesn't exist or is invalid, start with empty array
+      indexArray = [];
+    }
+    
+    // Remove existing entry if present
+    indexArray = indexArray.filter(post => post.number !== discussion.number);
+    
+    // Add new/updated entry
+    indexArray.push({
+      number: discussion.number,
+      title: discussion.title,
+      author: {
+        login: discussion.user.login,
+        avatarUrl: discussion.user.avatar_url,
+        profileUrl: discussion.user.html_url
+      },
+      createdAt: discussion.created_at,
+      updatedAt: discussion.updated_at
+    });
+    
+    // Sort by number descending (newest first)
+    indexArray.sort((a, b) => b.number - a.number);
+    
+    await fsPromises.writeFile(indexFilePath, JSON.stringify(indexArray, null, 2));
+  } catch (error) {
+    console.error('Error writing blog post:', error);
+    throw error;
   }
 }
 
@@ -633,6 +716,109 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
   }
 };
 
+/**
+ * Handles requests to the /api/webhook/github endpoint.
+ */
+const handleWebhookRequest = async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      logRequest(req, res, 'webhook method-not-allowed');
+      return;
+    }
+
+    if (!process.env.GITHUB_WEBHOOK_SECRET) {
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'GitHub webhook secret not configured' }));
+      logRequest(req, res, 'webhook secret-not-configured');
+      return;
+    }
+
+    const signature = req.headers['x-hub-signature-256'];
+    if (!signature) {
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Missing signature' }));
+      logRequest(req, res, 'webhook missing-signature');
+      return;
+    }
+
+    const chunks = [];
+    req.on('data', chunk => chunks.push(chunk));
+    await new Promise((resolve, reject) => {
+      req.on('end', resolve);
+      req.on('error', reject);
+    });
+    const body = Buffer.concat(chunks);
+
+    if (!verifyGitHubSignature(process.env.GITHUB_WEBHOOK_SECRET, body, signature)) {
+      res.statusCode = 401;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid signature' }));
+      logRequest(req, res, 'webhook invalid-signature');
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(body.toString());
+    } catch (error) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      logRequest(req, res, 'webhook invalid-json');
+      return;
+    }
+
+    if (!payload.action || !payload.discussion || !payload.repository) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid payload structure' }));
+      logRequest(req, res, 'webhook invalid-payload');
+      return;
+    }
+
+    if (payload.repository.full_name !== 'arete-org/arete') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ message: 'Ignored: wrong repository' }));
+      logRequest(req, res, 'webhook ignored-wrong-repo');
+      return;
+    }
+
+    if (payload.discussion.category?.name !== 'Blog') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ message: 'Ignored: not Blog category' }));
+      logRequest(req, res, 'webhook ignored-not-blog');
+      return;
+    }
+
+    if (payload.action !== 'created' && payload.action !== 'edited') {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ message: 'Ignored: action not relevant' }));
+      logRequest(req, res, 'webhook ignored-action');
+      return;
+    }
+
+    await writeBlogPost(payload.discussion);
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ success: true, postNumber: payload.discussion.number }));
+    logRequest(req, res, `webhook success postNumber=${payload.discussion.number}`);
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+    logRequest(req, res, `webhook error ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+};
+
 // Initialize services
 try {
   initializeServices();
@@ -649,6 +835,12 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const parsedUrl = new URL(req.url, 'http://localhost');
+    
+    // Handle /api/webhook/github endpoint
+    if (parsedUrl.pathname === '/api/webhook/github') {
+      await handleWebhookRequest(req, res);
+      return;
+    }
     
     // Handle /api/reflect endpoint
     if (parsedUrl.pathname === '/api/reflect') {
