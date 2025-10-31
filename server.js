@@ -428,6 +428,7 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
 
     // Extract and validate question parameter
     let question = parsedUrl.searchParams.get('question');
+    let turnstileTokenFromBody = null;
     
     // Handle POST requests with JSON body
     if (req.method === 'POST') {
@@ -446,6 +447,9 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
           const parsedBody = JSON.parse(body);
           if (parsedBody.question) {
             question = parsedBody.question;
+          }
+          if (parsedBody.turnstileToken) {
+            turnstileTokenFromBody = String(parsedBody.turnstileToken);
           }
         }
       } catch (error) {
@@ -481,19 +485,39 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
     // Check if CAPTCHA should be skipped first
     const skipCaptcha = process.env.NODE_ENV === 'development' || process.env.SKIP_CAPTCHA === 'true';
     
-    // Extract Turnstile token
-    let turnstileToken = req.headers['x-turnstile-token'];
+    // Extract Turnstile token (priority: header → body → query param)
+    let turnstileToken = null;
+    let tokenSource = 'none';
     
-    if (turnstileToken) {
+    // Try header first (most secure, not exposed in URL)
+    if (req.headers['x-turnstile-token']) {
+      turnstileToken = req.headers['x-turnstile-token'];
       if (Array.isArray(turnstileToken)) {
         turnstileToken = turnstileToken[0];
       } else {
         turnstileToken = String(turnstileToken);
       }
+      tokenSource = 'header';
     }
     
+    // Try POST body if available and header didn't have it
+    if (!turnstileToken && turnstileTokenFromBody) {
+      turnstileToken = turnstileTokenFromBody;
+      tokenSource = 'body';
+    }
+    
+    // Fallback to query param (least secure, but works for GET requests)
     if (!turnstileToken) {
-      turnstileToken = parsedUrl.searchParams.get('turnstileToken');
+      const queryToken = parsedUrl.searchParams.get('turnstileToken');
+      if (queryToken) {
+        turnstileToken = String(queryToken);
+        tokenSource = 'query';
+      }
+    }
+    
+    // Log token extraction for debugging
+    if (!skipCaptcha) {
+      console.log(`Turnstile token extraction: source=${tokenSource}, length=${turnstileToken?.length || 0}`);
     }
     
     if (!turnstileToken && !skipCaptcha) {
@@ -552,8 +576,10 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
       } else {
         // Debug: Log CAPTCHA verification info (without exposing sensitive data)
         console.log('CAPTCHA verification debug:');
-        console.log('Token length:', turnstileToken?.length || 0);
-        console.log('Secret key is set:', !!process.env.TURNSTILE_SECRET_KEY);
+        console.log(`  Token source: ${tokenSource}`);
+        console.log(`  Token length: ${turnstileToken?.length || 0}`);
+        console.log(`  Secret key is set: ${!!process.env.TURNSTILE_SECRET_KEY}`);
+        console.log(`  Client IP: ${clientIp}`);
         
         const formData = new URLSearchParams();
         formData.append('secret', process.env.TURNSTILE_SECRET_KEY);
@@ -570,7 +596,10 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         });
 
         if (!verificationResponse.ok) {
-          throw new Error(`Verification service returned ${verificationResponse.status}`);
+          const errorText = await verificationResponse.text().catch(() => 'Unable to read error response');
+          console.error(`Turnstile verification service error: ${verificationResponse.status} ${verificationResponse.statusText}`);
+          console.error(`Error response body: ${errorText}`);
+          throw new Error(`Verification service returned ${verificationResponse.status}: ${errorText}`);
         }
 
         const verificationData = await verificationResponse.json();
@@ -579,19 +608,30 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         console.log('Turnstile verification response:', JSON.stringify(verificationData, null, 2));
         
         if (!verificationData.success) {
-          const errorCodes = verificationData['error-codes']?.join(', ') || 'Unknown verification error';
+          const errorCodes = verificationData['error-codes'] || [];
+          const errorCodesStr = errorCodes.join(', ') || 'Unknown verification error';
+          
+          // Enhanced error logging
+          console.error('CAPTCHA verification FAILED:');
+          console.error(`  Error codes: ${errorCodesStr}`);
+          console.error(`  Token source: ${tokenSource}`);
+          console.error(`  Token length: ${turnstileToken?.length || 0}`);
+          console.error(`  Client IP: ${clientIp}`);
+          console.error(`  Challenge timestamp: ${verificationData['challenge-ts'] || 'N/A'}`);
+          
           res.statusCode = 403;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
           res.setHeader('Cache-Control', 'no-store');
           res.end(JSON.stringify({ 
             error: 'CAPTCHA verification failed', 
-            details: errorCodes 
+            details: errorCodesStr 
           }));
-          logRequest(req, res, `reflect captcha-failed ip=${clientIp} errors=${errorCodes}`);
+          logRequest(req, res, `reflect captcha-failed ip=${clientIp} source=${tokenSource} errors=${errorCodesStr}`);
           return;
         }
 
-        logRequest(req, res, `reflect captcha-verified ip=${clientIp}`);
+        console.log(`CAPTCHA verification SUCCESS for token from ${tokenSource}`);
+        logRequest(req, res, `reflect captcha-verified ip=${clientIp} source=${tokenSource}`);
       }
     } catch (error) {
       res.statusCode = 502;

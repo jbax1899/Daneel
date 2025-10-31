@@ -210,9 +210,15 @@ const MeetArete = (): JSX.Element => {
       }
       
       if (import.meta.env.DEV) {
+        console.log('=== CAPTCHA Debug Info ===');
         console.log('Making request to:', `/api/reflect?question=${encodeURIComponent(trimmedQuestion)}`);
-        console.log('Headers:', headers);
         console.log('Development mode:', isDevelopment);
+        console.log('Turnstile token exists:', !!turnstileToken);
+        console.log('Turnstile token length:', turnstileToken?.length || 0);
+        console.log('Turnstile ready:', isTurnstileReady);
+        console.log('Turnstile error:', turnstileError);
+        console.log('Headers:', headers);
+        console.log('========================');
       }
       
       const response = await fetch(`/api/reflect?question=${encodeURIComponent(trimmedQuestion)}`, {
@@ -224,23 +230,51 @@ const MeetArete = (): JSX.Element => {
       if (import.meta.env.DEV) {
         console.log('Response status:', response.status);
         console.log('Response ok:', response.ok);
+        console.log('Response headers:', Object.fromEntries(response.headers.entries()));
       }
 
       if (!response.ok) {
         // Handle CAPTCHA-specific errors
         if (response.status === 403) {
-          setStatus('CAPTCHA verification failed. Please refresh and try again.');
-          setTurnstileToken(null);
-          setIsTurnstileReady(false);
-          setTurnstileError('CAPTCHA verification failed. Please refresh and try again.');
-          setTurnstileKey(prev => prev + 1);
-          return;
+          try {
+            const errorData = await response.json();
+            if (import.meta.env.DEV) {
+              console.error('CAPTCHA verification failed (403):');
+              console.error('Error data:', errorData);
+              console.error('Error details:', errorData.details);
+            }
+            
+            const errorMessage = errorData.details 
+              ? `CAPTCHA verification failed: ${errorData.details}. Please refresh and try again.`
+              : 'CAPTCHA verification failed. Please refresh and try again.';
+            
+            setStatus(errorMessage);
+            setTurnstileToken(null);
+            setIsTurnstileReady(false);
+            setTurnstileError(errorMessage);
+            setTurnstileKey(prev => prev + 1);
+            return;
+          } catch (parseError) {
+            if (import.meta.env.DEV) {
+              console.error('Failed to parse 403 error response:', parseError);
+            }
+            setStatus('CAPTCHA verification failed. Please refresh and try again.');
+            setTurnstileToken(null);
+            setIsTurnstileReady(false);
+            setTurnstileError('CAPTCHA verification failed. Please refresh and try again.');
+            setTurnstileKey(prev => prev + 1);
+            return;
+          }
         }
         
         // Handle 502 Turnstile service errors
         if (response.status === 502) {
           try {
             const errorData = await response.json();
+            if (import.meta.env.DEV) {
+              console.error('CAPTCHA service error (502):');
+              console.error('Error data:', errorData);
+            }
             if (errorData.error && errorData.error.includes('CAPTCHA verification service unavailable')) {
               setStatus('CAPTCHA service is unavailable. Please try again shortly.');
               setTurnstileToken(null);
@@ -251,6 +285,9 @@ const MeetArete = (): JSX.Element => {
             }
           } catch {
             // If JSON parsing fails, still show the 502 error
+            if (import.meta.env.DEV) {
+              console.error('Failed to parse 502 error response');
+            }
             setStatus('CAPTCHA service is unavailable. Please try again shortly.');
             setTurnstileToken(null);
             setIsTurnstileReady(false);
@@ -260,7 +297,7 @@ const MeetArete = (): JSX.Element => {
           }
         }
         
-        throw new Error('Unexpected response');
+        throw new Error(`Unexpected response status: ${response.status}`);
       }
 
       const payload = await response.json();
