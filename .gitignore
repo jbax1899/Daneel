@@ -30,6 +30,11 @@ packages/shared/src/**/*.d.ts
 
 # Traces
 packages/discord-bot/traces/
+traces/
+
+# Keys
+keys/
+*.pem
 
 # VSCode settings
 .vscode
