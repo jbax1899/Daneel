@@ -1165,6 +1165,29 @@ div.interaction-status:not(.interaction-status-visible) *,
   background-color: color-mix(in srgb, var(--bg-soft) 70%, rgba(255, 255, 255, 0.16) 30%);
 }
 
+.card-link {
+  display: inline-block;
+  margin-top: 1rem;
+  color: var(--link);
+  text-decoration: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  transition: color var(--transition-speed) ease;
+}
+
+.card-link:hover,
+.card-link:focus {
+  color: var(--link-hover);
+  text-decoration: underline;
+  outline: none;
+}
+
+.card-link:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-hover) 55%, transparent 45%);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
 .services-grid {
   display: grid;
   gap: clamp(1rem, 2vw, 1.6rem);
@@ -1216,11 +1239,170 @@ div.interaction-status:not(.interaction-status-visible) *,
   margin-bottom: 0.6rem;
 }
 
-.feature-quote {
-  font-family: var(--mono-font);
-  font-size: 0.9rem;
-  color: color-mix(in srgb, var(--subtle-text) 80%, var(--accent) 20%);
-  margin-top: 1.3rem;
+.feature-card__image-wrapper {
+  position: relative;
+  margin-top: clamp(1rem, 2vw, 1.5rem);
+}
+
+.feature-card__image {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  object-fit: contain;
+  max-width: 100%;
+  transform: scale(1);
+  transition: transform 0.3s ease;
+  cursor: pointer;
+}
+
+.feature-card:hover .feature-card__image {
+  transform: scale(1.05);
+}
+
+.feature-card__expand-button {
+  position: absolute;
+  top: 0.75rem;
+  right: 0.75rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: color-mix(in srgb, var(--bg) 85%, rgba(0, 0, 0, 0.15) 15%);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  opacity: 0.8;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 2;
+}
+
+.feature-card__expand-button:hover,
+.feature-card__expand-button:focus {
+  opacity: 1;
+  background-color: color-mix(in srgb, var(--bg-soft) 90%, var(--accent) 10%);
+  border-color: var(--accent);
+  transform: scale(1.1);
+  outline: none;
+}
+
+.feature-card__expand-button:active {
+  transform: scale(0.95);
+}
+
+.feature-card__expand-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  stroke: var(--text);
+}
+
+/* Modal styles */
+.image-modal {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 1rem;
+  cursor: pointer;
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.image-modal__close {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 3rem;
+  height: 3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  color: white;
+  cursor: pointer;
+  transition: all var(--transition-speed) ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 10001;
+}
+
+.image-modal__close:hover,
+.image-modal__close:focus {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: scale(1.1);
+  outline: none;
+}
+
+.image-modal__close:active {
+  transform: scale(0.95);
+}
+
+.image-modal__image {
+  max-width: min(1200px, 95vw);
+  max-height: 95vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+  animation: scaleIn 0.3s ease;
+}
+
+@keyframes scaleIn {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Mobile optimizations */
+@media (max-width: 600px) {
+  .feature-card__expand-button {
+    width: 2rem;
+    height: 2rem;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .feature-card__expand-button svg {
+    width: 1rem;
+    height: 1rem;
+  }
+
+  .image-modal__close {
+    top: 1rem;
+    right: 1rem;
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .image-modal__image {
+    max-width: 98vw;
+    max-height: 98vh;
+  }
 }
 
 /* ===== ARETE SECTION ===== */

@@ -473,10 +473,42 @@ const initializeServices = () => {
 };
 
 /**
+ * Sets CORS headers for API endpoints to allow requests from allowed origins
+ */
+const setCorsHeaders = (res, req) => {
+  const allowedOrigins = [
+    'https://jordanmakes.fly.dev',
+    'https://ai.jordanmakes.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  const origin = req.headers.origin;
+  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
+  const allowOrigin = isAllowedOrigin ? origin : allowedOrigins[0];
+  
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Turnstile-Token, X-Session-Id');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+};
+
+/**
  * Handles requests to the /api/reflect endpoint.
  */
 const handleReflectRequest = async (req, res, parsedUrl) => {
   try {
+    // Set CORS headers for API endpoints
+    setCorsHeaders(res, req);
+    
+    // Handle OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      logRequest(req, res, 'reflect options-preflight');
+      return;
+    }
+    
     // Verify Turnstile configuration
     if (!process.env.TURNSTILE_SECRET_KEY) {
       res.statusCode = 503;
@@ -1198,6 +1230,35 @@ const server = http.createServer(async (req, res) => {
     res.statusCode = 200;
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=600');
+    
+    // Set CSP frame-ancestors header for /embed route to allow embedding from allowed domains
+    if (parsedUrl.pathname === '/embed' || parsedUrl.pathname.startsWith('/embed/')) {
+      // Build frame-ancestors list: production domains + localhost for development
+      const isDev = process.env.NODE_ENV !== 'production';
+      const frameAncestors = [
+        'https://jordanmakes.fly.dev',
+        'https://ai.jordanmakes.dev'
+      ];
+      
+      // Add localhost variants for development
+      if (isDev) {
+        frameAncestors.push('http://localhost:3000', 'http://localhost:5173');
+      }
+      
+      // Allow embedding from allowed domains and also allow all necessary resources
+      const csp = [
+        `frame-ancestors ${frameAncestors.join(' ')}`,
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://challenges.cloudflare.com",
+        "style-src 'self' 'unsafe-inline' data:",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "frame-src 'self' https://challenges.cloudflare.com",
+        "connect-src 'self' https://challenges.cloudflare.com https://api.openai.com"
+      ].join('; ');
+      res.setHeader('Content-Security-Policy', csp);
+    }
+    
     res.end(asset.content);
     logRequest(req, res);
   } catch (error) {
