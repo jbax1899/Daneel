@@ -1238,7 +1238,8 @@ const server = http.createServer(async (req, res) => {
       const frameAncestors = [
         'https://jordanmakes.fly.dev',
         'https://ai.jordanmakes.dev',
-        'https://portfolio.jordanmakes.dev'
+        'https://portfolio.jordanmakes.dev',
+        'https://jordanmakes.dev'
       ];
       
       // Add localhost variants for development

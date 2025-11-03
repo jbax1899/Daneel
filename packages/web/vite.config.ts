@@ -14,6 +14,7 @@ const cspPlugin = () => ({
           'https://jordanmakes.fly.dev',
           'https://ai.jordanmakes.dev',
           'https://portfolio.jordanmakes.dev',
+          'https://jordanmakes.dev',
           'http://localhost:3000',
           'http://localhost:5173'
         ];
