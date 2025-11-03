@@ -143,6 +143,40 @@ const resolveAsset = async (requestPath) => {
 };
 
 /**
+ * Writes a blog post JSON file for a GitHub discussion.
+ * Files are written directly to the dist directory so they're immediately
+ * available to the HTTP server without requiring a rebuild.
+ */
+async function writeBlogPost(discussion) {
+  const BLOG_POSTS_DIR = path.join(DIST_DIR, 'blog-posts');
+
+  try {
+    await fs.mkdir(BLOG_POSTS_DIR, { recursive: true });
+
+    const postObject = {
+      number: discussion.number,
+      title: discussion.title,
+      body: discussion.body,
+      author: {
+        login: discussion.user.login,
+        avatarUrl: discussion.user.avatar_url,
+        profileUrl: discussion.user.html_url
+      },
+      createdAt: discussion.created_at,
+      updatedAt: discussion.updated_at,
+      discussionUrl: discussion.html_url,
+      commentCount: discussion.comments || 0
+    };
+
+    const postFilePath = path.join(BLOG_POSTS_DIR, `${discussion.number}.json`);
+    await fs.writeFile(postFilePath, JSON.stringify(postObject, null, 2));
+  } catch (error) {
+    console.error('Failed to write blog post:', error);
+    throw error;
+  }
+}
+
+/**
  * Builds a short log entry for monitoring within Fly.io logs.
  */
 const logRequest = (req, res, extra = '') => {
