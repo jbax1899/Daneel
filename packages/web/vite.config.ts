@@ -9,7 +9,8 @@ const cspPlugin = () => ({
     server.middlewares.use((req, res, next) => {
       // Set CSP frame-ancestors header for /embed route
       if (req.url && (req.url === '/embed' || req.url.startsWith('/embed/'))) {
-        // In Vite dev server, always allow localhost for development
+        // Allow embedding from production domains and localhost for development
+        // Note: localhost is included to allow dev servers to embed even when running in production mode
         const frameAncestors = [
           'https://jordanmakes.fly.dev',
           'https://ai.jordanmakes.dev',

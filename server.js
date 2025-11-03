@@ -1238,18 +1238,15 @@ const server = http.createServer(async (req, res) => {
     
     if (isHtml) {
       // Build frame-ancestors list: production domains + localhost for development
-      const isDev = process.env.NODE_ENV !== 'production';
+      // Note: localhost is included in production to allow dev servers to embed the production embed
       const frameAncestors = [
         'https://jordanmakes.fly.dev',
         'https://ai.jordanmakes.dev',
         'https://portfolio.jordanmakes.dev',
-        'https://jordanmakes.dev'
+        'https://jordanmakes.dev',
+        'http://localhost:3000',
+        'http://localhost:5173'
       ];
-      
-      // Add localhost variants for development
-      if (isDev) {
-        frameAncestors.push('http://localhost:3000', 'http://localhost:5173');
-      }
       
       // Allow embedding from allowed domains and also allow all necessary resources
       const csp = [
