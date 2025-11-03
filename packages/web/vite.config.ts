@@ -13,6 +13,7 @@ const cspPlugin = () => ({
         const frameAncestors = [
           'https://jordanmakes.fly.dev',
           'https://ai.jordanmakes.dev',
+          'https://portfolio.jordanmakes.dev',
           'http://localhost:3000',
           'http://localhost:5173'
         ];

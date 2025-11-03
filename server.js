@@ -1237,7 +1237,8 @@ const server = http.createServer(async (req, res) => {
       const isDev = process.env.NODE_ENV !== 'production';
       const frameAncestors = [
         'https://jordanmakes.fly.dev',
-        'https://ai.jordanmakes.dev'
+        'https://ai.jordanmakes.dev',
+        'https://portfolio.jordanmakes.dev'
       ];
       
       // Add localhost variants for development
