@@ -1231,8 +1231,12 @@ const server = http.createServer(async (req, res) => {
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=600');
     
-    // Set CSP frame-ancestors header for /embed route to allow embedding from allowed domains
-    if (parsedUrl.pathname === '/embed' || parsedUrl.pathname.startsWith('/embed/')) {
+    // Set CSP frame-ancestors header for HTML responses to allow embedding from allowed domains
+    // Check if this is an HTML response
+    const isHtml = contentType.includes('text/html') || parsedUrl.pathname === '/' || 
+                   parsedUrl.pathname.endsWith('.html') || parsedUrl.pathname.startsWith('/embed');
+    
+    if (isHtml) {
       // Build frame-ancestors list: production domains + localhost for development
       const isDev = process.env.NODE_ENV !== 'production';
       const frameAncestors = [
