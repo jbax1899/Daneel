@@ -1,9 +1,7 @@
 import { Routes, Route } from 'react-router-dom';
 import Hero from '@components/Hero';
-import MeetArete from '@components/MeetArete';
 import Invite from '@components/Invite';
 import Services from '@components/Services';
-import Arete from '@components/Arete';
 import OpenAccountable from '@components/OpenAccountable';
 import Footer from '@components/Footer';
 import TracePage from '@pages/TracePage';
@@ -14,17 +12,24 @@ import BlogPostPage from '@pages/BlogPostPage';
 // The App component stitches together the landing page sections in their intended scroll order.
 const App = (): JSX.Element => (
   <div className="app-shell">
+    <a href="#main-content" className="skip-link">
+      Skip to main content
+    </a>
     <Routes>
       <Route
         path="/"
         element={(
-          <main>
+          <main id="main-content">
             <Hero />
-            <Arete />
-            <MeetArete />
-            <Services />
-            <OpenAccountable />
-            <Invite />
+            <div className="section-container">
+              <Services />
+            </div>
+            <div className="section-container">
+              <OpenAccountable />
+            </div>
+            <div className="section-container">
+              <Invite />
+            </div>
             <Footer />
           </main>
         )}

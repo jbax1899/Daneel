@@ -10,6 +10,9 @@ require('dotenv').config();
 // Resolve the directory containing the built frontend assets.
 const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');
 
+// Resolve the directory for storing trace files.
+const TRACES_DIR = path.resolve(process.env.TRACE_STORE_PATH?.trim() || path.join(__dirname, 'traces'));
+
 // Model parameters
 const DEFAULT_MODEL = 'gpt-5-mini';
 const DEFAULT_REASONING_EFFORT = 'low';
@@ -309,7 +312,7 @@ class SimpleOpenAIService {
       body: JSON.stringify({
         model: model,
         messages: messages,
-        max_completion_tokens: 1000,
+        max_completion_tokens: 4000,
       }),
     });
 
@@ -322,6 +325,16 @@ class SimpleOpenAIService {
     const data = await response.json();
     const rawContent = data.choices[0]?.message?.content || 'I was unable to generate a response.';
     
+    // Debug: log raw content to see if metadata is present
+    console.log('=== Raw AI Response Debug ===');
+    console.log('Raw content length:', rawContent.length);
+    console.log('Contains ARETE_METADATA:', rawContent.includes('<ARETE_METADATA>'));
+    if (rawContent.includes('<ARETE_METADATA>')) {
+      const metadataStart = rawContent.indexOf('<ARETE_METADATA>');
+      console.log('Metadata block:', rawContent.substring(metadataStart, metadataStart + 200));
+    }
+    console.log('============================');
+    
     // Parse metadata from the response if it contains <ARETE_METADATA>
     const { normalizedText, metadata: parsedMetadata } = extractTextAndMetadata(rawContent);
     
@@ -333,7 +346,12 @@ class SimpleOpenAIService {
         finishReason: data.choices[0]?.finish_reason,
         // Include parsed metadata if available
         ...(parsedMetadata && {
-          confidence: parsedMetadata.confidence,
+          // Only include confidence if it's a valid number in range
+          ...(typeof parsedMetadata.confidence === 'number' && 
+              parsedMetadata.confidence >= 0 && 
+              parsedMetadata.confidence <= 1 && {
+                confidence: parsedMetadata.confidence
+              }),
           provenance: parsedMetadata.provenance,
           tradeoffCount: parsedMetadata.tradeoffCount,
           citations: parsedMetadata.citations
@@ -347,7 +365,7 @@ class SimpleOpenAIService {
  * Simple response metadata builder
  */
 const buildResponseMetadata = (assistantMetadata, reasoningEffort, runtimeContext) => {
-  return {
+  const metadata = {
     id: `reflect-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
     timestamp: new Date().toISOString(),
     model: assistantMetadata.model || DEFAULT_MODEL,
@@ -357,8 +375,61 @@ const buildResponseMetadata = (assistantMetadata, reasoningEffort, runtimeContex
     runtimeContext,
     usage: assistantMetadata.usage,
     finishReason: assistantMetadata.finishReason,
-    staleAfter: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
+    staleAfter: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
   };
+
+  // Include confidence if available (0.0 to 1.0 range)
+  if (typeof assistantMetadata.confidence === 'number' && 
+      assistantMetadata.confidence >= 0 && 
+      assistantMetadata.confidence <= 1) {
+    metadata.confidence = assistantMetadata.confidence;
+  }
+
+  // Include tradeoffCount if available
+  if (typeof assistantMetadata.tradeoffCount === 'number') {
+    metadata.tradeoffCount = assistantMetadata.tradeoffCount;
+  }
+
+  // Include citations if available
+  if (Array.isArray(assistantMetadata.citations)) {
+    metadata.citations = assistantMetadata.citations;
+  }
+
+  return metadata;
+};
+
+/**
+ * Stores trace metadata to disk asynchronously.
+ * Failures are logged but don't block the response.
+ */
+const storeTrace = async (metadata) => {
+  try {
+    // Ensure traces directory exists
+    await fsPromises.mkdir(TRACES_DIR, { recursive: true });
+    
+    // Validate responseId (metadata.id) - only allow alphanumeric, hyphens, underscores
+    const responseId = metadata.id;
+    if (!/^[A-Za-z0-9_-]+$/.test(responseId)) {
+      console.error(`Invalid responseId "${responseId}" - not storing trace.`);
+      return;
+    }
+    
+    // Write trace file
+    const filePath = path.join(TRACES_DIR, `${responseId}.json`);
+    const traceContent = JSON.stringify(metadata, null, 2);
+    
+    console.log('=== Storing Trace Debug ===');
+    console.log('Response ID:', responseId);
+    console.log('Metadata being stored:', traceContent);
+    console.log('Metadata confidence:', metadata.confidence);
+    console.log('===========================');
+    
+    await fsPromises.writeFile(filePath, traceContent, { encoding: 'utf-8' });
+    console.log(`Trace stored successfully: ${filePath}`);
+  } catch (error) {
+    // Log but don't throw - trace storage failures shouldn't break the API
+    console.error(`Failed to store trace for response "${metadata.id}":`, error instanceof Error ? error.message : error);
+  }
 };
 
 // Initialize services
@@ -581,10 +652,49 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         console.log(`  Secret key is set: ${!!process.env.TURNSTILE_SECRET_KEY}`);
         console.log(`  Client IP: ${clientIp}`);
         
+        // Validate token exists before attempting verification
+        if (!turnstileToken || turnstileToken.trim().length === 0) {
+          console.error('CAPTCHA verification attempted without a token');
+          res.statusCode = 400;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(JSON.stringify({ 
+            error: 'CAPTCHA token is required', 
+            details: 'Missing turnstile token' 
+          }));
+          logRequest(req, res, 'reflect missing-captcha-token');
+          return;
+        }
+        
+        // Validate secret key is configured
+        if (!process.env.TURNSTILE_SECRET_KEY) {
+          console.error('CAPTCHA verification attempted without secret key');
+          res.statusCode = 503;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(JSON.stringify({ 
+            error: 'CAPTCHA verification not configured',
+            details: 'TURNSTILE_SECRET_KEY is not set'
+          }));
+          logRequest(req, res, 'reflect captcha-not-configured');
+          return;
+        }
+        
         const formData = new URLSearchParams();
         formData.append('secret', process.env.TURNSTILE_SECRET_KEY);
         formData.append('response', turnstileToken);
         formData.append('remoteip', clientIp);
+        
+        // Create abort signal with fallback for older Node versions
+        let abortSignal;
+        try {
+          abortSignal = AbortSignal.timeout(10000);
+        } catch (e) {
+          // Fallback for Node < 17.3.0 (shouldn't be needed but safer)
+          const controller = new AbortController();
+          setTimeout(() => controller.abort(), 10000);
+          abortSignal = controller.signal;
+        }
         
         const verificationResponse = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
           method: 'POST',
@@ -592,13 +702,38 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
             'Content-Type': 'application/x-www-form-urlencoded',
           },
           body: formData.toString(),
-          signal: AbortSignal.timeout(10000)
+          signal: abortSignal
         });
 
         if (!verificationResponse.ok) {
           const errorText = await verificationResponse.text().catch(() => 'Unable to read error response');
           console.error(`Turnstile verification service error: ${verificationResponse.status} ${verificationResponse.statusText}`);
           console.error(`Error response body: ${errorText}`);
+          
+          // Try to parse error details
+          let errorDetails;
+          try {
+            errorDetails = JSON.parse(errorText);
+          } catch {
+            errorDetails = { 'error-codes': ['unknown-error'] };
+          }
+          
+          const errorCodes = errorDetails['error-codes'] || [];
+          
+          // Handle specific error codes appropriately
+          if (errorCodes.includes('invalid-input-secret') || errorCodes.includes('missing-input-secret')) {
+            console.error('CAPTCHA configuration error: Secret key is invalid or does not match site key');
+            res.statusCode = 403;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(JSON.stringify({ 
+              error: 'CAPTCHA verification failed', 
+              details: 'Invalid CAPTCHA configuration. Secret key does not match site key.'
+            }));
+            logRequest(req, res, `reflect captcha-config-error ip=${clientIp} codes=${errorCodes.join(',')}`);
+            return;
+          }
+          
           throw new Error(`Verification service returned ${verificationResponse.status}: ${errorText}`);
         }
 
@@ -618,6 +753,9 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
           console.error(`  Token length: ${turnstileToken?.length || 0}`);
           console.error(`  Client IP: ${clientIp}`);
           console.error(`  Challenge timestamp: ${verificationData['challenge-ts'] || 'N/A'}`);
+          console.error(`  Hostname from response: ${verificationData.hostname || 'N/A'}`);
+          console.error(`  Request hostname: ${req.headers.host || 'N/A'}`);
+          console.error(`  Request origin: ${req.headers.origin || 'N/A'}`);
           
           res.statusCode = 403;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -630,18 +768,35 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
           return;
         }
 
+        // According to Cloudflare docs: tokens can only be validated once, expire after 300s
+        // Log success with relevant info from verification response
         console.log(`CAPTCHA verification SUCCESS for token from ${tokenSource}`);
+        console.log(`  Hostname verified: ${verificationData.hostname || 'N/A'}`);
+        console.log(`  Expected hostname: ${req.headers.host || 'N/A'}`);
+        console.log(`  Challenge timestamp: ${verificationData['challenge-ts'] || 'N/A'}`);
         logRequest(req, res, `reflect captcha-verified ip=${clientIp} source=${tokenSource}`);
       }
     } catch (error) {
+      // Enhanced error logging for debugging
+      console.error('=== CAPTCHA Verification Error ===');
+      console.error('Error type:', error?.constructor?.name);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
+      console.error('Token was present:', !!turnstileToken);
+      console.error('Token length:', turnstileToken?.length || 0);
+      console.error('Secret key configured:', !!process.env.TURNSTILE_SECRET_KEY);
+      
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorDetails = error instanceof Error ? error.stack : 'Unknown error';
+      
       res.statusCode = 502;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
       res.end(JSON.stringify({ 
         error: 'CAPTCHA verification service unavailable', 
-        details: error.message 
+        details: errorMessage 
       }));
-      logRequest(req, res, `reflect captcha-service-error ${error.message}`);
+      logRequest(req, res, `reflect captcha-service-error ${errorMessage}`);
       return;
     }
 
@@ -688,7 +843,27 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
         return;
       }
 
-      const systemPrompt = `You are Arete, an AI assistant that helps people think through tough questions while staying honest and fair. You explore multiple ethical perspectives, trace your sources, and show how you reach your conclusions. Be helpful, thoughtful, and transparent in your responses.`;
+      const systemPrompt = `You are Arete, an AI assistant that helps people think through tough questions while staying honest and fair. You explore multiple ethical perspectives, trace your sources, and show how you reach your conclusions. Be helpful, thoughtful, and transparent in your responses.
+
+────────────────────────────────────────────────
+RESPONSE METADATA PAYLOAD
+────────────────────────────────────────────────
+After your conversational reply, leave a blank line and append a single JSON object on its own line prefixed with <ARETE_METADATA>.
+This metadata records provenance and confidence for downstream systems.
+
+Required fields:
+  • provenance → one of "Retrieved", "Inferred", or "Speculative"
+  • confidence → floating-point certainty between 0.0 and 1.0 (e.g., 0.85)
+  • tradeoffCount → integer ≥ 0 capturing how many value tradeoffs you surfaced (use 0 if none)
+  • citations → array of {"title": string, "url": fully-qualified URL, "snippet"?: string} objects (use [] if none)
+
+Example:
+<ARETE_METADATA>{"provenance":"Retrieved","confidence":0.78,"tradeoffCount":1,"citations":[{"title":"Example","url":"https://example.com"}]}
+
+Guidelines:
+  - Emit valid, minified JSON (no comments, no code fences, no trailing text)
+  - Always include the <ARETE_METADATA> block after every response
+  - Use "Inferred" for reasoning-based answers, "Retrieved" for fact-based, "Speculative" for uncertain answers`;
 
       const messages = [
         { role: 'system', content: systemPrompt },
@@ -716,6 +891,19 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
       };
 
       const responseMetadata = buildResponseMetadata(assistantMetadata, 'Low', runtimeContext);
+
+      // Debug logging for metadata
+      console.log('=== Server Metadata Debug ===');
+      console.log('Assistant metadata:', JSON.stringify(assistantMetadata, null, 2));
+      console.log('Assistant metadata confidence:', assistantMetadata?.confidence);
+      console.log('Built response metadata:', JSON.stringify(responseMetadata, null, 2));
+      console.log('Response metadata confidence:', responseMetadata.confidence);
+      console.log('================================');
+
+      // Store trace asynchronously (don't await - fire and forget)
+      storeTrace(responseMetadata).catch(err => {
+        console.error('Background trace storage error:', err);
+      });
 
       // Return successful response
       res.statusCode = 200;
@@ -753,6 +941,103 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
     
     res.end(JSON.stringify(errorResponse));
     logRequest(req, res, `reflect error ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+};
+
+/**
+ * Handles requests to the /trace/:responseId.json endpoint.
+ */
+const handleTraceRequest = async (req, res, parsedUrl) => {
+  try {
+    // Extract responseId from pathname (remove /trace/ prefix and .json suffix)
+    const pathMatch = parsedUrl.pathname.match(/^\/trace\/(.+)\.json$/);
+    if (!pathMatch) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid trace request format' }));
+      logRequest(req, res, 'trace invalid-format');
+      return;
+    }
+
+    const responseId = pathMatch[1];
+    
+    console.log('=== Trace Request Debug ===');
+    console.log('Request pathname:', parsedUrl.pathname);
+    console.log('Extracted responseId:', responseId);
+    
+    // Validate responseId format
+    if (!/^[A-Za-z0-9_-]+$/.test(responseId)) {
+      console.log('ResponseId validation failed');
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid responseId format' }));
+      logRequest(req, res, 'trace invalid-id');
+      return;
+    }
+
+    const filePath = path.join(TRACES_DIR, `${responseId}.json`);
+    console.log('Looking for trace file at:', filePath);
+    console.log('TRACES_DIR:', TRACES_DIR);
+    
+    try {
+      const fileContent = await fsPromises.readFile(filePath, { encoding: 'utf-8' });
+      const metadata = JSON.parse(fileContent);
+      
+      // Debug logging for trace retrieval
+      console.log('=== Trace Retrieval Debug ===');
+      console.log('Response ID:', responseId);
+      console.log('File path:', filePath);
+      console.log('Metadata from file:', JSON.stringify(metadata, null, 2));
+      console.log('Metadata confidence:', metadata.confidence);
+      console.log('Metadata confidence type:', typeof metadata.confidence);
+      console.log('==============================');
+      
+      // Check if trace is stale
+      if (metadata.staleAfter) {
+        const staleAfterDate = new Date(metadata.staleAfter);
+        if (staleAfterDate < new Date()) {
+          // Trace is stale, return 410 with the metadata
+          res.statusCode = 410;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.setHeader('Cache-Control', 'no-store');
+          res.end(JSON.stringify({ message: 'Trace is stale', metadata }));
+          logRequest(req, res, 'trace stale');
+          return;
+        }
+      }
+      
+      // Return successful response
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Disable caching for debugging
+      res.end(fileContent);
+      logRequest(req, res, 'trace success');
+      
+    } catch (error) {
+      // File not found - check for ENOENT error code
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.setHeader('Cache-Control', 'no-store');
+        res.end(JSON.stringify({ error: 'Trace not found' }));
+        logRequest(req, res, 'trace not-found');
+        return;
+      }
+      
+      // JSON parse error or other read error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      res.statusCode = 500;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(JSON.stringify({ error: 'Failed to read trace file' }));
+      logRequest(req, res, `trace error ${errorMessage}`);
+    }
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+    logRequest(req, res, `trace error ${error instanceof Error ? error.message : 'unknown error'}`);
   }
 };
 
@@ -885,6 +1170,15 @@ const server = http.createServer(async (req, res) => {
     // Handle /api/reflect endpoint
     if (parsedUrl.pathname === '/api/reflect') {
       await handleReflectRequest(req, res, parsedUrl);
+      return;
+    }
+    
+    // Handle /trace/:responseId.json endpoint
+    if (parsedUrl.pathname.startsWith('/trace/') && parsedUrl.pathname.endsWith('.json')) {
+      console.log('=== Trace Route Matched ===');
+      console.log('Pathname:', parsedUrl.pathname);
+      console.log('Full URL:', req.url);
+      await handleTraceRequest(req, res, parsedUrl);
       return;
     }
     

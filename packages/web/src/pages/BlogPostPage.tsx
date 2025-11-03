@@ -8,8 +8,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { fetchBlogPost } from '../utils/blog';
 import BlogProvenance from '../components/BlogProvenance';
-import Breadcrumb from '../components/Breadcrumb';
-import ThemeToggle from '../components/ThemeToggle';
+import Header from '../components/Header';
 import type { BlogPost } from '../types/blog';
 
 type LoadingState = 'loading' | 'success' | 'error' | 'not-found';
@@ -132,7 +131,6 @@ const BlogPostPage = (): JSX.Element => {
 
   // Breadcrumb items for blog post page
   const breadcrumbItems = [
-    { label: 'Home', path: '/' },
     { label: 'Blog', path: '/blog' },
     { label: post ? post.title : `Post #${number}` }
   ];
@@ -192,13 +190,7 @@ const BlogPostPage = (): JSX.Element => {
   if (loadingState === 'loading') {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <div className="interaction-status" aria-live="polite">
           <div className="spinner" aria-hidden="true" />
@@ -211,13 +203,7 @@ const BlogPostPage = (): JSX.Element => {
   if (loadingState === 'not-found') {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <article className="card">
           <h2>Post Not Found</h2>
@@ -235,13 +221,7 @@ const BlogPostPage = (): JSX.Element => {
   if (loadingState === 'error') {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <article className="card">
           <h2>Unable to Load Blog Post</h2>
@@ -261,13 +241,7 @@ const BlogPostPage = (): JSX.Element => {
   if (!post) {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <article className="card">
           <h2>No Post Data</h2>
@@ -279,13 +253,7 @@ const BlogPostPage = (): JSX.Element => {
 
   return (
     <section className="site-section">
-      <header className="site-header">
-        <div className="site-title-group">
-          <p className="site-mark">ARETE</p>
-          <Breadcrumb items={breadcrumbItems} />
-        </div>
-        <ThemeToggle />
-      </header>
+      <Header breadcrumbItems={breadcrumbItems} />
 
       <article className="blog-post">
         <header className="blog-post__header">

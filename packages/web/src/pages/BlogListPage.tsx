@@ -5,8 +5,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import BlogPostCard from '../components/BlogPostCard';
-import Breadcrumb from '../components/Breadcrumb';
-import ThemeToggle from '../components/ThemeToggle';
+import Header from '../components/Header';
 import { fetchBlogIndex, getLatestBlogPosts, getBlogPostsPage } from '../utils/blog';
 import type { BlogPostMetadata } from '../types/blog';
 
@@ -26,7 +25,6 @@ const BlogListPage = (): JSX.Element => {
 
   // Breadcrumb items for blog list page
   const breadcrumbItems = [
-    { label: 'Home', path: '/' },
     { label: 'Blog' }
   ];
 
@@ -138,13 +136,7 @@ const BlogListPage = (): JSX.Element => {
   if (loadingState === 'loading') {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <div className="interaction-status" aria-live="polite">
           <div className="spinner" aria-hidden="true" />
@@ -157,13 +149,7 @@ const BlogListPage = (): JSX.Element => {
   if (loadingState === 'error') {
     return (
       <section className="site-section">
-        <header className="site-header">
-          <div className="site-title-group">
-            <p className="site-mark">ARETE</p>
-            <Breadcrumb items={breadcrumbItems} />
-          </div>
-          <ThemeToggle />
-        </header>
+        <Header breadcrumbItems={breadcrumbItems} />
         
         <article className="card">
           <h2>Unable to Load Blog Posts</h2>
@@ -182,13 +168,7 @@ const BlogListPage = (): JSX.Element => {
 
   return (
     <section className="site-section">
-      <header className="site-header">
-        <div className="site-title-group">
-          <p className="site-mark">ARETE</p>
-          <Breadcrumb items={breadcrumbItems} />
-        </div>
-        <ThemeToggle />
-      </header>
+      <Header breadcrumbItems={breadcrumbItems} />
 
       {posts.length === 0 ? (
         <article className="card">

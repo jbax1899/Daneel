@@ -31,8 +31,8 @@ const Invite = (): JSX.Element => (
         </article>
       ))}
     </div>
-    <a className="inline-cta" href="/invite/">
-      🛠 Detailed instructions
+    <a className="inline-cta" href="/invite/" aria-label="View detailed setup instructions">
+      <span aria-hidden="true">🛠</span> Detailed instructions
     </a>
   </section>
 );

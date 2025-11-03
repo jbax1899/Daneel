@@ -5,8 +5,10 @@
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "node server.js & npm run dev -w @arete/web",
+        "start:dev": "concurrently \"node server.js\" \"npm run dev -w @arete/web\"",
         "start:backend": "node server.js",
+        "start:prod-test": "cross-env NODE_ENV=production SKIP_CAPTCHA=false node server.js",
+        "dev:prod-test": "cross-env NODE_ENV=production SKIP_CAPTCHA=false node server.js & npm run dev -w @arete/web",
         "build": "npm run build --workspaces",
         "validate-arete-tags": "node scripts/validate-arete-tags.js",
         "blog-sync": "node scripts/blog-sync.js",
@@ -28,6 +30,7 @@
         "@typescript-eslint/eslint-plugin": "^8.46.2",
         "@typescript-eslint/parser": "^8.46.2",
         "concurrently": "^8.0.1",
+        "cross-env": "^10.1.0",
         "eslint": "^9.38.0",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.2",

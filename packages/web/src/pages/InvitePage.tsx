@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import ThemeToggle from '@components/ThemeToggle';
+import Header from '@components/Header';
 import Footer from '@components/Footer';
-import Breadcrumb from '@components/Breadcrumb';
 
 const InvitePage: React.FC = () => {
   const [cloneToast, setCloneToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -16,7 +15,6 @@ const InvitePage: React.FC = () => {
 
   // Breadcrumb items for invite page
   const breadcrumbItems = [
-    { label: 'Home', path: '/' },
     { label: 'Self-Hosting Setup' }
   ];
 
@@ -26,25 +24,17 @@ const InvitePage: React.FC = () => {
   };
 
   return (
-    <div className="app-shell">
+    <>
       {/* Header Section */}
-      <header className="site-header" aria-label="Site header">
-        <div className="site-title-group">
-          <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-            <p className="site-mark">ARETE</p>
-          </Link>
-          <Breadcrumb items={breadcrumbItems} />
-        </div>
-        <ThemeToggle />
-      </header>
+      <Header breadcrumbItems={breadcrumbItems} />
 
       {/* Main Content Section */}
       <main>
         <section className="hero" aria-labelledby="hero-title">
           <div className="hero-copy">
-            <h1 id="hero-title">Self-Host ARETE</h1>
+            <h1 id="hero-title">Setup</h1>
             <p>
-              Ethics-first AI built for thoughtful conversations. I share how I think and respect your privacy at every step. Open-source, easy to host and invite to your Discord community.
+              For beginners and advanced users alike.
             </p>
           </div>
         </section>
@@ -941,7 +931,7 @@ WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}
       </main>
 
       <Footer />
-    </div>
+    </>
   );
 };
 
