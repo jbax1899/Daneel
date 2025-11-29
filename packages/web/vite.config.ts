@@ -2,9 +2,45 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
+// Vite plugin to set CSP headers for /embed route in development
+const cspPlugin = () => ({
+  name: 'csp-headers',
+  configureServer(server) {
+    server.middlewares.use((req, res, next) => {
+      // Set CSP frame-ancestors header for /embed route
+      if (req.url && (req.url === '/embed' || req.url.startsWith('/embed/'))) {
+        // Allow embedding from production domains and localhost for development
+        // Note: localhost is included to allow dev servers to embed even when running in production mode
+        const frameAncestors = [
+          'https://jordanmakes.fly.dev',
+          'https://ai.jordanmakes.dev',
+          'https://portfolio.jordanmakes.dev',
+          'https://jordanmakes.dev',
+          'http://localhost:3000',
+          'http://localhost:5173'
+        ];
+        
+        // Allow embedding from allowed domains and also allow all necessary resources
+        const csp = [
+          `frame-ancestors ${frameAncestors.join(' ')}`,
+          "default-src 'self'",
+          "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://challenges.cloudflare.com",
+          "style-src 'self' 'unsafe-inline' data:",
+          "img-src 'self' data: blob:",
+          "font-src 'self' data:",
+          "frame-src 'self' https://challenges.cloudflare.com",
+          "connect-src 'self' https://challenges.cloudflare.com https://api.openai.com"
+        ].join('; ');
+        res.setHeader('Content-Security-Policy', csp);
+      }
+      next();
+    });
+  },
+});
+
 // Vite configuration keeps things lean while allowing TypeScript paths for components and styles.
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), cspPlugin()],
   define: {
     // In production, require real Turnstile keys. Only use test keys as fallback in development.
     // WARNING: If VITE_TURNSTILE_SITE_KEY is not set in production, CAPTCHA will not work!

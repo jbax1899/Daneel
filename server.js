@@ -85,7 +85,7 @@ function verifyGitHubSignature(secret, body, signature) {
  * Writes a blog post to the file system based on GitHub discussion data
  */
 async function writeBlogPost(discussion) {
-  const BLOG_POSTS_DIR = path.join(__dirname, 'packages', 'web', 'public', 'blog-posts');
+  const BLOG_POSTS_DIR = path.join(DIST_DIR, 'blog-posts');
   
   try {
     await fsPromises.mkdir(BLOG_POSTS_DIR, { recursive: true });
@@ -507,10 +507,42 @@ const initializeServices = () => {
 };
 
 /**
+ * Sets CORS headers for API endpoints to allow requests from allowed origins
+ */
+const setCorsHeaders = (res, req) => {
+  const allowedOrigins = [
+    'https://jordanmakes.fly.dev',
+    'https://ai.jordanmakes.dev',
+    'http://localhost:3000',
+    'http://localhost:5173'
+  ];
+  
+  const origin = req.headers.origin;
+  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
+  const allowOrigin = isAllowedOrigin ? origin : allowedOrigins[0];
+  
+  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Turnstile-Token, X-Session-Id');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+};
+
+/**
  * Handles requests to the /api/reflect endpoint.
  */
 const handleReflectRequest = async (req, res, parsedUrl) => {
   try {
+    // Set CORS headers for API endpoints
+    setCorsHeaders(res, req);
+    
+    // Handle OPTIONS preflight requests
+    if (req.method === 'OPTIONS') {
+      res.statusCode = 204;
+      res.end();
+      logRequest(req, res, 'reflect options-preflight');
+      return;
+    }
+    
     // Verify Turnstile configuration
     if (!process.env.TURNSTILE_SECRET_KEY) {
       res.statusCode = 503;
@@ -1232,6 +1264,38 @@ const server = http.createServer(async (req, res) => {
     res.statusCode = 200;
     res.setHeader('Content-Type', contentType);
     res.setHeader('Cache-Control', 'public, max-age=600');
+    
+    // Set CSP frame-ancestors header for HTML responses to allow embedding from allowed domains
+    // Check if this is an HTML response
+    const isHtml = contentType.includes('text/html') || parsedUrl.pathname === '/' || 
+                   parsedUrl.pathname.endsWith('.html') || parsedUrl.pathname.startsWith('/embed');
+    
+    if (isHtml) {
+      // Build frame-ancestors list: production domains + localhost for development
+      // Note: localhost is included in production to allow dev servers to embed the production embed
+      const frameAncestors = [
+        'https://jordanmakes.fly.dev',
+        'https://ai.jordanmakes.dev',
+        'https://portfolio.jordanmakes.dev',
+        'https://jordanmakes.dev',
+        'http://localhost:3000',
+        'http://localhost:5173'
+      ];
+      
+      // Allow embedding from allowed domains and also allow all necessary resources
+      const csp = [
+        `frame-ancestors ${frameAncestors.join(' ')}`,
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://challenges.cloudflare.com",
+        "style-src 'self' 'unsafe-inline' data:",
+        "img-src 'self' data: blob:",
+        "font-src 'self' data:",
+        "frame-src 'self' https://challenges.cloudflare.com",
+        "connect-src 'self' https://challenges.cloudflare.com https://api.openai.com"
+      ].join('; ');
+      res.setHeader('Content-Security-Policy', csp);
+    }
+    
     res.end(asset.content);
     logRequest(req, res);
   } catch (error) {
