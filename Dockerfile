@@ -11,7 +11,7 @@ COPY packages/web/package.json packages/web/package.json
 COPY packages/ethics-core/package.json packages/ethics-core/package.json
 
 # Install dependencies using workspace support
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Bring in the remainder of the landing page source and produce the static dist bundle.
 COPY packages/web/ /app/packages/web/
@@ -35,7 +35,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/ethics-core/package.json packages/ethics-core/
 
 # Install dependencies (includes @discordjs/opus build)
-RUN npm install --include=dev
+RUN npm install --include=dev --legacy-peer-deps
 
 # Copy and build bot
 COPY . .
@@ -43,7 +43,7 @@ RUN npm run build --workspace=@arete/shared
 RUN npx tsc -p packages/discord-bot/tsconfig.json
 
 # Prune dev dependencies to reduce image size
-RUN cd packages/discord-bot && npm install --production
+RUN cd packages/discord-bot && npm install --production --legacy-peer-deps
 
 
 # Stage 3: Final runtime image
@@ -63,7 +63,7 @@ COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
 COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
 COPY --from=bot-builder /app/package.json ./package.json
 COPY --from=bot-builder /app/package-lock.json ./package-lock.json
-RUN npm install --production --ignore-scripts
+RUN npm install --production --ignore-scripts --legacy-peer-deps
 
 # Copy the lightweight Node server used to host the static site
 COPY server.js ./server.js

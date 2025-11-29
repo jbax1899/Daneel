@@ -244,10 +244,22 @@ For issues or questions about embedding ARETE:
 
 ## Updating Allowed Origins
 
-To embed ARETE from a different domain, you'll need to update the server configuration:
+To embed ARETE from a different domain, you have two options:
+
+### Option 1: Environment Variable (Recommended)
+
+Set the `ARETE_FRAME_ANCESTORS` environment variable with a comma-separated list of domains:
+
+```bash
+ARETE_FRAME_ANCESTORS=https://yourblog.com,https://anotherdomain.com,http://localhost:3000
+```
+
+This will add your domains to the default allowed list. The environment variable is read by both the production server (`server.js`) and the development server (`vite.config.ts`).
+
+### Option 2: Code Configuration
 
 1. **CORS configuration**: Update the `setCorsHeaders` function in `server.js` to include your domain in `Access-Control-Allow-Origin`
-2. **CSP configuration**: Update the `frame-ancestors` directive in `server.js` for the `/embed` route to allow your domain
+2. **CSP configuration**: Update the `frame-ancestors` directive in `server.js` (around line 1276) and `packages/web/vite.config.ts` (around line 14) to allow your domain
 
 Note: Multiple domains can be configured by listing them in the CSP `frame-ancestors` directive (space-separated).
 

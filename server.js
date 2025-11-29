@@ -1278,13 +1278,29 @@ const server = http.createServer(async (req, res) => {
         'https://ai.jordanmakes.dev',
         'https://portfolio.jordanmakes.dev',
         'https://jordanmakes.dev',
+        'https://blog.jordanmakes.dev',
+        'https://www.jordanmakes.dev',
         'http://localhost:3000',
         'http://localhost:5173'
       ];
       
+      // Allow additional domains via ARETE_FRAME_ANCESTORS environment variable (comma-separated)
+      if (process.env.ARETE_FRAME_ANCESTORS) {
+        const additionalDomains = process.env.ARETE_FRAME_ANCESTORS.split(',')
+          .map(domain => domain.trim())
+          .map(domain => domain.replace(/\/+$/, '')) // Remove trailing slashes
+          .filter(domain => domain.length > 0);
+        frameAncestors.push(...additionalDomains);
+      }
+      
+      // Normalize all domains: remove trailing slashes and deduplicate
+      const normalizedFrameAncestors = [...new Set(
+        frameAncestors.map(domain => domain.replace(/\/+$/, ''))
+      )];
+      
       // Allow embedding from allowed domains and also allow all necessary resources
       const csp = [
-        `frame-ancestors ${frameAncestors.join(' ')}`,
+        `frame-ancestors ${normalizedFrameAncestors.join(' ')}`,
         "default-src 'self'",
         "script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https://challenges.cloudflare.com",
         "style-src 'self' 'unsafe-inline' data:",
