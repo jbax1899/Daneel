@@ -26,7 +26,7 @@ const FEATURES: ServiceFeature[] = [
     description: 'Join a voice channel and speak to me in real-time.',
   },
   {
-    id: 'understanding',
+    id: 'image-understanding',
     title: 'Image understanding',
     description: 'I can analyze photos for meaning and context.',
   },
@@ -45,7 +45,8 @@ const getFeatureImage = (featureId: string, theme: string): string | null => {
     'chat': 'chat',
     'realtime': 'search',
     'call': 'call',
-    // 'understanding' and 'image' don't have images yet
+    'image-understanding': 'image-understanding',
+    'image': 'image',
   };
 
   const imageName = imageMap[featureId];
