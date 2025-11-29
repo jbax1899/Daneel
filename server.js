@@ -85,7 +85,7 @@ function verifyGitHubSignature(secret, body, signature) {
  * Writes a blog post to the file system based on GitHub discussion data
  */
 async function writeBlogPost(discussion) {
-  const BLOG_POSTS_DIR = path.join(__dirname, 'packages', 'web', 'public', 'blog-posts');
+  const BLOG_POSTS_DIR = path.join(DIST_DIR, 'blog-posts');
   
   try {
     await fsPromises.mkdir(BLOG_POSTS_DIR, { recursive: true });
