@@ -36,13 +36,23 @@ const Header = ({ breadcrumbItems }: HeaderProps): JSX.Element => {
         </div>
         <div className="site-header-actions">
           {showSetupButton && (
-            <a className="header-button secondary" href="/invite/">
-              Setup
+            <a 
+              className="header-button secondary" 
+              href="/invite/"
+              {...(pathname === '/embed' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              aria-label={pathname === '/embed' ? 'Setup (opens in new tab)' : 'Setup'}
+            >
+              Setup{pathname === '/embed' && <> <span aria-hidden="true">↗</span></>}
             </a>
           )}
           {showBlogButton && (
-            <a className="header-button secondary" href="/blog">
-              Blog
+            <a 
+              className="header-button secondary" 
+              href="/blog"
+              {...(pathname === '/embed' ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              aria-label={pathname === '/embed' ? 'Blog (opens in new tab)' : 'Blog'}
+            >
+              Blog{pathname === '/embed' && <> <span aria-hidden="true">↗</span></>}
             </a>
           )}
           <a className="header-button secondary" href="https://github.com/arete-org/arete" target="_blank" rel="noreferrer" aria-label="View ARETE project on GitHub (opens in new tab)">
