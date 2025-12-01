@@ -226,6 +226,14 @@ If you see scrollbars in the iframe:
 
 5. **Responsive Behavior**: The embed is designed to work well on desktop and tablet devices. Mobile responsiveness is optimized but may require additional styling considerations.
 
+## Embed-Specific Considerations
+
+- **Mobile responsiveness**: Shared `global.css` applies additional padding and stacking below ~560px and ~480px. At 320–414px, the ARETE intro and AMA form stack vertically; keep the iframe container at `width: 100%` with no CSS transforms to avoid forced zoom/scroll.
+- **Header links**: On `/embed`, `Setup` and `Blog` buttons automatically open in a new tab with `target="_blank"`/`rel="noopener noreferrer"`. GitHub always opens in a new tab.
+- **Height messaging**: The embed posts `arete-embed-height` messages on load, resize, mutations, and a 500ms interval. Ensure the parent listener stays attached and validates origin as needed.
+- **Trimmed UI**: The embed shows only the header, hero copy, ARETE intro, and Ask Me Anything. No blog grid or other site sections render.
+- **Iframe container**: Prefer dynamic height (listener above) over hard-coding short heights; if hard-coding, use at least 800px and let the iframe scroll be hidden.
+
 ## Customization
 
 If you need to customize the embed appearance, you can:
