@@ -33,6 +33,7 @@
   --transition-speed: 200ms;
   
   /* Responsive breakpoints */
+  --breakpoint-xs: 320px;
   --breakpoint-lg: 960px;
   --breakpoint-md: 768px;
   --breakpoint-sm: 480px;
@@ -165,6 +166,9 @@ body {
   overflow-wrap: break-word;
   /* Ensure body allows vertical scrolling for sticky to work */
   height: auto;
+  width: 100%;
+  max-width: 100vw;
+  box-sizing: border-box;
 }
 
 /* Background pattern */
@@ -192,6 +196,33 @@ body::before {
   margin: 0 auto;
   /* Ensure app-shell doesn't create a scrolling container or containing block that limits sticky */
   overflow: visible;
+  box-sizing: border-box;
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    padding: clamp(1.35rem, 4vw, 2rem) clamp(1.15rem, 4vw, 1.85rem);
+  }
+}
+
+@media (max-width: 480px) {
+  .app-shell {
+    padding: clamp(1.5rem, 4vw, 4.5rem) clamp(1.1rem, 3.5vw, 1.9rem);
+  }
+}
+
+@media (max-width: 450px) {
+  .app-shell {
+    padding: clamp(1.2rem, 3vw, 2rem) clamp(0.75rem, 2vw, 1rem);
+    max-width: 100vw;
+    width: 100%;
+    min-width: 0;
+  }
+  
+  .app-shell > * {
+    max-width: 100%;
+    min-width: 0;
+  }
 }
 
 main {
@@ -317,6 +348,35 @@ a:hover, a:focus {
   width: 100%;
   max-width: var(--max-width);
   margin: 0 auto;
+}
+
+@media (max-width: 480px) {
+  .site-header-sticky__inner {
+    gap: clamp(0.75rem, 2vw, 1.5rem);
+    padding: clamp(0.75rem, 1.5vw, 1rem) 0;
+  }
+}
+
+@media (max-width: 450px) {
+  .site-header-sticky__inner {
+    gap: clamp(0.5rem, 1.5vw, 1rem);
+    padding: clamp(0.75rem, 1.5vw, 1rem) 0;
+  }
+  
+  .site-header-actions {
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+  
+  .header-button {
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
+  }
+  
+  .theme-toggle {
+    padding: 0.55rem 0.8rem;
+    font-size: 0.85rem;
+  }
 }
 
 .site-header-actions {
@@ -618,6 +678,29 @@ section:has(.site-header-sticky) {
   outline-offset: 2px;
 }
 
+@media (max-width: 540px) {
+  .interaction-heading-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: clamp(0.6rem, 2vw, 0.9rem);
+  }
+
+  .interaction-heading-row .interaction-prompt-buttons-row {
+    width: 100%;
+    justify-content: flex-start;
+    gap: clamp(0.5rem, 2vw, 0.75rem);
+  }
+
+  .interaction-prompt-text-button-wrapper {
+    flex: 1 1 180px;
+    width: 100%;
+  }
+
+  .interaction-prompt-text-button {
+    width: 100%;
+  }
+}
+
 [data-theme='dark'] .interaction-prompt-text-button:hover {
   background: color-mix(in srgb, var(--bg-soft) 85%, var(--hover-bg) 15%);
 }
@@ -722,7 +805,7 @@ section:has(.site-header-sticky) {
 .interaction-input-group {
   display: flex;
   gap: clamp(0.75rem, 2vw, 0.9rem);
-  align-items: flex-start;
+  align-items: stretch;
 }
 
 .interaction-input-wrapper {
@@ -830,10 +913,18 @@ section:has(.site-header-sticky) {
 
 /* Base interaction-captcha styling - Invisible mode widgets have no visual footprint */
 .interaction-captcha {
+  display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.75rem;
+  gap: 0;
   /* Invisible mode widgets don't need container styling - they handle themselves */
+  position: absolute;
+  left: -9999px;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+  margin: 0;
+  padding: 0;
 }
 
 /* Hide CAPTCHA widget container when it's in hidden mode to prevent gaps */
@@ -853,11 +944,15 @@ section:has(.site-header-sticky) {
 /* Error state: Show widget when user needs to retry after an error */
 .interaction-captcha.interaction-captcha-visible {
   display: flex !important;
+  position: static !important;
+  left: auto !important;
+  width: 100% !important;
   height: auto !important;
   min-height: auto !important;
   max-height: none !important;
   margin: 0;
   padding: 0;
+  justify-content: center;
   line-height: normal;
   visibility: visible !important;
   pointer-events: auto !important;
@@ -1482,6 +1577,18 @@ div.interaction-status:not(.interaction-status-visible) *,
   gap: clamp(1rem, 3vw, 2rem);
   grid-template-columns: 140px 1fr;
   align-items: start;
+}
+
+@media (max-width: 480px) {
+  .arete-content {
+    grid-template-columns: 1fr;
+    align-items: center;
+  }
+
+  .arete-logo-image {
+    width: 100px;
+    height: 100px;
+  }
 }
 
 .arete-logo {
@@ -2456,6 +2563,7 @@ code, pre, kbd {
   .interaction-input-group {
     flex-direction: column;
     align-items: stretch;
+    gap: clamp(0.4rem, 2vw, 0.6rem);
   }
   
   .interaction-input {
@@ -2477,8 +2585,8 @@ code, pre, kbd {
   }
   
   .site-header-sticky__inner {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 0.75rem;
   }
   
@@ -2496,7 +2604,7 @@ code, pre, kbd {
   .site-header-actions {
     gap: 0.5rem;
     flex-wrap: wrap;
-    width: 100%;
+    width: auto;
   }
   
   .header-button {
@@ -2507,8 +2615,8 @@ code, pre, kbd {
   .theme-toggle {
     min-width: auto;
     width: auto;
-    padding: 0.55rem;
-    font-size: 1.2rem;
+    padding: 0.55rem 0.75rem;
+    font-size: 1rem;
   }
   
   .theme-toggle-text {
@@ -2578,6 +2686,111 @@ code, pre, kbd {
   .blog-markdown__th,
   .blog-markdown__td {
     padding: 0.6rem 0.8rem;
+  }
+}
+
+@media (max-width: 700px) {
+  .interaction-input-group {
+    gap: 0;
+  }
+}
+
+@media (max-width: 600px) {
+  .interaction-input-group {
+    gap: 0;
+  }
+}
+
+@media (max-width: 540px) {
+  .interaction-input-group {
+    gap: 0;
+  }
+}
+
+@media (max-width: 450px) {
+  .interaction-input-group {
+    gap: 0;
+  }
+}
+
+@media (max-width: 540px) {
+  .site-header-sticky__inner {
+    gap: 0.6rem;
+  }
+}
+
+@media (max-width: 440px) {
+  .site-header-sticky__inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .site-header-actions {
+    width: auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    align-items: flex-start;
+    gap: 0.5rem;
+    align-self: flex-start;
+  }
+
+  .site-title-group {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  /* Keep ARETE mark at full size - don't shrink yet */
+  .site-tagline {
+    font-size: 0.85rem;
+  }
+
+  .header-button {
+    white-space: normal;
+    width: auto;
+    padding: 0.55rem 0.9rem;
+    flex: 0 0 auto;
+  }
+
+  .theme-toggle {
+    width: auto;
+    padding: 0.55rem 0.9rem;
+    flex: 0 0 auto;
+  }
+}
+
+@media (max-width: 400px) {
+  .site-title-group {
+    gap: 0.35rem;
+  }
+
+  /* Only shrink ARETE mark at 400px and below */
+  .site-mark {
+    font-size: 1.5rem;
+    letter-spacing: 0.16em;
+  }
+
+  .site-tagline {
+    font-size: 0.78rem;
+  }
+
+  .site-header-actions {
+    gap: 0.4rem;
+  }
+
+  .header-button,
+  .theme-toggle {
+    width: auto;
+    flex: 0 0 auto;
+    padding: 0.55rem 0.9rem;
+  }
+}
+
+@media (max-width: 350px) {
+  /* Further shrink ARETE mark only at very small sizes */
+  .site-mark {
+    font-size: 1.3rem;
+    letter-spacing: 0.12em;
   }
 }
 
