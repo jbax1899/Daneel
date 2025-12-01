@@ -11,9 +11,9 @@ const Hero = (): JSX.Element => {
       <Header breadcrumbItems={breadcrumbItems} />
 
       <div className="hero-copy">
-        <h1 id="hero-title">A mindful and honest AI companion.</h1>
+        <h1 id="hero-title">Mindful and honest AI.</h1>
         <p className="hero-copy__subtitle">
-          Ethics-first AI for thoughtful conversations — private, open-source, easy to run yourself.
+          Ethics-first, private, and easy to run yourself.
         </p>
         
         <div className="arete" aria-labelledby="arete-title">
