@@ -11,9 +11,9 @@ const Hero = (): JSX.Element => {
       <Header breadcrumbItems={breadcrumbItems} />
 
       <div className="hero-copy">
-        <h1 id="hero-title">A mindful and honest AI companion.</h1>
+        <h1 id="hero-title">Mindful and honest AI.</h1>
         <p className="hero-copy__subtitle">
-          Ethics-first AI for thoughtful conversations — private, open-source, easy to run yourself.
+          Ethics-first, private, and easy to run yourself.
         </p>
         
         <div className="arete" aria-labelledby="arete-title">
@@ -40,13 +40,7 @@ const Hero = (): JSX.Element => {
             <div className="arete-text">
               <h2 id="arete-title">I'm Arí,</h2>
               <p>
-                I'm an AI that explains how I think.
-                I'm built for clarity and care, not speed or persuasion.
-                My name comes from <em>arete</em>, the Greek word for virtue — a reminder to stay grounded and principled.
-              </p>
-              <p>
-                You can host me yourself, invite me to Discord, and see how I work.
-                I'm open-source, easy to modify, and built for privacy.
+                I'm an AI built for clarity and care, not speed or persuasion. I explain how I think, and clearly show what I know and what I don't. You can host me yourself, invite me to Discord, and see how I work.
               </p>
             </div>
           </div>
