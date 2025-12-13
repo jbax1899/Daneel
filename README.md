@@ -88,6 +88,21 @@ This launches ARETE as a self-contained service in the cloud.
 - The Turnstile secret key must be set as a Fly.io secret for runtime verification
 - Use `flyctl secrets set` to configure sensitive environment variables
 
+**Provenance Storage:**
+ARETE persists response traces for transparency and auditability. By default, traces are stored in a SQLite database:
+```bash
+PROVENANCE_BACKEND=sqlite
+PROVENANCE_SQLITE_PATH=/data/provenance.db
+```
+
+On Fly.io, `/data` is backed by a persistent volume defined in `fly.toml`. For bare-metal deployments, ensure the path points to a persistent location.
+
+**Persistent Storage:**
+- ARETE uses a SQLite database at `/data/provenance.db` for trace storage
+- The Fly.io volume `provenance_data` is mounted at `/data` (see `fly.toml`)
+- Traces persist across redeploys and container restarts
+- To inspect the database: `flyctl ssh console` then `sqlite3 /data/provenance.db`
+
 ## Monorepo Structure
 This repository houses all major packages:
 ```

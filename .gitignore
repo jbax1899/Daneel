@@ -52,3 +52,6 @@ packages/web/tsconfig*.tsbuildinfo
 packages/web/vite.config.js
 packages/web/vite.config.js.map
 packages/web/vite.config.d.ts
+
+# Database
+data/

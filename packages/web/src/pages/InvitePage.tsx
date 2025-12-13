@@ -376,8 +376,9 @@ ENGAGEMENT_PROBABILISTIC_LOW=0.4
 ENGAGEMENT_PROBABILISTIC_HIGH=0.6
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false
 
-# Optional trace storage configuration
-TRACE_STORE_PATH=./traces
+# Provenance storage configuration
+PROVENANCE_BACKEND=sqlite
+PROVENANCE_SQLITE_PATH=/data/provenance.db
 
 # Optional web server configuration
 WEB_BASE_URL=https://your-domain.com`;
@@ -441,8 +442,9 @@ ENGAGEMENT_PROBABILISTIC_LOW=0.4
 ENGAGEMENT_PROBABILISTIC_HIGH=0.6
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false
 
-# Optional trace storage configuration
-TRACE_STORE_PATH=./traces
+# Provenance storage configuration
+PROVENANCE_BACKEND=sqlite
+PROVENANCE_SQLITE_PATH=/data/provenance.db
 
 # Optional web server configuration
 WEB_BASE_URL=https://your-domain.com`;
@@ -561,8 +563,9 @@ ENGAGEMENT_PROBABILISTIC_LOW=0.4          # Lower bound for LLM refinement (Floa
 ENGAGEMENT_PROBABILISTIC_HIGH=0.6         # Upper bound for LLM refinement (Float: 0.0-1.0)
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false    # Use LLM for score refinement (Boolean)
 
-# Optional trace storage configuration
-TRACE_STORE_PATH=./traces                  # Directory for response traces (String)
+# Provenance storage configuration
+PROVENANCE_BACKEND=sqlite                  # Storage backend (sqlite)
+PROVENANCE_SQLITE_PATH=/data/provenance.db # SQLite database path
 
 # Optional web server configuration
 WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}

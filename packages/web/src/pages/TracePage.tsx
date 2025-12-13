@@ -7,9 +7,15 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 // Define the actual server response metadata structure
 interface ServerMetadata {
+  responseId?: string;
   id: string;
   timestamp: string;
   model: string;
+  modelVersion?: string;
+  provenance?: string;
+  riskTier?: string;
+  chainHash?: string;
+  licenseContext?: string;
   reasoningEffort: string;
   runtimeContext: {
     modelVersion: string;
@@ -171,6 +177,19 @@ const TracePage = (): JSX.Element => {
     };
   }, [responseId]);
 
+  // Debug: log traceData whenever it changes
+  useEffect(() => {
+    console.log('=== traceData State Changed ===');
+    console.log('traceData:', traceData);
+    console.log('traceData?.confidence:', traceData?.confidence);
+    console.log('traceData?.confidence type:', typeof traceData?.confidence);
+    if (traceData) {
+      console.log('All traceData keys:', Object.keys(traceData));
+      console.log('Raw traceData JSON:', JSON.stringify(traceData, null, 2));
+    }
+    console.log('================================');
+  }, [traceData]);
+
   if (loadingState === 'loading') {
     return (
       <section className="interaction-status" aria-live="polite">
@@ -278,21 +297,12 @@ const TracePage = (): JSX.Element => {
     );
   }
 
-  // Debug: log traceData whenever it changes
-  useEffect(() => {
-    console.log('=== traceData State Changed ===');
-    console.log('traceData:', traceData);
-    console.log('traceData?.confidence:', traceData?.confidence);
-    console.log('traceData?.confidence type:', typeof traceData?.confidence);
-    if (traceData) {
-      console.log('All traceData keys:', Object.keys(traceData));
-      console.log('Raw traceData JSON:', JSON.stringify(traceData, null, 2));
-    }
-    console.log('================================');
-  }, [traceData]);
-
   const riskTier = traceData?.reasoningEffort ?? 'low';
   const riskColor = RISK_TIER_COLORS[riskTier] ?? '#6b7280';
+  const provenance = traceData?.provenance || traceData?.reasoningEffort || 'Unknown';
+  const model = traceData?.model || traceData?.modelVersion || 'Unspecified';
+  const riskLabel = traceData?.riskTier || riskTier || 'Unspecified';
+  const chainHash = traceData?.chainHash || traceData?.chainHash === '' ? traceData.chainHash : undefined;
   
   // Format confidence as percentage if available
   const formatConfidence = (confidence?: number): string => {
@@ -321,7 +331,7 @@ const TracePage = (): JSX.Element => {
   const staleAfter = traceData?.staleAfter
     ? new Date(traceData.staleAfter).toLocaleString()
     : 'N/A';
-  const provenance = traceData?.reasoningEffort ?? 'Unknown';
+  const displayId = traceData?.id || traceData?.responseId || responseId;
 
   return (
     <section className="site-section">
@@ -329,7 +339,7 @@ const TracePage = (): JSX.Element => {
       <header className="site-header" aria-live="polite">
         <div className="site-mark">
           <h1>Response Trace</h1>
-          <code>{traceData?.id ?? responseId}</code>
+          <code>{displayId}</code>
         </div>
         <Link to="/" className="button-link">
           Back to home
@@ -356,11 +366,11 @@ const TracePage = (): JSX.Element => {
                 display: 'inline-block',
               }}
             />
-            {riskTier || 'Unspecified'}
+            {riskLabel}
           </span>
         </p>
         <p>
-          <strong>Model:</strong> {traceData?.model || 'Unspecified'}
+          <strong>Model:</strong> {model}
         </p>
       </article>
 
@@ -405,7 +415,7 @@ const TracePage = (): JSX.Element => {
           <div>
             <dt>Chain Hash</dt>
             <dd>
-              <code>Unavailable</code>
+              <code>{chainHash ?? 'Unavailable'}</code>
             </dd>
           </div>
           <div>

@@ -49,6 +49,7 @@ RUN cd packages/discord-bot && npm install --production --legacy-peer-deps
 # Stage 3: Final runtime image
 FROM node:22.14.0-slim
 WORKDIR /app
+ENV npm_config_python=/usr/bin/python3
 
 # Copy built frontend assets from the Vite build stage
 # Note: TURNSTILE_SITE_KEY is baked into the frontend build (public, safe to expose)
@@ -63,7 +64,12 @@ COPY --from=bot-builder /app/packages/shared/prompts ./packages/shared/prompts
 COPY --from=bot-builder /app/packages/ethics-core ./packages/ethics-core
 COPY --from=bot-builder /app/package.json ./package.json
 COPY --from=bot-builder /app/package-lock.json ./package-lock.json
-RUN npm install --production --ignore-scripts --legacy-peer-deps
+# Install build essentials for native modules, then production deps with native builds enabled (better-sqlite3)
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/* \
+  && npm ci --omit=dev --legacy-peer-deps \
+  && npm rebuild better-sqlite3 --build-from-source
 
 # Copy the lightweight Node server used to host the static site
 COPY server.js ./server.js

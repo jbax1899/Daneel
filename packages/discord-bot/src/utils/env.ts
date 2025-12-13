@@ -7,7 +7,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { PromptRegistry, PromptKey, renderPrompt as sharedRenderPrompt, setActivePromptRegistry } from '@arete/shared';
+import type { PromptKey, PromptRegistry as PromptRegistryType } from '@arete/shared';
 import { logger } from './logger.js';
 
 // Get the current directory
@@ -19,17 +19,28 @@ const envPath = path.resolve(__dirname, '../../../../.env');
 logger.debug(`Loading environment variables from: ${envPath}`);
 
 // Load environment variables from .env file in the root directory
-try { 
-  const { error, parsed } = dotenv.config({ path: envPath }); 
+try {
+  const { error, parsed } = dotenv.config({ path: envPath });
 
   if (error) {
     logger.warn(`Failed to load .env file: ${error.message}`);
   } else if (parsed) {
     logger.debug(`Loaded environment variables: ${Object.keys(parsed).join(', ')}`);
   }
-} catch { 
-  logger.warn("No .env found (expected on Fly.io deployments)");
+} catch {
+  logger.warn('No .env found (expected on Fly.io deployments)');
 }
+
+// Import shared module after environment has been configured so it reads the correct values.
+const {
+  PromptRegistry,
+  renderPrompt: sharedRenderPrompt,
+  setActivePromptRegistry
+}: {
+  PromptRegistry: typeof PromptRegistryType;
+  renderPrompt: typeof import('@arete/shared').renderPrompt;
+  setActivePromptRegistry: typeof import('@arete/shared').setActivePromptRegistry;
+} = await import('@arete/shared');
 
 /**
  * List of required environment variables that must be set for the application to run.

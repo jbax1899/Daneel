@@ -24,4 +24,5 @@ export {
  * Trace storage utilities for persisting and retrieving response metadata.
  */
 export * from './traceStore.js';
-export { defaultTraceStore } from './traceStore.js';
+export { defaultTraceStore, createTraceStoreFromEnv } from './traceStore.js';
+export { SqliteTraceStore } from './sqliteTraceStore.js';
