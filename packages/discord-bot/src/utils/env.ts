@@ -37,7 +37,7 @@ const {
   renderPrompt: sharedRenderPrompt,
   setActivePromptRegistry
 }: {
-  PromptRegistry: typeof PromptRegistryType;
+  PromptRegistry: typeof import('@arete/shared').PromptRegistry;
   renderPrompt: typeof import('@arete/shared').renderPrompt;
   setActivePromptRegistry: typeof import('@arete/shared').setActivePromptRegistry;
 } = await import('@arete/shared');
