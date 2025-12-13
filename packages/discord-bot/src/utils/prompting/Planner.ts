@@ -127,9 +127,9 @@ const planFunction = {
           webSearch: {
             type: "object",
             properties: {
-              query: { type: "string", description: "If performing a web_search, the query to perform a web search for." },
+              query: { type: "string", description: "If performing a web_search, the web search query. web_search is required whenever the answer depends on versioned, time-sensitive, comparative, or externally verifiable facts (e.g., model versions, releases, benchmarks, pricing). If you cannot justify high confidence without lookup, you must perform a web_search rather than speculate." },
               //allowedDomains: { type: "array", items: { type: "string" }, description: "An array of allowed domains to search within." },
-              searchContextSize: { type: "string", enum: ["low", "medium"/*, "high"*/], description: "The size of the search context, 'medium' being the default." },
+              searchContextSize: { type: "string", enum: ["low", "medium", "high"], description: "Controls the breadth of external context retrieved. Use 'low' only when a single, stable fact is sufficient. Use 'medium' for comparisons, synthesis, or when confidence beyond a single source is required (e.g., model versions, release differences, benchmarks, pricing, timelines). Use 'high' only for complex, multi-factor, or high-stakes queries where missing context could materially affect correctness. Default to 'medium' when uncertainty exists." },
               /*userLocation: {
                 type: "object",
                 properties: {
@@ -146,7 +146,7 @@ const planFunction = {
           },
           ttsOptions: {
             type: "object",
-            description: "Controls how the TTS response should be generated. Required if 'modality' is 'tts'.",
+            description: "Controls how the TTS response should be generated. Use only if 'modality' is 'tts'.",
             properties: {
               //model:      { type: "string", description: "The model to use for TTS." }, // hardcoded to "gpt-4o-mini-tts" for now
               //voice:      { type: "string", description: "The voice to use for TTS." }, // hardcoded to "echo" for now
