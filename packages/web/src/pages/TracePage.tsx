@@ -297,11 +297,13 @@ const TracePage = (): JSX.Element => {
     );
   }
 
-  const riskTier = traceData?.reasoningEffort ?? 'low';
-  const riskColor = RISK_TIER_COLORS[riskTier] ?? '#6b7280';
+  const rawRiskTier = traceData?.riskTier || 'low';
+  const normalizedRiskTier = typeof rawRiskTier === 'string' ? rawRiskTier.toLowerCase() : 'low';
+  const riskTier = rawRiskTier || 'low';
+  const riskColor = RISK_TIER_COLORS[normalizedRiskTier] ?? '#6b7280';
   const provenance = traceData?.provenance || traceData?.reasoningEffort || 'Unknown';
   const model = traceData?.model || traceData?.modelVersion || 'Unspecified';
-  const riskLabel = traceData?.riskTier || riskTier || 'Unspecified';
+  const riskLabel = riskTier || 'Unspecified';
   const chainHash = traceData?.chainHash || traceData?.chainHash === '' ? traceData.chainHash : undefined;
   
   // Format confidence as percentage if available
