@@ -51,7 +51,7 @@ type MessageProcessorOptions = {
   systemPrompt?: string;
 };
 
-const MAIN_MODEL: SupportedModel = 'gpt-5-mini';
+const MAIN_MODEL: SupportedModel = 'gpt-5.2';
 const PLAN_CONTEXT_SIZE = 8;
 const RESPONSE_CONTEXT_SIZE = 24;
 const VALID_IMAGE_BACKGROUNDS: ImageBackgroundType[] = ['auto', 'transparent', 'opaque'];

@@ -19,7 +19,7 @@ import { logger } from './logger.js';
 // Type Declarations
 // ====================
 
-export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano';
+export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-5.1' | 'gpt-5.2';
 export type OmniModelType = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
 export type EmbeddingModelType = 'text-embedding-3-small' | 'text-embedding-3-large' | 'text-embedding-ada-002';
 export type TextModelPricingKey = GPT5ModelType | OmniModelType | EmbeddingModelType;
@@ -120,6 +120,8 @@ export interface ImageGenerationCostEstimate {
  */
 const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: number }> = {
     // GPT-5 Models
+    'gpt-5.2':      { input: 1.75, output: 14.00 },
+    'gpt-5.1':      { input: 1.25, output: 10.00 },
     'gpt-5':        { input: 1.25, output: 10.00 },
     'gpt-5-mini':   { input: 0.25, output: 2.00 },
     'gpt-5-nano':   { input: 0.05, output: 0.40 },
