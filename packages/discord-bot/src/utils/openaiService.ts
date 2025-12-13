@@ -817,7 +817,7 @@ export class OpenAIService {
     */
    // TODO: Output is inconsistent - We usually get the warning "number of summaries does not match number of messages to summarize". Consider implementing a tool call to get consistent output.
 
-    const REDUCE_OVER_N_CHARCTERS = 256;
+    const REDUCE_OVER_N_CHARCTERS = 1024;
     const REDUCTION_MODEL: GPT5ModelType = 'gpt-5-nano';
     const summarizerPrompt = renderPrompt('discord.summarizer.system').content;
 
