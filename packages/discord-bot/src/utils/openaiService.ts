@@ -817,7 +817,8 @@ export class OpenAIService {
     */
    // TODO: Output is inconsistent - We usually get the warning "number of summaries does not match number of messages to summarize". Consider implementing a tool call to get consistent output.
 
-    const REDUCE_OVER_N_CHARCTERS = 256;
+    const REDUCE_OVER_N_CHARCTERS = 999999; //1024; 
+    //TODO: reevaluate the threshold for summarization; Discord's message length limit (2048 characters) is too small, so we might need a system for analyzing groups of messages from a single user rather than summarizing each message individually.
     const REDUCTION_MODEL: GPT5ModelType = 'gpt-5-nano';
     const summarizerPrompt = renderPrompt('discord.summarizer.system').content;
 

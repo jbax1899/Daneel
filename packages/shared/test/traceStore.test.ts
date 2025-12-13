@@ -4,13 +4,13 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 
-import { createTraceStore } from '../src/traceStore.js';
+import { SqliteTraceStore } from '../src/sqliteTraceStore.js';
 import type { ResponseMetadata } from 'ethics-core';
 
 test('TraceStore round trips metadata with citation URLs', async () => {
   const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'trace-store-'));
-  const storagePath = path.join(tempRoot, 'traces');
-  const store = createTraceStore({ storagePath });
+  const dbPath = path.join(tempRoot, 'provenance.db');
+  const store = new SqliteTraceStore({ dbPath });
 
   const metadata: ResponseMetadata = {
     responseId: 'response_123',
@@ -39,19 +39,6 @@ test('TraceStore round trips metadata with citation URLs', async () => {
   try {
     await store.upsert(metadata);
 
-    const persistedPath = path.join(storagePath, `${metadata.responseId}.json`);
-    const persistedContent = await fs.readFile(persistedPath, 'utf-8');
-    const persistedJson = JSON.parse(persistedContent);
-
-    assert.equal(typeof persistedJson.citations[0].url, 'string', 'citation URL should persist as a string');
-    assert.equal(persistedJson.citations[0].url, metadata.citations[0].url.toString(), 'persisted URL should match original string');
-    assert.equal(typeof persistedJson.citations[1].url, 'string', 'string citation URL should persist as string');
-    assert.equal(
-      persistedJson.citations[1].url,
-      new URL('https://example.com/string').href,
-      'string citation should be normalized'
-    );
-
     const retrieved = await store.retrieve(metadata.responseId);
     assert.ok(retrieved, 'retrieve should return stored metadata');
     assert.equal(retrieved.responseId, metadata.responseId);
@@ -66,11 +53,8 @@ test('TraceStore round trips metadata with citation URLs', async () => {
     );
 
     await store.delete(metadata.responseId);
-    await assert.rejects(
-      fs.access(persistedPath),
-      { code: 'ENOENT' },
-      'deleted trace should not exist on disk'
-    );
+    const deleted = await store.retrieve(metadata.responseId);
+    assert.equal(deleted, null, 'deleted trace should not be retrievable');
   } finally {
     await fs.rm(tempRoot, { recursive: true, force: true });
   }

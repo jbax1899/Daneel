@@ -3,15 +3,13 @@ const fs = require('node:fs/promises');
 const fsPromises = require('node:fs/promises');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { createTraceStoreFromEnv } = require('@arete/shared');
 
 // Load environment variables from .env file
 require('dotenv').config();
 
 // Resolve the directory containing the built frontend assets.
 const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');
-
-// Resolve the directory for storing trace files.
-const TRACES_DIR = path.resolve(process.env.TRACE_STORE_PATH?.trim() || path.join(__dirname, 'traces'));
 
 // Model parameters
 const DEFAULT_MODEL = 'gpt-5-mini';
@@ -432,41 +430,8 @@ const buildResponseMetadata = (assistantMetadata, reasoningEffort, runtimeContex
   return metadata;
 };
 
-/**
- * Stores trace metadata to disk asynchronously.
- * Failures are logged but don't block the response.
- */
-const storeTrace = async (metadata) => {
-  try {
-    // Ensure traces directory exists
-    await fsPromises.mkdir(TRACES_DIR, { recursive: true });
-    
-    // Validate responseId (metadata.id) - only allow alphanumeric, hyphens, underscores
-    const responseId = metadata.id;
-    if (!/^[A-Za-z0-9_-]+$/.test(responseId)) {
-      console.error(`Invalid responseId "${responseId}" - not storing trace.`);
-      return;
-    }
-    
-    // Write trace file
-    const filePath = path.join(TRACES_DIR, `${responseId}.json`);
-    const traceContent = JSON.stringify(metadata, null, 2);
-    
-    console.log('=== Storing Trace Debug ===');
-    console.log('Response ID:', responseId);
-    console.log('Metadata being stored:', traceContent);
-    console.log('Metadata confidence:', metadata.confidence);
-    console.log('===========================');
-    
-    await fsPromises.writeFile(filePath, traceContent, { encoding: 'utf-8' });
-    console.log(`Trace stored successfully: ${filePath}`);
-  } catch (error) {
-    // Log but don't throw - trace storage failures shouldn't break the API
-    console.error(`Failed to store trace for response "${metadata.id}":`, error instanceof Error ? error.message : error);
-  }
-};
-
 // Initialize services
+let traceStore = null;
 let openaiService = null;
 let ipRateLimiter = null;
 let sessionRateLimiter = null;
@@ -484,6 +449,7 @@ const initializeServices = () => {
     throw new Error('OPENAI_API_KEY environment variable is required');
   }
 
+  traceStore = createTraceStoreFromEnv();
   openaiService = new SimpleOpenAIService(process.env.OPENAI_API_KEY);
   
   // Initialize rate limiters
@@ -504,6 +470,40 @@ const initializeServices = () => {
   }, 2 * 60 * 1000); // Cleanup every 2 minutes
 
   console.log('Services initialized successfully');
+};
+
+/**
+ * Stores trace metadata asynchronously using the configured trace store.
+ * Failures are logged but don't block the response.
+ */
+const storeTrace = async (metadata) => {
+  try {
+    const responseId = metadata.responseId || metadata.id;
+    if (!responseId) {
+      console.error('Missing response identifier for trace storage.');
+      return;
+    }
+
+    const citations = Array.isArray(metadata.citations) ? metadata.citations : [];
+    const normalizedMetadata = {
+      ...metadata,
+      responseId,
+      chainHash: metadata.chainHash || responseId,
+      licenseContext: metadata.licenseContext || 'unspecified',
+      modelVersion: metadata.modelVersion || metadata.runtimeContext?.modelVersion || metadata.model || 'unknown',
+      riskTier: metadata.riskTier || 'unknown',
+      provenance: metadata.provenance || 'unspecified',
+      staleAfter: metadata.staleAfter || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      tradeoffCount: typeof metadata.tradeoffCount === 'number' ? metadata.tradeoffCount : 0,
+      confidence: typeof metadata.confidence === 'number' ? metadata.confidence : 0,
+      citations
+    };
+
+    await traceStore.upsert(normalizedMetadata);
+    console.log(`Trace stored successfully: ${normalizedMetadata.responseId || normalizedMetadata.id}`);
+  } catch (error) {
+    console.error(`Failed to store trace for response "${metadata.id}":`, error);
+  }
 };
 
 /**
@@ -1031,71 +1031,38 @@ const handleTraceRequest = async (req, res, parsedUrl) => {
     console.log('Request pathname:', parsedUrl.pathname);
     console.log('Extracted responseId:', responseId);
     
-    // Validate responseId format
-    if (!/^[A-Za-z0-9_-]+$/.test(responseId)) {
-      console.log('ResponseId validation failed');
-      res.statusCode = 400;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ error: 'Invalid responseId format' }));
-      logRequest(req, res, 'trace invalid-id');
-      return;
-    }
-
-    const filePath = path.join(TRACES_DIR, `${responseId}.json`);
-    console.log('Looking for trace file at:', filePath);
-    console.log('TRACES_DIR:', TRACES_DIR);
-    
     try {
-      const fileContent = await fsPromises.readFile(filePath, { encoding: 'utf-8' });
-      const metadata = JSON.parse(fileContent);
+      const metadata = await traceStore.retrieve(responseId);
       
-      // Debug logging for trace retrieval
-      console.log('=== Trace Retrieval Debug ===');
-      console.log('Response ID:', responseId);
-      console.log('File path:', filePath);
-      console.log('Metadata from file:', JSON.stringify(metadata, null, 2));
-      console.log('Metadata confidence:', metadata.confidence);
-      console.log('Metadata confidence type:', typeof metadata.confidence);
-      console.log('==============================');
+      if (!metadata) {
+        res.statusCode = 404;
+        res.setHeader('Content-Type', 'application/json; charset=utf-8');
+        res.end(JSON.stringify({ error: 'Trace not found' }));
+        logRequest(req, res, 'trace not-found');
+        return;
+      }
       
-      // Check if trace is stale
       if (metadata.staleAfter) {
         const staleAfterDate = new Date(metadata.staleAfter);
         if (staleAfterDate < new Date()) {
-          // Trace is stale, return 410 with the metadata
           res.statusCode = 410;
           res.setHeader('Content-Type', 'application/json; charset=utf-8');
-          res.setHeader('Cache-Control', 'no-store');
           res.end(JSON.stringify({ message: 'Trace is stale', metadata }));
           logRequest(req, res, 'trace stale');
           return;
         }
       }
       
-      // Return successful response
       res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'); // Disable caching for debugging
-      res.end(fileContent);
+      res.end(JSON.stringify(metadata));
       logRequest(req, res, 'trace success');
-      
     } catch (error) {
-      // File not found - check for ENOENT error code
-      if (error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT') {
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'application/json; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        res.end(JSON.stringify({ error: 'Trace not found' }));
-        logRequest(req, res, 'trace not-found');
-        return;
-      }
-      
-      // JSON parse error or other read error
       const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`Failed to retrieve trace for response "${responseId}":`, errorMessage);
       res.statusCode = 500;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify({ error: 'Failed to read trace file' }));
+      res.end(JSON.stringify({ error: 'Failed to read trace' }));
       logRequest(req, res, `trace error ${errorMessage}`);
     }
   } catch (error) {
