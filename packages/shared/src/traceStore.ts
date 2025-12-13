@@ -86,8 +86,24 @@ export function createTraceStoreFromEnv(): TraceStore {
     throw new Error(`Unsupported PROVENANCE_BACKEND "${backend}". Only "sqlite" is supported.`);
   }
 
-  const dbPath = process.env.PROVENANCE_SQLITE_PATH?.trim() || '/data/provenance.db';
-  return new SqliteTraceStore({ dbPath });
+  const envPath = process.env.PROVENANCE_SQLITE_PATH?.trim();
+  const flyDefaultPath = process.env.FLY_APP_NAME ? '/data/provenance.db' : undefined;
+  const defaultPath = envPath || flyDefaultPath || './data/provenance.db';
+
+  try {
+    return new SqliteTraceStore({ dbPath: defaultPath });
+  } catch (error) {
+    const code = (error as { code?: string }).code;
+    const isPermission = code === 'EACCES' || code === 'EPERM';
+    if (isPermission && !envPath) {
+      // Fallback to a local relative path when default path is not writable and no env override is set.
+      console.warn(
+        `Falling back to local SQLite path "./data/provenance.db" because default path "${defaultPath}" was not writable: ${String(error)}`
+      );
+      return new SqliteTraceStore({ dbPath: './data/provenance.db' });
+    }
+    throw error;
+  }
 }
 
 export const defaultTraceStore = createTraceStoreFromEnv();
