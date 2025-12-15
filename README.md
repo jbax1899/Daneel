@@ -26,7 +26,7 @@ Instead of chasing speed or persuasion like other AI systems, ARETE values clari
 | ------------- | ------------- |
 | [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
 | [SECURITY.md](SECURITY.md) | Security and ethical safety policy. |
-| [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md)  | Dual-license rationale (MIT + Hippocratic License v3). |
+| [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md). |
 
 ## Quickstart
 You can deploy ARETE locally or on Fly.io (either path uses the same environment configuration).
@@ -124,8 +124,7 @@ See [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md) for details.
 
 ## Contributing
 
-ARETE welcomes thoughtful contributions — technical, philosophical, or editorial.
-
+We welcome thoughtful contributions of all kinds. 
 Guidelines and governance structure are documented (COMING SOON) in:
 - CONTRIBUTING.md — workflow and ethics review notes
 - GOVERNANCE.md — decision-making processes
