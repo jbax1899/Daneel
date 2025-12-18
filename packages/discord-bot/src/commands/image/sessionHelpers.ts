@@ -311,11 +311,13 @@ export function buildImageResultPresentation(
     let promptTruncated = false;
     let originalTruncated = false;
 
+    const originalLabel = followUpContext.allowPromptAdjustment ? 'Original prompt' : 'Prompt';
+
     if (normalizedRefinedPrompt) {
         promptTruncated = recordPrompt('Prompt', normalizedActivePrompt);
-        originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
+        originalTruncated = recordPrompt(originalLabel, normalizedOriginalPrompt);
     } else {
-        promptTruncated = recordPrompt('Prompt', normalizedOriginalPrompt);
+        promptTruncated = recordPrompt(originalLabel, normalizedOriginalPrompt);
     }
 
     assertField('Image model', followUpContext.imageModel, { inline: true });

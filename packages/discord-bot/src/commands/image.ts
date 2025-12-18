@@ -88,16 +88,6 @@ function buildInitialStatusFields(
 
     const fields: StatusField[] = [
         {
-            name: 'Current prompt',
-            value: buildPromptFieldValue(activePrompt, { label: 'current prompt' }),
-            inline: false
-        },
-        {
-            name: 'Original prompt',
-            value: buildPromptFieldValue(originalPrompt, { label: 'original prompt' }),
-            inline: false
-        },
-        {
             name: 'Image model',
             value: context.imageModel,
             inline: true
