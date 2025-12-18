@@ -104,7 +104,8 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
         model: imageModel,
         quality,
         size,
-        background
+        background,
+        allowPartialImages: Boolean(onPartialImage)
     });
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
@@ -185,19 +186,23 @@ function createImageGenerationTool(options: {
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
+    allowPartialImages: boolean;
 }): Tool.ImageGeneration {
     // The OpenAI SDK currently narrows the `model` property to only allow the
     // `gpt-image-1` literal. The API accepts additional models (for example the
     // more affordable `gpt-image-1-mini`), so we populate the field and then
     // cast the resulting object back to the SDK's type.
-    const tool = {
+    const tool: Tool.ImageGeneration = {
         type: 'image_generation',
         quality: options.quality,
         size: options.size,
         background: options.background,
-        partial_images: PARTIAL_IMAGE_LIMIT,
         model: options.model
-    } as Tool.ImageGeneration;
+    };
+
+    if (options.allowPartialImages) {
+        tool.partial_images = PARTIAL_IMAGE_LIMIT;
+    }
 
     return tool;
 }
