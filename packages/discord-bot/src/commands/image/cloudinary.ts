@@ -95,7 +95,7 @@ export async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMe
             context.image_description = clampForCloudinary(metadata.description);
         }
 
-        addChunkedContext(context, 'reflection_note', metadata.reflectionMessage ?? undefined);
+        addChunkedContext(context, 'annotation_note', metadata.noteMessage ?? undefined);
         addChunkedContext(context, 'original_prompt', metadata.originalPrompt);
         addChunkedContext(context, 'adjusted_prompt', metadata.revisedPrompt ?? undefined, {
             fallback: 'Model reused the original prompt.'

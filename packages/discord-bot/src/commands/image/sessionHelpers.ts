@@ -8,23 +8,23 @@ import {
     type TextModelPricingKey
 } from '../../utils/pricing.js';
 import {
+    ANNOTATION_MESSAGE_LIMIT,
     EMBED_FIELD_VALUE_LIMIT,
     EMBED_MAX_FIELDS,
     EMBED_TOTAL_FIELD_CHAR_LIMIT,
     EMBED_TITLE_LIMIT,
     IMAGE_RETRY_CUSTOM_ID_PREFIX,
-    IMAGE_VARIATION_CUSTOM_ID_PREFIX,
-    REFLECTION_MESSAGE_LIMIT
+    IMAGE_VARIATION_CUSTOM_ID_PREFIX
 } from './constants.js';
 import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
-import { generateImageWithReflection } from './openai.js';
+import { generateImageWithMetadata } from './openai.js';
 import type {
     ImageGenerationCallWithPrompt,
     ImageRenderModel,
     ImageStylePreset,
     ImageTextModel,
     PartialImagePayload,
-    ReflectionFields
+    AnnotationFields
 } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import { sanitizeForEmbed, setEmbedFooterText, truncateForEmbed } from './embed.js';
@@ -40,7 +40,7 @@ export interface ImageGenerationArtifacts {
     imageModel: ImageRenderModel;
     revisedPrompt: string | null;
     finalStyle: ImageStylePreset;
-    reflection: ReflectionFields;
+    annotations: AnnotationFields;
     finalImageBuffer: Buffer;
     finalImageFileName: string;
     imageUrl: string | null;
@@ -82,7 +82,7 @@ export async function executeImageGeneration(
     const start = Date.now();
     const openai = new OpenAI();
 
-    const generation = await generateImageWithReflection({
+    const generation = await generateImageWithMetadata({
         openai,
         prompt: context.prompt,
         textModel: context.textModel,
@@ -99,7 +99,7 @@ export async function executeImageGeneration(
         onPartialImage: options.onPartialImage
     });
 
-    const { response, imageCall, finalImageBase64, reflection } = generation;
+    const { response, imageCall, finalImageBase64, annotations } = generation;
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
     const totalTokens = response.usage?.total_tokens ?? (inputTokens + outputTokens);
@@ -131,10 +131,10 @@ export async function executeImageGeneration(
         try {
             imageUrl = await uploadToCloudinary(finalImageBuffer, {
                 originalPrompt: context.originalPrompt ?? context.prompt,
-                revisedPrompt: reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null,
-                title: reflection.title,
-                description: reflection.description,
-                reflectionMessage: reflection.reflection,
+                revisedPrompt: annotations.adjustedPrompt ?? imageCall.revised_prompt ?? null,
+                title: annotations.title,
+                description: annotations.description,
+                noteMessage: annotations.note,
                 textModel: context.textModel,
                 imageModel: context.imageModel,
                 quality: context.quality,
@@ -166,7 +166,7 @@ export async function executeImageGeneration(
     }
 
     const generationTimeMs = Date.now() - start;
-    const revisedPrompt = reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null;
+    const revisedPrompt = annotations.adjustedPrompt ?? imageCall.revised_prompt ?? null;
 
     return {
         responseId: response.id ?? null,
@@ -174,7 +174,7 @@ export async function executeImageGeneration(
         imageModel: context.imageModel,
         revisedPrompt,
         finalStyle,
-        reflection,
+        annotations,
         finalImageBuffer,
         finalImageFileName,
         imageUrl,
@@ -250,7 +250,7 @@ export function buildImageResultPresentation(
         .setColor(0x5865F2)
         .setTimestamp();
 
-    const title = artifacts.reflection.title ? `🎨 ${artifacts.reflection.title}` : '🎨 Image Generation';
+    const title = artifacts.annotations.title ? `🎨 ${artifacts.annotations.title}` : '🎨 Image Generation';
     embed.setTitle(truncateForEmbed(title, EMBED_TITLE_LIMIT));
 
     if (artifacts.imageUrl) {

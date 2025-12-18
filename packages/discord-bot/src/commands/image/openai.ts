@@ -7,10 +7,10 @@ import type {
 } from 'openai/resources/responses/responses.js';
 import { logger } from '../../utils/logger.js';
 import {
-    PARTIAL_IMAGE_LIMIT,
-    REFLECTION_DESCRIPTION_LIMIT,
-    REFLECTION_MESSAGE_LIMIT,
-    REFLECTION_TITLE_LIMIT
+    ANNOTATION_DESCRIPTION_LIMIT,
+    ANNOTATION_MESSAGE_LIMIT,
+    ANNOTATION_TITLE_LIMIT,
+    PARTIAL_IMAGE_LIMIT
 } from './constants.js';
 import { sanitizeForEmbed, truncateForEmbed } from './embed.js';
 import { renderPrompt } from '../../utils/env.js';
@@ -24,7 +24,7 @@ import type {
     ImageStylePreset,
     ImageTextModel,
     PartialImagePayload,
-    ReflectionFields
+    AnnotationFields
 } from './types.js';
 import { mapResponseError } from './errors.js';
 
@@ -50,10 +50,10 @@ interface GenerationOutcome {
     imageCall: ImageGenerationCallWithPrompt;
     finalImageBase64: string;
     partialImages: string[];
-    reflection: ReflectionFields;
+    annotations: AnnotationFields;
 }
 
-export async function generateImageWithReflection(options: GenerateImageOptions): Promise<GenerationOutcome> {
+export async function generateImageWithMetadata(options: GenerateImageOptions): Promise<GenerationOutcome> {
     const {
         openai,
         prompt,
@@ -169,15 +169,15 @@ export async function generateImageWithReflection(options: GenerateImageOptions)
 
     logger.debug(`Image generation successful - ID: ${imageCall.id}, Status: ${imageCall.status}`);
 
-    const reflectionText = extractFirstTextMessage(response);
-    const reflection = parseReflectionFields(reflectionText);
+    const annotationText = extractFirstTextMessage(response);
+    const annotations = parseAnnotationFields(annotationText);
 
     return {
         response,
         imageCall,
         finalImageBase64: imageData,
         partialImages,
-        reflection
+        annotations
     };
 }
 
@@ -197,7 +197,8 @@ function createImageGenerationTool(options: {
         quality: options.quality,
         size: options.size,
         background: options.background,
-        model: options.model
+        // SDK only narrows to "gpt-image-1" literal, but API accepts other models (e.g., gpt-image-1-mini).
+        model: options.model as Tool.ImageGeneration['model']
     };
 
     if (options.allowPartialImages) {
@@ -254,28 +255,29 @@ function stripJsonFences(value: string): string {
     return trimmed;
 }
 
-function parseReflectionFields(rawText: string | null): ReflectionFields {
+function parseAnnotationFields(rawText: string | null): AnnotationFields {
     if (!rawText) {
-        return { title: null, description: null, reflection: null, adjustedPrompt: null };
+        return { title: null, description: null, note: null, adjustedPrompt: null };
     }
 
     const sanitizedRaw = stripJsonFences(rawText);
 
     try {
-        const parsed = JSON.parse(sanitizedRaw) as Partial<ReflectionFields> & { adjusted_prompt?: string };
-        const title = parsed.title ? truncateForEmbed(sanitizeForEmbed(parsed.title), REFLECTION_TITLE_LIMIT) : null;
+        const parsed = JSON.parse(sanitizedRaw) as Partial<AnnotationFields> & { adjusted_prompt?: string; reflection?: string };
+        const title = parsed.title ? truncateForEmbed(sanitizeForEmbed(parsed.title), ANNOTATION_TITLE_LIMIT) : null;
         const description = parsed.description
-            ? truncateForEmbed(sanitizeForEmbed(parsed.description), REFLECTION_DESCRIPTION_LIMIT)
+            ? truncateForEmbed(sanitizeForEmbed(parsed.description), ANNOTATION_DESCRIPTION_LIMIT)
             : null;
-        const reflection = parsed.reflection
-            ? truncateForEmbed(sanitizeForEmbed(parsed.reflection), REFLECTION_MESSAGE_LIMIT)
+        const noteSource = parsed.note ?? (parsed as { reflection?: string }).reflection ?? null;
+        const note = noteSource
+            ? truncateForEmbed(sanitizeForEmbed(noteSource), ANNOTATION_MESSAGE_LIMIT)
             : null;
         const adjustedPrompt = parsed.adjusted_prompt ?? parsed.adjustedPrompt ?? null;
 
-        return { title, description, reflection, adjustedPrompt };
+        return { title, description, note, adjustedPrompt };
     } catch (error) {
-        logger.warn('Failed to parse reflection response JSON. Using raw text.', error);
-        const reflection = truncateForEmbed(sanitizeForEmbed(sanitizedRaw), REFLECTION_MESSAGE_LIMIT);
-        return { title: null, description: null, reflection, adjustedPrompt: null };
+        logger.warn('Failed to parse annotation response JSON. Using raw text.', error);
+        const note = truncateForEmbed(sanitizeForEmbed(sanitizedRaw), ANNOTATION_MESSAGE_LIMIT);
+        return { title: null, description: null, note, adjustedPrompt: null };
     }
 }

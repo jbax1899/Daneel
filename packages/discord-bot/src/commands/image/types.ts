@@ -14,10 +14,10 @@ export type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCa
     style_preset?: ImageStylePreset | null;
 };
 
-export interface ReflectionFields {
+export interface AnnotationFields {
     title: string | null;
     description: string | null;
-    reflection: string | null;
+    note: string | null;
     adjustedPrompt?: string | null;
 }
 
@@ -48,7 +48,7 @@ export interface UploadMetadata {
     revisedPrompt?: string | null;
     title?: string | null;
     description?: string | null;
-    reflectionMessage?: string | null;
+    noteMessage?: string | null;
     textModel: ImageTextModel;
     imageModel: ImageRenderModel;
     quality: ImageQualityType;
