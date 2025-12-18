@@ -233,7 +233,10 @@ export function buildImageResultPresentation(
     }: { followUpResponseId?: string | null } = {}
 ): ImageResultPresentation {
     const originalPrompt = context.originalPrompt ?? context.prompt;
-    const candidateRefinedPrompt = artifacts.revisedPrompt ?? context.refinedPrompt ?? null;
+    // Only surface a refined/adjusted prompt when callers allow adjustments.
+    const candidateRefinedPrompt = context.allowPromptAdjustment
+        ? (artifacts.revisedPrompt ?? context.refinedPrompt ?? null)
+        : null;
     const refinedPrompt = candidateRefinedPrompt && candidateRefinedPrompt !== originalPrompt
         ? candidateRefinedPrompt
         : null;

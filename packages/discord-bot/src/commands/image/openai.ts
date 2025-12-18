@@ -126,18 +126,19 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         input,
         tools: [imageTool],
         tool_choice: toolChoice,
-        previous_response_id: followUpResponseId ?? null,
-        stream: (stream ?? Boolean(onPartialImage)) as boolean
+        previous_response_id: followUpResponseId ?? null
     };
 
     logger.debug(`Request payload: ${JSON.stringify(requestPayload, null, 2)}`);
 
-    const partialImages: string[] = [];
+    const shouldStream = Boolean(stream ?? onPartialImage);
+    let response: Response;
+    let partials: string[] = [];
 
-    const shouldStream = Boolean(requestPayload.stream);
     if (shouldStream) {
         const partialImages: string[] = [];
-        const stream = await openai.responses.stream(requestPayload);
+        const streamingPayload = { ...requestPayload, stream: true as const };
+        const stream = await openai.responses.stream(streamingPayload);
 
         stream.on('response.image_generation_call.partial_image', event => {
             try {
@@ -159,12 +160,11 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
             logger.error('Image generation stream failed:', event.response.error ?? event.response);
         });
 
-        var response = await stream.finalResponse();
-        var partials = partialImages;
+        response = await stream.finalResponse();
+        partials = partialImages;
     } else {
-        const { stream: _removed, ...nonStreamingPayload } = requestPayload;
-        var response = await openai.responses.create(nonStreamingPayload as any);
-        var partials: string[] = [];
+        response = await openai.responses.create(requestPayload as any);
+        partials = [];
     }
 
     if (response.error) {
@@ -220,10 +220,17 @@ function createImageGenerationTool(options: {
         size: options.size,
         background: options.background,
         output_format: options.outputFormat,
-        output_compression: clampOutputCompression(options.outputCompression),
         // SDK only narrows to "gpt-image-1" literal, but API accepts other models (e.g., gpt-image-1-mini).
         model: options.model as Tool.ImageGeneration['model']
     };
+
+    // OpenAI currently expects PNG requests to use 100 compression; values < 100
+    // return a 400. For other formats we clamp to the requested value.
+    if (options.outputFormat === 'png') {
+        tool.output_compression = 100;
+    } else {
+        tool.output_compression = clampOutputCompression(options.outputCompression);
+    }
 
     if (options.allowPartialImages) {
         tool.partial_images = PARTIAL_IMAGE_LIMIT;

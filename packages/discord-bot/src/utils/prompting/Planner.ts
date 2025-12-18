@@ -3,7 +3,8 @@ import { logger } from '../logger.js';
 import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel, TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 import { ActivityOptions } from 'discord.js';
 import type { RiskTier } from 'ethics-core';
-import { DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT } from '../../commands/image/constants.js';
+import { DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY } from '../../commands/image/constants.js';
+import type { ImageQualityType } from '../../commands/image/types.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
 const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // letting it handle verbosity
@@ -28,6 +29,7 @@ type ImagePlanRequest = {
   prompt: string;
   aspectRatio?: 'auto' | 'square' | 'portrait' | 'landscape';
   background?: string;
+  quality?: ImageQualityType;
   style?: string;
   allowPromptAdjustment?: boolean;
   followUpResponseId?: string;
@@ -91,13 +93,18 @@ const planFunction = {
           output_format: {
             type: "string",
             enum: ["png", "webp", "jpeg"],
-            description: "Preferred output format. Defaults to webp."
+            description: "Preferred output format. Omit for the default."
           },
           output_compression: {
             type: "integer",
             minimum: 1,
             maximum: 100,
-            description: "Compression quality (1-100). Defaults to 80."
+            description: "Compression quality (1-100). Omit for the default."
+          },
+          quality: {
+            type: "string",
+            enum: ["low", "medium", "high", "auto"],
+            description: "Image quality. Default is 'auto'."
           },
           style: {
             type: "string",
@@ -326,6 +333,7 @@ export class Planner {
     const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : 'auto';
     const background = typeof request.background === 'string' ? request.background : 'auto';
     const style = typeof request.style === 'string' ? request.style : 'unspecified';
+    const quality = this.normalizeQuality((request as Record<string, unknown>).quality ?? request.quality);
     const formatCandidate = (request as Record<string, unknown>).output_format ?? request.outputFormat;
     const normalizedFormat = typeof formatCandidate === 'string'
       ? this.normalizeOutputFormat(formatCandidate)
@@ -342,6 +350,7 @@ export class Planner {
       prompt: (request.prompt ?? '').toString(),
       aspectRatio,
       background,
+      quality,
       style,
       // Automated image requests should only opt into prompt adjustments when the
       // planner is absolutely certain the user requested it. Leaving this false by
@@ -357,6 +366,18 @@ export class Planner {
 
   private isValidAspectRatio(value: unknown): value is ImagePlanRequest['aspectRatio'] {
     return value === 'auto' || value === 'square' || value === 'portrait' || value === 'landscape';
+  }
+
+  private normalizeQuality(candidate: unknown): ImageQualityType {
+    const normalized = typeof candidate === 'string' ? candidate.toLowerCase() : '';
+    const allowed: ImageQualityType[] = ['low', 'medium', 'high', 'auto'];
+    if (allowed.includes(normalized as ImageQualityType)) {
+      return normalized as ImageQualityType;
+    }
+    if (normalized) {
+      logger.warn(`Planner returned unsupported image quality "${candidate}", defaulting to ${DEFAULT_IMAGE_QUALITY}.`);
+    }
+    return DEFAULT_IMAGE_QUALITY;
   }
 
   private normalizeOutputFormat(candidate: unknown): ImagePlanRequest['outputFormat'] {

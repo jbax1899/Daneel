@@ -23,7 +23,7 @@ import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
@@ -325,7 +325,7 @@ export class MessageProcessor {
           size,
           aspectRatio,
           aspectRatioLabel,
-          quality: referencedContext?.quality ?? ('low' as ImageQualityType),
+          quality: request.quality ?? referencedContext?.quality ?? DEFAULT_IMAGE_QUALITY,
           background,
           style,
           allowPromptAdjustment,
