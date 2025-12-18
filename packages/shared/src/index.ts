@@ -21,8 +21,20 @@ export {
 } from './prompts/promptRegistry.js';
 
 /**
+ * Logging utilities.
+ */
+export { logger, formatUsd, logLLMCostSummary } from './logger.js';
+export type { LLMCostTotals, LLMCostSummaryProvider } from './logger.js';
+
+/**
  * Trace storage utilities for persisting and retrieving response metadata.
  */
 export * from './traceStore.js';
 export { defaultTraceStore, createTraceStoreFromEnv } from './traceStore.js';
 export { SqliteTraceStore } from './sqliteTraceStore.js';
+
+/**
+ * Incident storage utilities for durable incident logging and audit trails.
+ */
+export * from './incidentStore.js';
+export { SqliteIncidentStore } from './sqliteIncidentStore.js';

@@ -12,7 +12,7 @@
  * Ethics: Determines the ethical classification and risk assessment of AI responses, affecting transparency, accountability, and user trust.
  */
 
-import { Provenance, RiskTier } from './types';
+import { Provenance, RiskTier } from './types.js';
 
 /**
  * Computes the provenance type for a given context.

@@ -12,7 +12,7 @@
  * Ethics: Provides cost transparency and enables budget controls; critical for responsible AI resource consumption.
  */
 
-import { logger } from './logger.js';
+import { logger, logLLMCostSummary, type LLMCostTotals } from './logger.js';
 import { formatUsd } from './pricing.js';
 import type { ModelCostBreakdown, CostStatistics } from './pricing.js';
 import type { ChannelContextManager } from '../state/ChannelContextManager.js';
@@ -236,6 +236,25 @@ export class LLMCostEstimator {
     } catch (error) {
       costLogger.error(`Failed to reset channel totals for ${channelId}: ${(error as Error)?.message ?? error}`);
     }
+  }
+
+  /**
+   * Returns a lightweight summary of global totals suitable for logging.
+   */
+  public getSummaryTotals(): LLMCostTotals {
+    return {
+      totalCostUsd: this.globalTotals.totalCostUsd,
+      totalCalls: this.globalTotals.totalCalls,
+      totalTokensIn: this.globalTotals.totalTokensIn,
+      totalTokensOut: this.globalTotals.totalTokensOut
+    };
+  }
+
+  /**
+   * Logs the current LLM cost summary using the shared logger helper.
+   */
+  public logSummary(): void {
+    logLLMCostSummary(() => this.getSummaryTotals());
   }
 
   /**

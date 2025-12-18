@@ -2,12 +2,14 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import type { ResponseMetadata } from 'ethics-core';
+import { logger } from './logger.js';
 import { assertValidResponseMetadata, traceStoreJsonReplacer } from './traceStore.js';
 
 const BUSY_MAX_ATTEMPTS = 5;
 const BUSY_RETRY_DELAY_MS = 50;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const traceLogger = typeof logger.child === 'function' ? logger.child({ module: 'sqliteTraceStore' }) : logger;
 
 export interface SqliteTraceStoreConfig {
   dbPath: string;
@@ -21,13 +23,12 @@ export class SqliteTraceStore {
 
   constructor(config: SqliteTraceStoreConfig) {
     const resolvedPath = path.resolve(config.dbPath);
-    // Ensure the parent directory exists before opening the database.
-    const dir = path.dirname(resolvedPath);
+    const dir = path.dirname(resolvedPath); // Ensure the parent directory exists before opening the database.
     fs.mkdirSync(dir, { recursive: true });
 
     this.db = new Database(resolvedPath);
-    this.db.pragma('journal_mode = WAL');
-    this.db.pragma('foreign_keys = ON');
+    this.db.pragma('journal_mode = WAL'); // WAL (Write-Ahead Logging) is a journaling mode that allows for concurrent writes to the database.
+    this.db.pragma('foreign_keys = ON'); // Foreign keys are enabled to enforce referential integrity.
 
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS provenance_traces (
@@ -53,7 +54,7 @@ export class SqliteTraceStore {
     );
     this.deleteStatement = this.db.prepare(`DELETE FROM provenance_traces WHERE response_id = ?`);
 
-    console.log(`Initialized SQLite trace store at ${resolvedPath}`);
+    traceLogger.info(`Initialized SQLite trace store at ${resolvedPath}`);
   }
 
   private normalizeMetadata(metadata: ResponseMetadata): ResponseMetadata {
@@ -124,7 +125,7 @@ export class SqliteTraceStore {
         updated_at: now
       })
     );
-    console.log(`Trace stored in SQLite: ${normalized.responseId}`);
+    traceLogger.info(`Trace stored in SQLite: ${normalized.responseId}`);
   }
 
   async retrieve(responseId: string): Promise<ResponseMetadata | null> {

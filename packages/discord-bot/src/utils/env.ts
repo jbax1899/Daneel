@@ -7,7 +7,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { PromptKey, PromptRegistry as PromptRegistryType } from '@arete/shared';
+import type { PromptKey } from '@arete/shared';
 import { logger } from './logger.js';
 
 // Get the current directory
