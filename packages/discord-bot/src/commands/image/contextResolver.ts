@@ -2,7 +2,7 @@ import type { Message } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 // Defaults stay in sync with environment overrides via the shared constants
 // module, so every recovery path mirrors the slash-command behaviour.
-import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from './constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL } from './constants.js';
 import { clampPromptForContext } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
@@ -64,7 +64,9 @@ const NEARBY_SEARCH_LIMIT = 15;
 
 function parseQuality(value: string | null | undefined): ImageQualityType {
     const normalised = value?.trim().toLowerCase() ?? '';
-    return QUALITY_VALUES.includes(normalised as ImageQualityType) ? (normalised as ImageQualityType) : 'low';
+    return QUALITY_VALUES.includes(normalised as ImageQualityType)
+        ? (normalised as ImageQualityType)
+        : DEFAULT_IMAGE_QUALITY;
 }
 
 function parseBackground(value: string | null | undefined): ImageBackgroundType {
