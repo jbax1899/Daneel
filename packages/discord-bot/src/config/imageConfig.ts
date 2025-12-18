@@ -1,5 +1,5 @@
 import { logger } from '../utils/logger.js';
-import type { ImageRenderModel, ImageTextModel } from '../commands/image/types.js';
+import type { ImageQualityType, ImageRenderModel, ImageTextModel } from '../commands/image/types.js';
 
 /**
  * Hard coded defaults ensure the bot keeps working even when no overrides are
@@ -8,6 +8,7 @@ import type { ImageRenderModel, ImageTextModel } from '../commands/image/types.j
  */
 const FALLBACK_TEXT_MODEL: ImageTextModel = 'gpt-4.1-mini';
 const FALLBACK_IMAGE_MODEL: ImageRenderModel = 'gpt-image-1-mini';
+const FALLBACK_IMAGE_QUALITY: ImageQualityType = 'low';
 const FALLBACK_TOKENS_PER_REFRESH = 10;
 const FALLBACK_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -113,6 +114,7 @@ export interface ImageConfiguration {
     defaults: {
         textModel: ImageTextModel;
         imageModel: ImageRenderModel;
+        quality: ImageQualityType;
     };
     tokens: {
         tokensPerRefresh: number;
@@ -130,7 +132,8 @@ export interface ImageConfiguration {
 export const imageConfig: ImageConfiguration = {
     defaults: {
         textModel: (process.env.IMAGE_DEFAULT_TEXT_MODEL as ImageTextModel | undefined) ?? FALLBACK_TEXT_MODEL,
-        imageModel: (process.env.IMAGE_DEFAULT_IMAGE_MODEL as ImageRenderModel | undefined) ?? FALLBACK_IMAGE_MODEL
+        imageModel: (process.env.IMAGE_DEFAULT_IMAGE_MODEL as ImageRenderModel | undefined) ?? FALLBACK_IMAGE_MODEL,
+        quality: (process.env.IMAGE_DEFAULT_QUALITY as ImageQualityType | undefined) ?? FALLBACK_IMAGE_QUALITY
     },
     tokens: {
         tokensPerRefresh: readNumberEnv('IMAGE_TOKENS_PER_REFRESH', FALLBACK_TOKENS_PER_REFRESH),
@@ -146,4 +149,3 @@ export const imageConfig: ImageConfiguration = {
 export function getImageModelTokenMultiplier(model: ImageRenderModel): number {
     return imageConfig.tokens.modelTokenMultipliers[model] ?? 1;
 }
-

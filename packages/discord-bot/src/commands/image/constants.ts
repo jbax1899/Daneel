@@ -17,6 +17,7 @@ export const REFLECTION_DESCRIPTION_LIMIT = EMBED_DESCRIPTION_LIMIT;
 export const REFLECTION_MESSAGE_LIMIT = 2000; // Discord's max is 2000
 export const DEFAULT_TEXT_MODEL = imageConfig.defaults.textModel;
 export const DEFAULT_IMAGE_MODEL = imageConfig.defaults.imageModel;
+export const DEFAULT_IMAGE_QUALITY = imageConfig.defaults.quality;
 export const IMAGE_VARIATION_CUSTOM_ID_PREFIX = 'image:variation:';
 export const IMAGE_RETRY_CUSTOM_ID_PREFIX = 'image:retry:';
 export const IMAGE_VARIATION_GENERATE_CUSTOM_ID_PREFIX = 'image:variation:generate:';

@@ -6,7 +6,7 @@ import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './i
 import { imageConfig } from '../config/imageConfig.js';
 // Pulling defaults from the constants module keeps the slash command aligned
 // with any environment overrides exposed by imageConfig.
-import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import {
     buildImageResultPresentation,
@@ -405,7 +405,7 @@ const imageCommand: Command = {
         const { size, aspectRatio, aspectRatioLabel } = resolveAspectRatioSettings(aspectRatioOption);
 
         const requestedQuality = interaction.options.getString('quality') as ImageQualityType | null;
-        const quality: ImageQualityType = requestedQuality ?? 'low';
+        const quality: ImageQualityType = requestedQuality ?? DEFAULT_IMAGE_QUALITY;
 
         const textModel = (interaction.options.getString('text_model') as ImageTextModel | null) ?? DEFAULT_TEXT_MODEL;
         const imageModel = (interaction.options.getString('image_model') as ImageRenderModel | null) ?? DEFAULT_IMAGE_MODEL;
