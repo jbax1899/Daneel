@@ -320,7 +320,7 @@ export function buildImageResultPresentation(
 
     assertField('Image model', followUpContext.imageModel, { inline: true });
     assertField('Text model', followUpContext.textModel, { inline: true });
-    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
+    assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
     assertField('Aspect ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Resolution', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });

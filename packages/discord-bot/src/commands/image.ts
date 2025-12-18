@@ -109,7 +109,7 @@ function buildInitialStatusFields(
         },
         {
             name: 'Quality',
-            value: `${toTitleCase(context.quality)} (${context.imageModel})`,
+            value: toTitleCase(context.quality),
             inline: true
         },
         {
