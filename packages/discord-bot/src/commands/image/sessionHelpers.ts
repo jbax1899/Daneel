@@ -27,7 +27,7 @@ import type {
     ReflectionFields
 } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
-import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
+import { sanitizeForEmbed, setEmbedFooterText, truncateForEmbed } from './embed.js';
 
 /**
  * Provides structured metadata about a generated image so that different
@@ -253,10 +253,6 @@ export function buildImageResultPresentation(
     const title = artifacts.reflection.title ? `🎨 ${artifacts.reflection.title}` : '🎨 Image Generation';
     embed.setTitle(truncateForEmbed(title, EMBED_TITLE_LIMIT));
 
-    if (artifacts.reflection.description) {
-        setEmbedDescription(embed, artifacts.reflection.description);
-    }
-
     if (artifacts.imageUrl) {
         embed.setImage(artifacts.imageUrl);
     }
@@ -312,8 +308,15 @@ export function buildImageResultPresentation(
         return truncated;
     };
 
-    const currentTruncated = recordPrompt('Current prompt', normalizedActivePrompt);
-    const originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
+    let promptTruncated = false;
+    let originalTruncated = false;
+
+    if (normalizedRefinedPrompt) {
+        promptTruncated = recordPrompt('Prompt', normalizedActivePrompt);
+        originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
+    } else {
+        promptTruncated = recordPrompt('Prompt', normalizedOriginalPrompt);
+    }
 
     assertField('Image model', followUpContext.imageModel, { inline: true });
     assertField('Text model', followUpContext.textModel, { inline: true });
@@ -328,8 +331,8 @@ export function buildImageResultPresentation(
     }
     assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
-    const refinedTruncated = normalizedRefinedPrompt ? currentTruncated : false;
-    const activeTruncated = currentTruncated;
+    const refinedTruncated = normalizedRefinedPrompt ? promptTruncated : false;
+    const activeTruncated = promptTruncated;
 
     embed.addFields(fields);
 
