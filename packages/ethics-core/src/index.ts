@@ -1,6 +1,12 @@
 // Export types
 // Re-export public types from types.ts
-export type { Provenance, RiskTier, ConfidenceScore, Citation, ResponseMetadata } from './types';
+export type {
+  Provenance,
+  RiskTier,
+  ConfidenceScore,
+  Citation,
+  ResponseMetadata
+} from './types.js';
 
 // Export functions
-export { computeProvenance, computeRiskTier } from './evaluators';
+export { computeProvenance, computeRiskTier } from './evaluators.js';

@@ -13,6 +13,7 @@
  */
 
 import type { ResponseMetadata } from 'ethics-core';
+import { logger } from './logger.js';
 import { SqliteTraceStore } from './sqliteTraceStore.js';
 
 export type TraceStore = SqliteTraceStore;
@@ -24,6 +25,8 @@ export const traceStoreJsonReplacer = (_key: string, value: unknown) => {
 
   return value;
 };
+
+const traceStoreLogger = typeof logger.child === 'function' ? logger.child({ module: 'traceStore' }) : logger;
 
 export function assertValidResponseMetadata(
   value: unknown,
@@ -97,7 +100,7 @@ export function createTraceStoreFromEnv(): TraceStore {
     const isPermission = code === 'EACCES' || code === 'EPERM';
     if (isPermission && !envPath) {
       // Fallback to a local relative path when default path is not writable and no env override is set.
-      console.warn(
+      traceStoreLogger.warn(
         `Falling back to local SQLite path "./data/provenance.db" because default path "${defaultPath}" was not writable: ${String(error)}`
       );
       return new SqliteTraceStore({ dbPath: './data/provenance.db' });

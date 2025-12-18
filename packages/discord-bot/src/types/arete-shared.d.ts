@@ -4,6 +4,7 @@
  */
 declare module '@arete/shared' {
   import type { ResponseMetadata } from 'ethics-core';
+  import type { Logger } from 'winston';
 
   export type PromptKey =
     | 'discord.chat.system'
@@ -68,4 +69,87 @@ declare module '@arete/shared' {
    */
   export function createTraceStoreFromEnv(): TraceStore;
   export const defaultTraceStore: TraceStore;
+  export const traceStoreJsonReplacer: (_key: string, value: unknown) => unknown;
+  export function assertValidResponseMetadata(
+    value: unknown,
+    source: string,
+    responseId: string
+  ): asserts value is ResponseMetadata;
+
+  export type IncidentStatus = 'new' | 'under_review' | 'confirmed' | 'dismissed' | 'resolved';
+
+  export interface IncidentPointers {
+    responseId?: string;
+    traceId?: string;
+    guildId?: string;
+    channelId?: string;
+    messageId?: string;
+    jumpUrl?: string;
+    modelVersion?: string;
+    chainHash?: string;
+    [key: string]: unknown;
+  }
+
+  export interface IncidentRecord {
+    id: number;
+    shortId: string;
+    status: IncidentStatus;
+    tags: string[];
+    pointers: IncidentPointers;
+    remediationApplied: boolean;
+    remediationNotes?: string | null;
+    createdAt: string;
+    updatedAt: string;
+  }
+
+  export interface IncidentAuditEvent {
+    id: number;
+    incidentId: number;
+    actorHash?: string | null;
+    action: string;
+    notes?: string | null;
+    createdAt: string;
+  }
+
+  export interface CreateIncidentInput {
+    status?: IncidentStatus;
+    tags?: string[];
+    pointers?: IncidentPointers;
+    remediationApplied?: boolean;
+    remediationNotes?: string | null;
+  }
+
+  export interface AppendAuditEventInput {
+    actorHash?: string | null;
+    action: string;
+    notes?: string | null;
+  }
+
+  export class SqliteIncidentStore {
+    constructor(config: { dbPath: string });
+    createIncident(input: CreateIncidentInput): Promise<IncidentRecord>;
+    getIncident(id: number): Promise<IncidentRecord | null>;
+    updateStatus(id: number, status: IncidentStatus): Promise<void>;
+    appendAuditEvent(incidentId: number, event: AppendAuditEventInput): Promise<IncidentAuditEvent>;
+  }
+
+  export type IncidentStore = SqliteIncidentStore;
+  export function createIncidentStoreFromEnv(): IncidentStore;
+  export const defaultIncidentStore: IncidentStore;
+
+  /**
+   * Logging utilities
+   */
+  export const logger: Logger;
+  export const formatUsd: (amount: number) => string;
+
+  export interface LLMCostTotals {
+    totalCostUsd: number;
+    totalCalls: number;
+    totalTokensIn: number;
+    totalTokensOut: number;
+  }
+
+  export type LLMCostSummaryProvider = () => LLMCostTotals | null | undefined;
+  export function logLLMCostSummary(getTotals?: LLMCostSummaryProvider): void;
 }
