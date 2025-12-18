@@ -1,5 +1,11 @@
 import { logger } from '../utils/logger.js';
-import type { ImageRenderModel, ImageTextModel } from '../commands/image/types.js';
+import type {
+    ImageOutputCompression,
+    ImageOutputFormat,
+    ImageQualityType,
+    ImageRenderModel,
+    ImageTextModel
+} from '../commands/image/types.js';
 
 /**
  * Hard coded defaults ensure the bot keeps working even when no overrides are
@@ -8,6 +14,9 @@ import type { ImageRenderModel, ImageTextModel } from '../commands/image/types.j
  */
 const FALLBACK_TEXT_MODEL: ImageTextModel = 'gpt-4.1-mini';
 const FALLBACK_IMAGE_MODEL: ImageRenderModel = 'gpt-image-1-mini';
+const FALLBACK_IMAGE_QUALITY: ImageQualityType = 'low';
+const FALLBACK_OUTPUT_FORMAT: ImageOutputFormat = 'webp';
+const FALLBACK_OUTPUT_COMPRESSION: ImageOutputCompression = 80;
 const FALLBACK_TOKENS_PER_REFRESH = 10;
 const FALLBACK_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -109,10 +118,41 @@ function parseMultiplierOverrides(): Record<ImageRenderModel, number> {
     return overrides;
 }
 
+function parseOutputFormat(raw: string | undefined): ImageOutputFormat | null {
+    if (!raw) {
+        return null;
+    }
+
+    const normalized = raw.toLowerCase();
+    if (normalized === 'png' || normalized === 'webp' || normalized === 'jpeg') {
+        return normalized;
+    }
+
+    logger.warn(`Ignoring invalid IMAGE_DEFAULT_OUTPUT_FORMAT "${raw}". Expected png, webp, or jpeg.`);
+    return null;
+}
+
+function parseOutputCompression(raw: string | undefined): ImageOutputCompression | null {
+    if (!raw) {
+        return null;
+    }
+
+    const value = Number(raw);
+    if (Number.isFinite(value) && value >= 1 && value <= 100) {
+        return value;
+    }
+
+    logger.warn(`Ignoring invalid IMAGE_DEFAULT_OUTPUT_COMPRESSION "${raw}". Expected a number between 1 and 100.`);
+    return null;
+}
+
 export interface ImageConfiguration {
     defaults: {
         textModel: ImageTextModel;
         imageModel: ImageRenderModel;
+        quality: ImageQualityType;
+        outputFormat: ImageOutputFormat;
+        outputCompression: ImageOutputCompression;
     };
     tokens: {
         tokensPerRefresh: number;
@@ -130,7 +170,10 @@ export interface ImageConfiguration {
 export const imageConfig: ImageConfiguration = {
     defaults: {
         textModel: (process.env.IMAGE_DEFAULT_TEXT_MODEL as ImageTextModel | undefined) ?? FALLBACK_TEXT_MODEL,
-        imageModel: (process.env.IMAGE_DEFAULT_IMAGE_MODEL as ImageRenderModel | undefined) ?? FALLBACK_IMAGE_MODEL
+        imageModel: (process.env.IMAGE_DEFAULT_IMAGE_MODEL as ImageRenderModel | undefined) ?? FALLBACK_IMAGE_MODEL,
+        quality: (process.env.IMAGE_DEFAULT_QUALITY as ImageQualityType | undefined) ?? FALLBACK_IMAGE_QUALITY,
+        outputFormat: parseOutputFormat(process.env.IMAGE_DEFAULT_OUTPUT_FORMAT) ?? FALLBACK_OUTPUT_FORMAT,
+        outputCompression: parseOutputCompression(process.env.IMAGE_DEFAULT_OUTPUT_COMPRESSION) ?? FALLBACK_OUTPUT_COMPRESSION
     },
     tokens: {
         tokensPerRefresh: readNumberEnv('IMAGE_TOKENS_PER_REFRESH', FALLBACK_TOKENS_PER_REFRESH),
@@ -146,4 +189,3 @@ export const imageConfig: ImageConfiguration = {
 export function getImageModelTokenMultiplier(model: ImageRenderModel): number {
     return imageConfig.tokens.modelTokenMultipliers[model] ?? 1;
 }
-

@@ -4,7 +4,9 @@ import type {
     ImageRenderModel,
     ImageSizeType,
     ImageStylePreset,
-    ImageTextModel
+    ImageTextModel,
+    ImageOutputFormat,
+    ImageOutputCompression
 } from './types.js';
 
 /**
@@ -40,6 +42,8 @@ export interface ImageGenerationContext {
     background: ImageBackgroundType;
     style: ImageStylePreset;
     allowPromptAdjustment: boolean;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
 }
 
 interface FollowUpCacheEntry {

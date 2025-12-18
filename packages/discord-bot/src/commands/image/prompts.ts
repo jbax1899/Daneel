@@ -43,9 +43,9 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
         safeGuildName ? `This generation takes place in the server "${safeGuildName}".` : ''
     ].filter(Boolean).join(' ');
 
-    const reflectionInstruction = requesterName
-        ? `The reflection must address "${requesterName}" by name and explore the creative intent in two or three sentences.`
-        : 'The reflection must explore the creative intent in two or three sentences.';
+    const annotationInstruction = requesterName
+        ? `Provide a brief annotation that addresses "${requesterName}" by name and explores the creative intent in two or three sentences.`
+        : 'Provide a brief annotation that explores the creative intent in two or three sentences.';
 
     const { content } = renderPrompt('discord.image.developer', {
         userContext,
@@ -54,7 +54,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
         background: options.background,
         style: options.style,
         adjustmentClause,
-        reflectionInstruction
+        reflectionInstruction: annotationInstruction
     });
 
     return content;

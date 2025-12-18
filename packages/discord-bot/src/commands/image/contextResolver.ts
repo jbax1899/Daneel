@@ -2,11 +2,12 @@ import type { Message } from 'discord.js';
 import { logger } from '../../utils/logger.js';
 // Defaults stay in sync with environment overrides via the shared constants
 // module, so every recovery path mirrors the slash-command behaviour.
-import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from './constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL } from './constants.js';
 import { clampPromptForContext } from './sessionHelpers.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import type {
     ImageBackgroundType,
+    ImageOutputFormat,
     ImageQualityType,
     ImageRenderModel,
     ImageSizeType,
@@ -64,7 +65,9 @@ const NEARBY_SEARCH_LIMIT = 15;
 
 function parseQuality(value: string | null | undefined): ImageQualityType {
     const normalised = value?.trim().toLowerCase() ?? '';
-    return QUALITY_VALUES.includes(normalised as ImageQualityType) ? (normalised as ImageQualityType) : 'low';
+    return QUALITY_VALUES.includes(normalised as ImageQualityType)
+        ? (normalised as ImageQualityType)
+        : DEFAULT_IMAGE_QUALITY;
 }
 
 function parseBackground(value: string | null | undefined): ImageBackgroundType {
@@ -106,6 +109,22 @@ function parseTextModel(value: string | null | undefined): ImageTextModel {
 function parseImageModel(value: string | null | undefined): ImageRenderModel {
     const normalised = value?.trim() as ImageRenderModel | undefined;
     return normalised ?? DEFAULT_IMAGE_MODEL;
+}
+
+function parseOutputFormat(value: string | null | undefined): ImageOutputFormat {
+    const normalised = value?.trim().toLowerCase();
+    if (normalised === 'png' || normalised === 'webp' || normalised === 'jpeg') {
+        return normalised;
+    }
+    return DEFAULT_IMAGE_OUTPUT_FORMAT;
+}
+
+function parseOutputCompression(value: string | null | undefined): number {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 100) {
+        return Math.round(parsed);
+    }
+    return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
 }
 
 function parsePromptAdjustment(value: string | null | undefined): boolean {
@@ -331,7 +350,9 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
             quality: parseQuality(fieldMap.get('Quality')),
             background: parseBackground(fieldMap.get('Background')),
             style: parseStyle(fieldMap.get('Style')),
-            allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt adjustment') ?? fieldMap.get('Prompt Adjustment'))
+            allowPromptAdjustment: parsePromptAdjustment(fieldMap.get('Prompt adjustment') ?? fieldMap.get('Prompt Adjustment')),
+            outputFormat: parseOutputFormat(fieldMap.get('Output format') ?? fieldMap.get('Output Format')),
+            outputCompression: parseOutputCompression(fieldMap.get('Compression'))
         },
         responseId: parseIdentifier(fieldMap.get('Output ID')),
         inputId: parseIdentifier(fieldMap.get('Input ID'))
