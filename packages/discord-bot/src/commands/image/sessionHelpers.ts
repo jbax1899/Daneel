@@ -41,7 +41,6 @@ export interface ImageGenerationArtifacts {
     revisedPrompt: string | null;
     finalStyle: ImageStylePreset;
     reflection: ReflectionFields;
-    reflectionMessage: string;
     finalImageBuffer: Buffer;
     finalImageFileName: string;
     imageUrl: string | null;
@@ -168,9 +167,6 @@ export async function executeImageGeneration(
 
     const generationTimeMs = Date.now() - start;
     const revisedPrompt = reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null;
-    const reflectionMessage = reflection.reflection
-        ? truncateForEmbed(reflection.reflection, REFLECTION_MESSAGE_LIMIT, { includeTruncationNote: true })
-        : '';
 
     return {
         responseId: response.id ?? null,
@@ -179,7 +175,6 @@ export async function executeImageGeneration(
         revisedPrompt,
         finalStyle,
         reflection,
-        reflectionMessage,
         finalImageBuffer,
         finalImageFileName,
         imageUrl,
@@ -375,7 +370,6 @@ export function buildImageResultPresentation(
     const components = artifacts.responseId ? [createVariationButtonRow(artifacts.responseId)] : [];
 
     return {
-        content: artifacts.reflectionMessage.trim() || undefined,
         embed,
         attachments,
         components,
