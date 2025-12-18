@@ -24,7 +24,9 @@ import type {
     ImageStylePreset,
     ImageTextModel,
     PartialImagePayload,
-    AnnotationFields
+    AnnotationFields,
+    ImageOutputFormat,
+    ImageOutputCompression
 } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import { sanitizeForEmbed, setEmbedFooterText, truncateForEmbed } from './embed.js';
@@ -44,6 +46,8 @@ export interface ImageGenerationArtifacts {
     finalImageBuffer: Buffer;
     finalImageFileName: string;
     imageUrl: string | null;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
     usage: {
         inputTokens: number;
         outputTokens: number;
@@ -92,6 +96,8 @@ export async function executeImageGeneration(
         background: context.background,
         style: context.style,
         allowPromptAdjustment: context.allowPromptAdjustment,
+        outputFormat: context.outputFormat,
+        outputCompression: context.outputCompression,
         followUpResponseId: options.followUpResponseId,
         username: options.user.username,
         nickname: options.user.nickname,
@@ -124,7 +130,8 @@ export async function executeImageGeneration(
     const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
 
     const finalImageBuffer = Buffer.from(finalImageBase64, 'base64');
-    const finalImageFileName = `arete-image-${Date.now()}.png`;
+    const extension = context.outputFormat ?? 'png';
+    const finalImageFileName = `arete-image-${Date.now()}.${extension}`;
     let imageUrl: string | null = null;
 
     if (isCloudinaryConfigured) {
@@ -178,6 +185,8 @@ export async function executeImageGeneration(
         finalImageBuffer,
         finalImageFileName,
         imageUrl,
+        outputFormat: context.outputFormat,
+        outputCompression: context.outputCompression,
         usage: {
             inputTokens,
             outputTokens,
@@ -327,6 +336,8 @@ export function buildImageResultPresentation(
     assertField('Resolution', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
     assertField('Prompt adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
+    assertField('Output format', followUpContext.outputFormat.toUpperCase(), { inline: true });
+    assertField('Compression', `${followUpContext.outputCompression}%`, { inline: true });
     assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
     if (followUpResponseId) {
         assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });

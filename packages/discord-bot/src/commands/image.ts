@@ -6,7 +6,7 @@ import { buildPromptFieldValue, setEmbedFooterText, truncateForEmbed } from './i
 import { imageConfig } from '../config/imageConfig.js';
 // Pulling defaults from the constants module keeps the slash command aligned
 // with any environment overrides exposed by imageConfig.
-import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL, PARTIAL_IMAGE_LIMIT, PROMPT_DISPLAY_LIMIT } from './image/constants.js';
 import { resolveAspectRatioSettings } from './image/aspect.js';
 import {
     buildImageResultPresentation,
@@ -23,7 +23,8 @@ import type {
     ImageQualityType,
     ImageRenderModel,
     ImageStylePreset,
-    ImageTextModel
+    ImageTextModel,
+    ImageOutputFormat
 } from './image/types.js';
 import {
     evictFollowUpContext,
@@ -51,6 +52,13 @@ const ensureDeferredReply = async (interaction: RepliableInteraction): Promise<v
 type StatusField = { name: string; value: string; inline: boolean };
 
 const QUALITY_LEVELS: ImageQualityType[] = ['low', 'medium', 'high'];
+
+const clampOutputCompression = (value: number | null): number => {
+    if (!Number.isFinite(value)) {
+        return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
+    }
+    return Math.min(100, Math.max(1, Math.round(value as number)));
+};
 
 /**
  * Builds a human-friendly quality description that reflects the configured
@@ -120,6 +128,16 @@ function buildInitialStatusFields(
         {
             name: 'Prompt adjustment',
             value: context.allowPromptAdjustment ? 'Enabled' : 'Disabled',
+            inline: true
+        },
+        {
+            name: 'Output format',
+            value: context.outputFormat.toUpperCase(),
+            inline: true
+        },
+        {
+            name: 'Compression',
+            value: `${context.outputCompression}%`,
             inline: true
         },
         {
@@ -340,6 +358,23 @@ const imageCommand: Command = {
             .setRequired(false)
         )
         .addStringOption(option => option
+            .setName('output_format')
+            .setDescription(`Output format (defaults to ${DEFAULT_IMAGE_OUTPUT_FORMAT.toUpperCase()})`)
+            .addChoices(
+                { name: 'WebP', value: 'webp' },
+                { name: 'PNG', value: 'png' },
+                { name: 'JPEG', value: 'jpeg' }
+            )
+            .setRequired(false)
+        )
+        .addIntegerOption(option => option
+            .setName('output_compression')
+            .setDescription(`Compression quality 1-100 (defaults to ${DEFAULT_IMAGE_OUTPUT_COMPRESSION})`)
+            .setMinValue(1)
+            .setMaxValue(100)
+            .setRequired(false)
+        )
+        .addStringOption(option => option
             .setName('quality')
             .setDescription(QUALITY_OPTION_DESCRIPTION)
             .addChoices(
@@ -400,6 +435,8 @@ const imageCommand: Command = {
         const textModel = (interaction.options.getString('text_model') as ImageTextModel | null) ?? DEFAULT_TEXT_MODEL;
         const imageModel = (interaction.options.getString('image_model') as ImageRenderModel | null) ?? DEFAULT_IMAGE_MODEL;
         const background = (interaction.options.getString('background') as ImageBackgroundType | null) ?? 'auto';
+        const outputFormat = (interaction.options.getString('output_format') as ImageOutputFormat | null) ?? DEFAULT_IMAGE_OUTPUT_FORMAT;
+        const outputCompression = clampOutputCompression(interaction.options.getInteger('output_compression'));
         const style = (interaction.options.getString('style') as ImageStylePreset | null) ?? 'unspecified';
         const adjustPrompt = interaction.options.getBoolean('adjust_prompt') ?? true;
         let followUpResponseId = interaction.options.getString('follow_up_response_id');
@@ -421,7 +458,9 @@ const imageCommand: Command = {
             quality,
             background,
             style,
-            allowPromptAdjustment: adjustPrompt
+            allowPromptAdjustment: adjustPrompt,
+            outputFormat,
+            outputCompression
         };
 
         const developerBypass = interaction.user.id === process.env.DEVELOPER_USER_ID;

@@ -23,7 +23,7 @@ import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
+import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
@@ -41,7 +41,8 @@ import type {
   ImageQualityType,
   ImageRenderModel,
   ImageStylePreset,
-  ImageTextModel
+  ImageTextModel,
+  ImageOutputFormat
 } from '../commands/image/types.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 
@@ -83,6 +84,12 @@ const VALID_IMAGE_STYLES = new Set<ImageStylePreset>([
   'isometric',
   'unspecified'
 ]);
+const clampOutputCompression = (value: number | undefined | null): number => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
+  }
+  return Math.min(100, Math.max(1, Math.round(value as number)));
+};
 
 export class MessageProcessor {
   private readonly openaiService: OpenAIService;
@@ -234,15 +241,16 @@ export class MessageProcessor {
           ? requestedBackground as ImageBackgroundType
           : 'auto';
 
+        let referencedContext: ImageGenerationContext | null = null;
+        let followUpResponseId: string | null = null;
+
+        // Normalise style before potentially inheriting values from a reference.
         const normalizedStyle = request.style
           ? request.style.toLowerCase().replace(/[^a-z0-9]+/g, '_')
           : 'unspecified';
         let style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
           ? normalizedStyle as ImageStylePreset
           : 'unspecified';
-
-        let referencedContext: ImageGenerationContext | null = null;
-        let followUpResponseId: string | null = null;
 
         if (message.reference?.messageId) {
           try {
@@ -285,6 +293,13 @@ export class MessageProcessor {
           }
         }
 
+        const outputFormat: ImageOutputFormat = (request.outputFormat as ImageOutputFormat | undefined)
+          ?? referencedContext?.outputFormat
+          ?? DEFAULT_IMAGE_OUTPUT_FORMAT;
+        const outputCompression = clampOutputCompression(
+          request.outputCompression ?? referencedContext?.outputCompression ?? DEFAULT_IMAGE_OUTPUT_COMPRESSION
+        );
+
         // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
         if (trimmedPrompt.length > normalizedPrompt.length) {
           logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
@@ -313,7 +328,9 @@ export class MessageProcessor {
           quality: referencedContext?.quality ?? ('low' as ImageQualityType),
           background,
           style,
-          allowPromptAdjustment
+          allowPromptAdjustment,
+          outputFormat,
+          outputCompression
         };
 
         await responseHandler.startTyping();

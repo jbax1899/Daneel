@@ -664,7 +664,9 @@ client.on(Events.InteractionCreate, async interaction => {
           quality: session.quality,
           background: session.background,
           style: session.style,
-          allowPromptAdjustment: session.allowPromptAdjustment
+          allowPromptAdjustment: session.allowPromptAdjustment,
+          outputFormat: session.outputFormat,
+          outputCompression: session.outputCompression
         };
 
         const result = await runImageGenerationSession(interaction, runContext, responseId);
@@ -927,4 +929,3 @@ appServer.listen(WEBHOOK_PORT, () => {
   console.log(`GitHub webhook server listening on port ${WEBHOOK_PORT}`);
 });
 */
-

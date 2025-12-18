@@ -3,6 +3,7 @@ import { logger } from '../logger.js';
 import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel, TTS_DEFAULT_OPTIONS } from '../openaiService.js';
 import { ActivityOptions } from 'discord.js';
 import type { RiskTier } from 'ethics-core';
+import { DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT } from '../../commands/image/constants.js';
 
 const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
 const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // letting it handle verbosity
@@ -30,6 +31,8 @@ type ImagePlanRequest = {
   style?: string;
   allowPromptAdjustment?: boolean;
   followUpResponseId?: string;
+  outputFormat?: 'png' | 'webp' | 'jpeg';
+  outputCompression?: number;
 };
 
 const defaultPlan: Plan = {
@@ -84,6 +87,17 @@ const planFunction = {
             type: "string",
             enum: ["auto", "transparent", "opaque"],
             description: "Background mode for the generated image."
+          },
+          output_format: {
+            type: "string",
+            enum: ["png", "webp", "jpeg"],
+            description: "Preferred output format. Defaults to webp."
+          },
+          output_compression: {
+            type: "integer",
+            minimum: 1,
+            maximum: 100,
+            description: "Compression quality (1-100). Defaults to 80."
           },
           style: {
             type: "string",
@@ -308,9 +322,18 @@ export class Planner {
   }
 
   private normalizeImageRequest(request: Partial<ImagePlanRequest>): ImagePlanRequest {
-    const aspectRatio = this.isValidAspectRatio(request.aspectRatio) ? request.aspectRatio : 'auto';
+    const aspectRatioCandidate = (request as Record<string, unknown>).aspect_ratio ?? request.aspectRatio;
+    const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : 'auto';
     const background = typeof request.background === 'string' ? request.background : 'auto';
     const style = typeof request.style === 'string' ? request.style : 'unspecified';
+    const formatCandidate = (request as Record<string, unknown>).output_format ?? request.outputFormat;
+    const normalizedFormat = typeof formatCandidate === 'string'
+      ? this.normalizeOutputFormat(formatCandidate)
+      : DEFAULT_IMAGE_OUTPUT_FORMAT;
+    const compressionCandidate = (request as Record<string, unknown>).output_compression ?? request.outputCompression;
+    const normalizedCompression = this.clampOutputCompression(
+      typeof compressionCandidate === 'number' ? compressionCandidate : Number(compressionCandidate)
+    );
     const followUpResponseId = typeof request.followUpResponseId === 'string' && request.followUpResponseId.trim()
       ? request.followUpResponseId.trim()
       : undefined;
@@ -326,11 +349,32 @@ export class Planner {
       allowPromptAdjustment: request.allowPromptAdjustment !== undefined
         ? Boolean(request.allowPromptAdjustment)
         : false,
-      followUpResponseId
+      followUpResponseId,
+      outputFormat: normalizedFormat,
+      outputCompression: normalizedCompression
     };
   }
 
   private isValidAspectRatio(value: unknown): value is ImagePlanRequest['aspectRatio'] {
     return value === 'auto' || value === 'square' || value === 'portrait' || value === 'landscape';
+  }
+
+  private normalizeOutputFormat(candidate: unknown): ImagePlanRequest['outputFormat'] {
+    const normalized = typeof candidate === 'string' ? candidate.trim().toLowerCase() : '';
+    if (normalized === 'png' || normalized === 'webp' || normalized === 'jpeg') {
+      return normalized;
+    }
+    if (normalized) {
+      logger.warn(`Planner returned unsupported output format "${candidate}", defaulting to ${DEFAULT_IMAGE_OUTPUT_FORMAT}.`);
+    }
+    return DEFAULT_IMAGE_OUTPUT_FORMAT;
+  }
+
+  private clampOutputCompression(candidate: unknown): number {
+    const value = typeof candidate === 'number' ? candidate : Number(candidate);
+    if (!Number.isFinite(value)) {
+      return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
+    }
+    return Math.min(100, Math.max(1, Math.round(value)));
   }
 }

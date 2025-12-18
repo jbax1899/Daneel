@@ -10,7 +10,8 @@ import {
     ANNOTATION_DESCRIPTION_LIMIT,
     ANNOTATION_MESSAGE_LIMIT,
     ANNOTATION_TITLE_LIMIT,
-    PARTIAL_IMAGE_LIMIT
+    PARTIAL_IMAGE_LIMIT,
+    DEFAULT_IMAGE_OUTPUT_COMPRESSION
 } from './constants.js';
 import { sanitizeForEmbed, truncateForEmbed } from './embed.js';
 import { renderPrompt } from '../../utils/env.js';
@@ -24,7 +25,9 @@ import type {
     ImageStylePreset,
     ImageTextModel,
     PartialImagePayload,
-    AnnotationFields
+    AnnotationFields,
+    ImageOutputFormat,
+    ImageOutputCompression
 } from './types.js';
 import { mapResponseError } from './errors.js';
 
@@ -41,6 +44,8 @@ interface GenerateImageOptions {
     nickname: string;
     guildName: string;
     allowPromptAdjustment: boolean;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
 }
@@ -64,6 +69,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         background,
         style,
         allowPromptAdjustment,
+        outputFormat,
+        outputCompression,
         followUpResponseId,
         username,
         nickname,
@@ -105,6 +112,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         quality,
         size,
         background,
+        outputFormat,
+        outputCompression,
         allowPartialImages: Boolean(onPartialImage)
     });
 
@@ -186,6 +195,8 @@ function createImageGenerationTool(options: {
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
     allowPartialImages: boolean;
 }): Tool.ImageGeneration {
     // The OpenAI SDK currently narrows the `model` property to only allow the
@@ -197,6 +208,8 @@ function createImageGenerationTool(options: {
         quality: options.quality,
         size: options.size,
         background: options.background,
+        output_format: options.outputFormat,
+        output_compression: clampOutputCompression(options.outputCompression),
         // SDK only narrows to "gpt-image-1" literal, but API accepts other models (e.g., gpt-image-1-mini).
         model: options.model as Tool.ImageGeneration['model']
     };
@@ -206,6 +219,13 @@ function createImageGenerationTool(options: {
     }
 
     return tool;
+}
+
+function clampOutputCompression(value: number): number {
+    if (!Number.isFinite(value)) {
+        return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
+    }
+    return Math.min(100, Math.max(1, Math.round(value)));
 }
 
 function normalizeImageResult(result: unknown): string | null {

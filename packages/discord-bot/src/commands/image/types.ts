@@ -6,6 +6,8 @@ export type ImageRenderModel = ImageModelPricingKey;
 export type ImageQualityType = ImageGenerationQuality;
 export type ImageSizeType = ImageGenerationSize;
 export type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
+export type ImageOutputFormat = 'png' | 'webp' | 'jpeg';
+export type ImageOutputCompression = number;
 export type ImageStylePreset = 'natural' | 'vivid' | 'photorealistic' | 'cinematic' | 'oil_painting' | 'watercolor' | 'digital_painting' | 'line_art' | 'sketch' | 'cartoon' | 'anime' | 'comic' | 'pixel_art' | 'cyberpunk' | 'fantasy_art' | 'surrealist' | 'minimalist' | 'vintage' | 'noir' | '3d_render' | 'steampunk' | 'abstract' | 'pop_art' | 'dreamcore' | 'isometric' 
                                 | 'unspecified'; // "unspecified" is used when no style preset is specified
 
