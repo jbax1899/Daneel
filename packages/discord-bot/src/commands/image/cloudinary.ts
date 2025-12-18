@@ -5,6 +5,13 @@ import { clampForCloudinary, chunkString, sanitizeForEmbed } from './embed.js';
 import { CLOUDINARY_CONTEXT_VALUE_LIMIT } from './constants.js';
 import type { UploadMetadata } from './types.js';
 
+const formatToMime: Record<string, string> = {
+    png: 'image/png',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    webp: 'image/webp'
+};
+
 const cloudinaryConfig = {
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
@@ -101,7 +108,9 @@ export async function uploadToCloudinary(imageBuffer: Buffer, metadata: UploadMe
             fallback: 'Model reused the original prompt.'
         });
 
-        const uploadResult = await cloudinary.uploader.upload(`data:image/png;base64,${imageBuffer.toString('base64')}`, {
+        const mimeType = formatToMime[metadata.outputFormat] ?? 'image/png';
+
+        const uploadResult = await cloudinary.uploader.upload(`data:${mimeType};base64,${imageBuffer.toString('base64')}`, {
             resource_type: 'image',
             public_id: `ai-image-${Date.now()}`,
             context,

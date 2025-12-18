@@ -53,6 +53,8 @@ export interface UploadMetadata {
     noteMessage?: string | null;
     textModel: ImageTextModel;
     imageModel: ImageRenderModel;
+    outputFormat: ImageOutputFormat;
+    outputCompression?: ImageOutputCompression;
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;

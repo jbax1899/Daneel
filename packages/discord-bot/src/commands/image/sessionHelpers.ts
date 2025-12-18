@@ -146,6 +146,8 @@ export async function executeImageGeneration(
                 noteMessage: annotations.note,
                 textModel: context.textModel,
                 imageModel: context.imageModel,
+                outputFormat: context.outputFormat,
+                outputCompression: context.outputCompression,
                 quality: context.quality,
                 size: context.size,
                 background: context.background,
