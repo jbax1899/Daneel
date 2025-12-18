@@ -119,13 +119,13 @@ const planFunction = {
         properties: {
           reasoningEffort: {
             type: "string",
-            enum: [/*"minimal", */"low", "medium"/*, "high"*/],
-            description: "The level of reasoning to use, with 'low' being the default."
+            enum: ["minimal", "low", "medium", "high"],
+            description: "The level of reasoning to use, with 'low' being the default. 'minimal' is for very simple tasks, 'high' is for complex tasks and should be used sparingly."
           },
           verbosity: {
             type: "string",
-            enum: ["low", "medium"/*,"high"*/],
-            description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses."// Only use 'high' when asked to be verbose/detailed."
+            enum: ["low", "medium","high"],
+            description: "The level of verbosity to use. Prefer 'low' for casual conversation, and 'medium' for more detailed responses. Only use 'high' when explicitly asked to be verbose."
           },
           tool_choice: {
             type: "object",

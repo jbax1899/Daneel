@@ -66,6 +66,7 @@ export interface ImageGenerationArtifacts {
 interface ExecuteImageGenerationOptions {
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
+    stream?: boolean;
     user: {
         username: string;
         nickname: string;
@@ -99,6 +100,7 @@ export async function executeImageGeneration(
         outputFormat: context.outputFormat,
         outputCompression: context.outputCompression,
         followUpResponseId: options.followUpResponseId,
+        stream: options.stream,
         username: options.user.username,
         nickname: options.user.nickname,
         guildName: options.user.guildName,

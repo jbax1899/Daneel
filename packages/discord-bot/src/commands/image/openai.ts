@@ -48,6 +48,7 @@ interface GenerateImageOptions {
     outputCompression: ImageOutputCompression;
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
+    stream?: boolean;
 }
 
 interface GenerationOutcome {
@@ -75,7 +76,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         username,
         nickname,
         guildName,
-        onPartialImage
+        onPartialImage,
+        stream
     } = options;
 
     const { content: imageSystemPrompt } = renderPrompt('discord.image.system');
@@ -125,36 +127,45 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         tools: [imageTool],
         tool_choice: toolChoice,
         previous_response_id: followUpResponseId ?? null,
-        stream: true as const
+        stream: (stream ?? Boolean(onPartialImage)) as boolean
     };
 
     logger.debug(`Request payload: ${JSON.stringify(requestPayload, null, 2)}`);
 
     const partialImages: string[] = [];
 
-    const stream = await openai.responses.stream(requestPayload);
+    const shouldStream = Boolean(requestPayload.stream);
+    if (shouldStream) {
+        const partialImages: string[] = [];
+        const stream = await openai.responses.stream(requestPayload);
 
-    stream.on('response.image_generation_call.partial_image', event => {
-        try {
-            partialImages[event.partial_image_index] = event.partial_image_b64;
-            if (onPartialImage) {
-                void Promise.resolve(onPartialImage({ index: event.partial_image_index, base64: event.partial_image_b64 }))
-                    .catch(error => logger.warn('Failed to process partial image update:', error));
+        stream.on('response.image_generation_call.partial_image', event => {
+            try {
+                partialImages[event.partial_image_index] = event.partial_image_b64;
+                if (onPartialImage) {
+                    void Promise.resolve(onPartialImage({ index: event.partial_image_index, base64: event.partial_image_b64 }))
+                        .catch(error => logger.warn('Failed to process partial image update:', error));
+                }
+            } catch (error) {
+                logger.warn('Unexpected error while handling partial image:', error);
             }
-        } catch (error) {
-            logger.warn('Unexpected error while handling partial image:', error);
-        }
-    });
+        });
 
-    stream.on('error', (error: unknown) => {
-        logger.error('Image generation stream error:', error);
-    });
+        stream.on('error', (error: unknown) => {
+            logger.error('Image generation stream error:', error);
+        });
 
-    stream.on('response.failed', event => {
-        logger.error('Image generation stream failed:', event.response.error ?? event.response);
-    });
+        stream.on('response.failed', event => {
+            logger.error('Image generation stream failed:', event.response.error ?? event.response);
+        });
 
-    const response = await stream.finalResponse();
+        var response = await stream.finalResponse();
+        var partials = partialImages;
+    } else {
+        const { stream: _removed, ...nonStreamingPayload } = requestPayload;
+        var response = await openai.responses.create(nonStreamingPayload as any);
+        var partials: string[] = [];
+    }
 
     if (response.error) {
         throw new Error(mapResponseError(response.error));
@@ -185,7 +196,7 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         response,
         imageCall,
         finalImageBase64: imageData,
-        partialImages,
+        partialImages: partials,
         annotations
     };
 }

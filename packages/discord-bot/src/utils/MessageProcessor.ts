@@ -343,7 +343,8 @@ export class MessageProcessor {
               nickname: message.member?.displayName ?? message.author.username,
               guildName: message.guild?.name ?? 'Direct message channel'
             },
-            followUpResponseId
+            followUpResponseId,
+            stream: false
           });
 
           const presentation = buildImageResultPresentation(context, artifacts);
