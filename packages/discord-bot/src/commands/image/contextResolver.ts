@@ -129,8 +129,9 @@ function parseOutputCompression(value: string | null | undefined): number {
 
 function parsePromptAdjustment(value: string | null | undefined): boolean {
     const normalised = value?.trim().toLowerCase();
+    // Default to enabled when the field is missing (common when embeds are trimmed)
     if (!normalised) {
-        return false;
+        return true;
     }
 
     if (normalised === 'disabled' || normalised === 'false' || normalised === 'no') {
