@@ -31,7 +31,7 @@ import {
   executeImageGeneration
 } from '../commands/image/sessionHelpers.js';
 import { readFollowUpContext, saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
-import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
+import { recoverContextDetailsFromMessage, type RecoveredImageContext } from '../commands/image/contextResolver.js';
 import { buildResponseMetadata } from './response/metadata.js';
 import { buildFooterEmbed } from './response/provenanceFooter.js';
 import { ResponseMetadata } from 'ethics-core';
@@ -184,6 +184,27 @@ export class MessageProcessor {
       });
     }
 
+    // Attempt to recover image embed metadata for the planner so it can request true variations.
+    let recoveredImageContext: RecoveredImageContext | null = null;
+    try {
+      recoveredImageContext = await recoverContextDetailsFromMessage(message);
+      if (recoveredImageContext) {
+        const ctx = recoveredImageContext.context;
+        planContext.push({
+          role: 'system',
+          content: `Recovered image embed context for follow-ups:\n` +
+            `prompt="${ctx.prompt}"\n` +
+            `textModel=${ctx.textModel} imageModel=${ctx.imageModel}\n` +
+            `aspect=${ctx.aspectRatio} size=${ctx.size} background=${ctx.background} style=${ctx.style}\n` +
+            `outputFormat=${ctx.outputFormat} compression=${ctx.outputCompression} allowPromptAdjustment=${ctx.allowPromptAdjustment}\n` +
+            `outputId=${recoveredImageContext.responseId ?? 'n/a'} inputId=${recoveredImageContext.inputId ?? 'n/a'}`
+        });
+        logger.debug(`Recovered image embed for planner: outputId=${recoveredImageContext.responseId ?? 'n/a'}, inputId=${recoveredImageContext.inputId ?? 'n/a'}, promptLength=${ctx.prompt.length}.`);
+      }
+    } catch (error) {
+      logger.debug('Failed to recover image embed context for planner:', error);
+    }
+
     //
     // Generate plan
     //
@@ -241,8 +262,11 @@ export class MessageProcessor {
           ? requestedBackground as ImageBackgroundType
           : 'auto';
 
-        let referencedContext: ImageGenerationContext | null = null;
-        let followUpResponseId: string | null = null;
+        let referencedContext: ImageGenerationContext | null = recoveredImageContext?.context ?? null;
+        let followUpResponseId: string | null = recoveredImageContext?.responseId ?? recoveredImageContext?.inputId ?? null;
+        if (recoveredImageContext) {
+          logger.debug(`Using recovered image context for follow-up: outputId=${recoveredImageContext.responseId ?? 'n/a'}, inputId=${recoveredImageContext.inputId ?? 'n/a'}.`);
+        }
 
         // Normalise style before potentially inheriting values from a reference.
         const normalizedStyle = request.style
@@ -252,19 +276,22 @@ export class MessageProcessor {
           ? normalizedStyle as ImageStylePreset
           : 'unspecified';
 
-        // Allow planner-supplied follow-ups only when they reference a cached context.
+        // Allow planner-supplied follow-ups only when they reference a cached or recovered context.
         const plannerFollowUpCandidate = request.followUpResponseId?.trim();
         if (plannerFollowUpCandidate) {
           const cached = readFollowUpContext(plannerFollowUpCandidate);
-          if (cached) {
-            referencedContext = cached;
+          const matchesRecovered = recoveredImageContext
+            && (recoveredImageContext.responseId === plannerFollowUpCandidate || recoveredImageContext.inputId === plannerFollowUpCandidate);
+
+          if (cached || matchesRecovered) {
+            referencedContext = referencedContext ?? cached ?? recoveredImageContext?.context ?? null;
             followUpResponseId = plannerFollowUpCandidate;
           } else {
-            logger.warn(`Planner supplied follow-up response ID "${plannerFollowUpCandidate}" that was not found in cache; ignoring.`);
+            logger.warn(`Planner supplied follow-up response ID "${plannerFollowUpCandidate}" that was not found in cache or recovery; ignoring.`);
           }
         }
 
-        if (message.reference?.messageId) {
+        if (!referencedContext && message.reference?.messageId) {
           try {
             // Fetch and parse the replied-to message so we can honour its
             // generation settings instead of relying on the planner to guess.
