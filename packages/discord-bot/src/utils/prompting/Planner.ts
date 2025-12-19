@@ -6,8 +6,8 @@ import type { RiskTier } from 'ethics-core';
 import { DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY } from '../../commands/image/constants.js';
 import type { ImageQualityType } from '../../commands/image/types.js';
 
-const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
-const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // letting it handle verbosity
+const PLANNING_MODEL: SupportedModel = 'gpt-5-nano';
+const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'low' };
 const DEFAULT_RISK_TIER: RiskTier = 'Low';
 
 export interface Plan {
@@ -64,12 +64,22 @@ const planFunction = {
       action: {
         type: "string",
         enum: ["message", "react", "ignore", "image"],
-        description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 'image' generates an image using the dedicated pipeline (and posts a summary plus buttons). Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
+        description: `The action to take: 
+        'message' sends a message response (some combination of text and files), 
+        'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 
+        'image' generates an image using the dedicated pipeline. 
+        Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. 
+        Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). 
+        If unsure, prefer to 'react'.`
       },
       modality: {
         type: "string",
         enum: ["text", "tts"],
-        description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
+        description: `The modality to use: 
+        'text' sends just a text response, 
+        'tts' sends that text response along with a TTS reading. 
+        Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses.
+        If 'action' is 'image', always use 'text'.`
       },
       reaction: {
         type: "string",
@@ -83,32 +93,32 @@ const planFunction = {
           aspect_ratio: {
             type: "string",
             enum: ["auto", "square", "portrait", "landscape"],
-            description: "Preferred aspect ratio for the generated image."
+            description: "Override aspect ratio for the generated image, only if explicitly requested (otherwise omit)."
           },
           background: {
             type: "string",
             enum: ["auto", "transparent", "opaque"],
-            description: "Background mode for the generated image."
+            description: "Override background mode for the generated image, only if explicitly requested (otherwise omit)."
           },
           output_format: {
             type: "string",
             enum: ["png", "webp", "jpeg"],
-            description: "Preferred output format. Omit for the default."
+            description: "Override output format, only if explicitly requested (otherwise omit)."
           },
           output_compression: {
             type: "integer",
             minimum: 1,
             maximum: 100,
-            description: "Compression quality (1-100). Omit for the default."
+            description: "Override compression quality (1-100% quality), only if explicitly requested (otherwise omit)."
           },
           quality: {
             type: "string",
             enum: ["low", "medium", "high", "auto"],
-            description: "Image quality. Default is 'auto'."
+            description: "Override image quality, only if explicitly requested (otherwise omit)."
           },
           style: {
             type: "string",
-            description: "Optional style preset (e.g., natural, photorealistic, watercolor)."
+            description: "Override style preset (e.g., natural, photorealistic, watercolor), only if explicitly requested (otherwise omit)."
           },
           allowPromptAdjustment: {
             type: "boolean",
@@ -312,6 +322,17 @@ export class Planner {
     // Ensure callers always see a supported risk tier value
     mergedPlan.riskTier = this.normalizeRiskTier(plan.riskTier);
 
+    // Image actions must never trigger TTS or web search; enforce text modality
+    // and clear tool/web search hints to avoid accidental spend.
+    if (mergedPlan.action === 'image') {
+      mergedPlan.modality = 'text';
+      mergedPlan.openaiOptions = {
+        ...mergedPlan.openaiOptions,
+        tool_choice: 'none',
+        webSearch: undefined
+      };
+    }
+
     return mergedPlan;
   }
 
@@ -330,18 +351,22 @@ export class Planner {
 
   private normalizeImageRequest(request: Partial<ImagePlanRequest>): ImagePlanRequest {
     const aspectRatioCandidate = (request as Record<string, unknown>).aspect_ratio ?? request.aspectRatio;
-    const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : 'auto';
-    const background = typeof request.background === 'string' ? request.background : 'auto';
-    const style = typeof request.style === 'string' ? request.style : 'unspecified';
+    const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : undefined;
+
+    const background = typeof request.background === 'string' ? request.background : undefined;
+    const style = typeof request.style === 'string' ? request.style : undefined;
     const quality = this.normalizeQuality((request as Record<string, unknown>).quality ?? request.quality);
+
     const formatCandidate = (request as Record<string, unknown>).output_format ?? request.outputFormat;
     const normalizedFormat = typeof formatCandidate === 'string'
       ? this.normalizeOutputFormat(formatCandidate)
-      : DEFAULT_IMAGE_OUTPUT_FORMAT;
+      : undefined;
+
     const compressionCandidate = (request as Record<string, unknown>).output_compression ?? request.outputCompression;
-    const normalizedCompression = this.clampOutputCompression(
-      typeof compressionCandidate === 'number' ? compressionCandidate : Number(compressionCandidate)
-    );
+    const normalizedCompression = typeof compressionCandidate === 'number' || typeof compressionCandidate === 'string'
+      ? this.clampOutputCompression(compressionCandidate)
+      : undefined;
+
     const followUpResponseId = typeof request.followUpResponseId === 'string' && request.followUpResponseId.trim()
       ? request.followUpResponseId.trim()
       : undefined;
@@ -350,7 +375,7 @@ export class Planner {
       prompt: (request.prompt ?? '').toString(),
       aspectRatio,
       background,
-      quality,
+      quality: quality ?? undefined,
       style,
       // Automated image requests should only opt into prompt adjustments when the
       // planner is absolutely certain the user requested it. Leaving this false by
@@ -368,16 +393,16 @@ export class Planner {
     return value === 'auto' || value === 'square' || value === 'portrait' || value === 'landscape';
   }
 
-  private normalizeQuality(candidate: unknown): ImageQualityType {
+  private normalizeQuality(candidate: unknown): ImageQualityType | undefined {
     const normalized = typeof candidate === 'string' ? candidate.toLowerCase() : '';
     const allowed: ImageQualityType[] = ['low', 'medium', 'high', 'auto'];
     if (allowed.includes(normalized as ImageQualityType)) {
       return normalized as ImageQualityType;
     }
     if (normalized) {
-      logger.warn(`Planner returned unsupported image quality "${candidate}", defaulting to ${DEFAULT_IMAGE_QUALITY}.`);
+      logger.warn(`Planner returned unsupported image quality "${candidate}", ignoring override.`);
     }
-    return DEFAULT_IMAGE_QUALITY;
+    return undefined;
   }
 
   private normalizeOutputFormat(candidate: unknown): ImagePlanRequest['outputFormat'] {
@@ -386,9 +411,9 @@ export class Planner {
       return normalized;
     }
     if (normalized) {
-      logger.warn(`Planner returned unsupported output format "${candidate}", defaulting to ${DEFAULT_IMAGE_OUTPUT_FORMAT}.`);
+      logger.warn(`Planner returned unsupported output format "${candidate}", ignoring override.`);
     }
-    return DEFAULT_IMAGE_OUTPUT_FORMAT;
+    return undefined;
   }
 
   private clampOutputCompression(candidate: unknown): number {

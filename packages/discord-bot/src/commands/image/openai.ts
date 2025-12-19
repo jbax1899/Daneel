@@ -82,6 +82,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
 
     const { content: imageSystemPrompt } = renderPrompt('discord.image.system');
 
+    const remainingPromptRatio = calculateRemainingRatio(prompt);
+
     const input: ResponseInput = [
         {
             role: 'system',
@@ -99,7 +101,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
                 style,
                 username,
                 nickname,
-                guildName
+                guildName,
+                remainingPromptRatio
             }) }]
         },
         {
@@ -244,6 +247,12 @@ function clampOutputCompression(value: number): number {
         return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
     }
     return Math.min(100, Math.max(1, Math.round(value)));
+}
+
+function calculateRemainingRatio(prompt: string): number {
+    const safeLimit = ANNOTATION_MESSAGE_LIMIT; // reuse a conservative limit for free text
+    const remaining = Math.max(0, safeLimit - prompt.length);
+    return remaining / safeLimit;
 }
 
 function normalizeImageResult(result: unknown): string | null {

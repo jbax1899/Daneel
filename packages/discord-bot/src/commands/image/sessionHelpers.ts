@@ -30,6 +30,7 @@ import type {
 } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
 import { sanitizeForEmbed, setEmbedFooterText, truncateForEmbed } from './embed.js';
+import { PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO } from './constants.js';
 
 /**
  * Provides structured metadata about a generated image so that different
@@ -259,7 +260,7 @@ export function buildImageResultPresentation(
         originalPrompt: normalizedOriginalPrompt,
         refinedPrompt: normalizedRefinedPrompt,
         style: artifacts.finalStyle,
-        allowPromptAdjustment: context.allowPromptAdjustment ?? true
+        allowPromptAdjustment: Boolean(context.allowPromptAdjustment)
     };
 
     const embed = new EmbedBuilder()

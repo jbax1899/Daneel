@@ -80,7 +80,12 @@ function buildQualityOptionDescription(): string {
     return `Image quality (${summaries.join(' • ')} tokens; defaults to low)`;
 }
 
-const QUALITY_OPTION_DESCRIPTION = buildQualityOptionDescription();
+const QUALITY_OPTION_DESCRIPTION = (() => {
+    const description = buildQualityOptionDescription();
+    return description.length > 100
+        ? 'Image quality (tokens vary by model; defaults to low)'
+        : description;
+})();
 
 /**
  * Produces the initial set of status fields for the generation embed so that
@@ -388,6 +393,7 @@ const imageCommand: Command = {
             .setName('image_model')
             .setDescription(`The image model to render with (optional; defaults to ${DEFAULT_IMAGE_MODEL})`)
             .addChoices(
+                { name: 'gpt-image-1.5', value: 'gpt-image-1.5' },
                 { name: 'gpt-image-1', value: 'gpt-image-1' },
                 { name: 'gpt-image-1-mini', value: 'gpt-image-1-mini' }
             )

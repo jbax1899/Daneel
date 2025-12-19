@@ -129,6 +129,7 @@ function parseOutputCompression(value: string | null | undefined): number {
 
 function parsePromptAdjustment(value: string | null | undefined): boolean {
     const normalised = value?.trim().toLowerCase();
+    // Default to enabled when the field is missing (common when embeds are trimmed)
     if (!normalised) {
         return true;
     }
@@ -279,8 +280,8 @@ function buildContextFromEmbed(message: Message): RecoveredContextDetails | null
         fieldMap.set(field.name, field.value ?? '');
     }
 
-    const currentPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Current prompt', 'Refined Prompt']);
-    const originalPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Original prompt', 'Original Prompt']);
+    const currentPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Current prompt', 'Refined Prompt', 'Prompt']);
+    const originalPromptResult = collectPromptSectionsWithFallback(fieldMap, ['Original prompt', 'Original Prompt', 'Prompt']);
     const legacyRefinedResult = collectPromptSections(fieldMap, 'Refined Prompt');
     const prompt = currentPromptResult.prompt ?? legacyRefinedResult.prompt ?? originalPromptResult.prompt;
 
