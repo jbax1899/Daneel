@@ -259,7 +259,7 @@ export function buildImageResultPresentation(
         originalPrompt: normalizedOriginalPrompt,
         refinedPrompt: normalizedRefinedPrompt,
         style: artifacts.finalStyle,
-        allowPromptAdjustment: context.allowPromptAdjustment ?? true
+        allowPromptAdjustment: Boolean(context.allowPromptAdjustment)
     };
 
     const embed = new EmbedBuilder()

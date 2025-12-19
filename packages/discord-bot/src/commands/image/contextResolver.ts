@@ -130,7 +130,7 @@ function parseOutputCompression(value: string | null | undefined): number {
 function parsePromptAdjustment(value: string | null | undefined): boolean {
     const normalised = value?.trim().toLowerCase();
     if (!normalised) {
-        return true;
+        return false;
     }
 
     if (normalised === 'disabled' || normalised === 'false' || normalised === 'no') {

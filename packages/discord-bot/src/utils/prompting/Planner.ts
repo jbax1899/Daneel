@@ -322,6 +322,17 @@ export class Planner {
     // Ensure callers always see a supported risk tier value
     mergedPlan.riskTier = this.normalizeRiskTier(plan.riskTier);
 
+    // Image actions must never trigger TTS or web search; enforce text modality
+    // and clear tool/web search hints to avoid accidental spend.
+    if (mergedPlan.action === 'image') {
+      mergedPlan.modality = 'text';
+      mergedPlan.openaiOptions = {
+        ...mergedPlan.openaiOptions,
+        tool_choice: 'none',
+        webSearch: undefined
+      };
+    }
+
     return mergedPlan;
   }
 
@@ -340,18 +351,22 @@ export class Planner {
 
   private normalizeImageRequest(request: Partial<ImagePlanRequest>): ImagePlanRequest {
     const aspectRatioCandidate = (request as Record<string, unknown>).aspect_ratio ?? request.aspectRatio;
-    const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : 'auto';
-    const background = typeof request.background === 'string' ? request.background : 'auto';
-    const style = typeof request.style === 'string' ? request.style : 'unspecified';
+    const aspectRatio = this.isValidAspectRatio(aspectRatioCandidate) ? aspectRatioCandidate : undefined;
+
+    const background = typeof request.background === 'string' ? request.background : undefined;
+    const style = typeof request.style === 'string' ? request.style : undefined;
     const quality = this.normalizeQuality((request as Record<string, unknown>).quality ?? request.quality);
+
     const formatCandidate = (request as Record<string, unknown>).output_format ?? request.outputFormat;
     const normalizedFormat = typeof formatCandidate === 'string'
       ? this.normalizeOutputFormat(formatCandidate)
-      : DEFAULT_IMAGE_OUTPUT_FORMAT;
+      : undefined;
+
     const compressionCandidate = (request as Record<string, unknown>).output_compression ?? request.outputCompression;
-    const normalizedCompression = this.clampOutputCompression(
-      typeof compressionCandidate === 'number' ? compressionCandidate : Number(compressionCandidate)
-    );
+    const normalizedCompression = typeof compressionCandidate === 'number' || typeof compressionCandidate === 'string'
+      ? this.clampOutputCompression(compressionCandidate)
+      : undefined;
+
     const followUpResponseId = typeof request.followUpResponseId === 'string' && request.followUpResponseId.trim()
       ? request.followUpResponseId.trim()
       : undefined;
@@ -360,7 +375,7 @@ export class Planner {
       prompt: (request.prompt ?? '').toString(),
       aspectRatio,
       background,
-      quality,
+      quality: quality ?? undefined,
       style,
       // Automated image requests should only opt into prompt adjustments when the
       // planner is absolutely certain the user requested it. Leaving this false by
@@ -378,16 +393,16 @@ export class Planner {
     return value === 'auto' || value === 'square' || value === 'portrait' || value === 'landscape';
   }
 
-  private normalizeQuality(candidate: unknown): ImageQualityType {
+  private normalizeQuality(candidate: unknown): ImageQualityType | undefined {
     const normalized = typeof candidate === 'string' ? candidate.toLowerCase() : '';
     const allowed: ImageQualityType[] = ['low', 'medium', 'high', 'auto'];
     if (allowed.includes(normalized as ImageQualityType)) {
       return normalized as ImageQualityType;
     }
     if (normalized) {
-      logger.warn(`Planner returned unsupported image quality "${candidate}", defaulting to ${DEFAULT_IMAGE_QUALITY}.`);
+      logger.warn(`Planner returned unsupported image quality "${candidate}", ignoring override.`);
     }
-    return DEFAULT_IMAGE_QUALITY;
+    return undefined;
   }
 
   private normalizeOutputFormat(candidate: unknown): ImagePlanRequest['outputFormat'] {
@@ -396,9 +411,9 @@ export class Planner {
       return normalized;
     }
     if (normalized) {
-      logger.warn(`Planner returned unsupported output format "${candidate}", defaulting to ${DEFAULT_IMAGE_OUTPUT_FORMAT}.`);
+      logger.warn(`Planner returned unsupported output format "${candidate}", ignoring override.`);
     }
-    return DEFAULT_IMAGE_OUTPUT_FORMAT;
+    return undefined;
   }
 
   private clampOutputCompression(candidate: unknown): number {

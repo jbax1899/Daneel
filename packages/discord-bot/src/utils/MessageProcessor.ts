@@ -30,7 +30,7 @@ import {
   clampPromptForContext,
   executeImageGeneration
 } from '../commands/image/sessionHelpers.js';
-import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
+import { readFollowUpContext, saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
 import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
 import { buildResponseMetadata } from './response/metadata.js';
 import { buildFooterEmbed } from './response/provenanceFooter.js';
@@ -251,6 +251,18 @@ export class MessageProcessor {
         let style = VALID_IMAGE_STYLES.has(normalizedStyle as ImageStylePreset)
           ? normalizedStyle as ImageStylePreset
           : 'unspecified';
+
+        // Allow planner-supplied follow-ups only when they reference a cached context.
+        const plannerFollowUpCandidate = request.followUpResponseId?.trim();
+        if (plannerFollowUpCandidate) {
+          const cached = readFollowUpContext(plannerFollowUpCandidate);
+          if (cached) {
+            referencedContext = cached;
+            followUpResponseId = plannerFollowUpCandidate;
+          } else {
+            logger.warn(`Planner supplied follow-up response ID "${plannerFollowUpCandidate}" that was not found in cache; ignoring.`);
+          }
+        }
 
         if (message.reference?.messageId) {
           try {
