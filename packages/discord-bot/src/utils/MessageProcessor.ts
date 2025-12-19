@@ -23,7 +23,15 @@ import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-import { DEFAULT_IMAGE_MODEL, DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
+import {
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_IMAGE_OUTPUT_COMPRESSION,
+  DEFAULT_IMAGE_OUTPUT_FORMAT,
+  DEFAULT_IMAGE_QUALITY,
+  DEFAULT_TEXT_MODEL,
+  PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO,
+  EMBED_FIELD_VALUE_LIMIT
+} from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
@@ -344,13 +352,14 @@ export class MessageProcessor {
           logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
         }
 
-        // Planner-driven image generations already flow through the LLM once, so
-        // re-enabling prompt adjustments rarely adds value. Defaulting to false
-        // keeps the resulting embeds compact unless the user explicitly opted in
-        // or the referenced context demanded otherwise.
-        const allowPromptAdjustment = request.allowPromptAdjustment
-          ?? referencedContext?.allowPromptAdjustment
-          ?? false;
+        // Planner-driven image generations already flowed through the LLM once. We
+        // allow optional refinements, but if the prompt is near the embed limit we
+        // skip adjustments to avoid bloating/duplicate fields.
+        const remainingRatio = Math.max(0, (EMBED_FIELD_VALUE_LIMIT - normalizedPrompt.length) / EMBED_FIELD_VALUE_LIMIT);
+        const hasRoomForAdjustment = remainingRatio > PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO;
+        const allowPromptAdjustment = hasRoomForAdjustment
+          ? (request.allowPromptAdjustment ?? referencedContext?.allowPromptAdjustment ?? false)
+          : false;
 
         const textModel: ImageTextModel = referencedContext?.textModel ?? DEFAULT_TEXT_MODEL;
         const imageModel: ImageRenderModel = referencedContext?.imageModel ?? DEFAULT_IMAGE_MODEL;

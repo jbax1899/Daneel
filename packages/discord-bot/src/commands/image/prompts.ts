@@ -17,6 +17,7 @@ interface DeveloperPromptOptions {
     username: string; // Discord username of the user that called the command
     nickname: string; // Discord nickname of the user that called the command
     guildName: string; // Discord server name where the command was called
+    remainingPromptRatio?: number;
 }
 
 export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
@@ -29,7 +30,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
     };
 
     const adjustmentClause = options.allowPromptAdjustment
-        ? 'You may refine the prompt for clarity, composition, or safety while preserving the user\'s intent.'
+        ? `You may refine the prompt for clarity, composition, or safety while preserving the user's intent. Prefer concise additions that fill missing scene/style/lighting gaps. Aim to stay within ~${Math.max(0, Math.round((options.remainingPromptRatio ?? 1) * 100))}% of the current length; keep expansions minimal when space is low.`
         : 'Do not modify, expand, or rephrase the prompt; use it exactly as provided.';
 
     const safeUsername = sanitize(options.username);

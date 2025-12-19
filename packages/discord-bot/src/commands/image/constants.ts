@@ -31,3 +31,6 @@ export const IMAGE_VARIATION_PROMPT_MODAL_ID_PREFIX = 'image:variation:prompt:';
 export const IMAGE_VARIATION_PROMPT_INPUT_ID = 'variationPrompt';
 export const IMAGE_VARIATION_RESET_PROMPT_CUSTOM_ID_PREFIX = 'image:variation:reset-prompt:';
 export const IMAGE_VARIATION_CANCEL_CUSTOM_ID_PREFIX = 'image:variation:cancel:';
+// When the prompt is already near the embed field budget, skip prompt
+// enlargement to avoid duplicate/truncated fields.
+export const PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO = 0.2;
