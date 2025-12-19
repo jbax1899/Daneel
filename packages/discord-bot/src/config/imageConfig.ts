@@ -27,7 +27,8 @@ const FALLBACK_REFRESH_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
  */
 const FALLBACK_MODEL_MULTIPLIERS: Record<ImageRenderModel, number> = {
     'gpt-image-1-mini': 1,
-    'gpt-image-1': 2
+    'gpt-image-1.5': 2, // Latest model, 1.5, is cheaper than 1
+    'gpt-image-1': 3
 };
 
 /**

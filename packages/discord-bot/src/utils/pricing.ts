@@ -25,7 +25,7 @@ export type EmbeddingModelType = 'text-embedding-3-small' | 'text-embedding-3-la
 export type TextModelPricingKey = GPT5ModelType | OmniModelType | EmbeddingModelType;
 export type ImageGenerationQuality = 'low' | 'medium' | 'high' | 'auto';
 export type ImageGenerationSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
-export type ImageModelPricingKey = 'gpt-image-1' | 'gpt-image-1-mini';
+export type ImageModelPricingKey = 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini';
 
 /**
  * Core cost breakdown for any model type
@@ -133,7 +133,7 @@ const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: n
     'gpt-4.1-mini': { input: 0.40, output: 1.60 },
     'gpt-4.1-nano': { input: 0.10, output: 0.40 },
     
-    // Embedding Models (bill only on input tokens)
+    // Embedding Models (these bill only on input tokens)
     'text-embedding-3-small': { input: 0.02, output: 0 },
     'text-embedding-3-large': { input: 0.13, output: 0 },
     'text-embedding-ada-002': { input: 0.10, output: 0 }
@@ -141,12 +141,29 @@ const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: n
 
 /**
  * Pricing per image in USD sourced from https://platform.openai.com/pricing
- * Updated on 2025-10-26
+ * Updated on 2025-12-18
  */
 const IMAGE_GENERATION_COST_TABLE: Record<
     ImageModelPricingKey,
     Record<Exclude<ImageGenerationQuality, 'auto'>, Record<'1024x1024' | '1024x1536' | '1536x1024', number>>
 > = {
+    'gpt-image-1.5': {
+        low: {
+            '1024x1024': 0.009,
+            '1024x1536': 0.013,
+            '1536x1024': 0.013
+        },
+        medium: {
+            '1024x1024': 0.034,
+            '1024x1536': 0.05,
+            '1536x1024': 0.05
+        },
+        high: {
+            '1024x1024': 0.133,
+            '1024x1536': 0.2,
+            '1536x1024': 0.2
+        }
+    },
     'gpt-image-1': {
         low: {
             '1024x1024': 0.011,

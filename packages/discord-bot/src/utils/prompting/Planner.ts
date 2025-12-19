@@ -6,8 +6,8 @@ import type { RiskTier } from 'ethics-core';
 import { DEFAULT_IMAGE_OUTPUT_COMPRESSION, DEFAULT_IMAGE_OUTPUT_FORMAT, DEFAULT_IMAGE_QUALITY } from '../../commands/image/constants.js';
 import type { ImageQualityType } from '../../commands/image/types.js';
 
-const PLANNING_MODEL: SupportedModel = 'gpt-5-mini';
-const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'medium', /*verbosity: 'low'*/ }; // letting it handle verbosity
+const PLANNING_MODEL: SupportedModel = 'gpt-5-nano';
+const PLANNING_OPTIONS: OpenAIOptions = { reasoningEffort: 'low' };
 const DEFAULT_RISK_TIER: RiskTier = 'Low';
 
 export interface Plan {
@@ -64,12 +64,22 @@ const planFunction = {
       action: {
         type: "string",
         enum: ["message", "react", "ignore", "image"],
-        description: "The action to take: 'message' sends a message response (some combination of text and files), 'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 'image' generates an image using the dedicated pipeline (and posts a summary plus buttons). Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). If unsure, prefer to 'react'."
+        description: `The action to take: 
+        'message' sends a message response (some combination of text and files), 
+        'react' uses Discord's react feature to react to the last message with one or more emoji, 'ignore' does nothing, and 
+        'image' generates an image using the dedicated pipeline. 
+        Based on the last message (which triggered this to run) and the context of the conversation (especially the most recent messages by timestamp), you should decide which of these actions to take. 
+        Depending on how you were triggered, a response may not be neccessary (such as a catchup event, which simply ran because N number of messages were sent from other users since your last response). 
+        If unsure, prefer to 'react'.`
       },
       modality: {
         type: "string",
         enum: ["text", "tts"],
-        description: "The modality to use: 'text' sends just a text response, 'tts' sends that text response along with a TTS reading. Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses."
+        description: `The modality to use: 
+        'text' sends just a text response, 
+        'tts' sends that text response along with a TTS reading. 
+        Prefer 'tts' for short/causal responses, or when asked to (and then set 'reasoningEffort' and 'verbosity' to 'low'), and 'text' for longer/more complex responses.
+        If 'action' is 'image', always use 'text'.`
       },
       reaction: {
         type: "string",
@@ -83,32 +93,32 @@ const planFunction = {
           aspect_ratio: {
             type: "string",
             enum: ["auto", "square", "portrait", "landscape"],
-            description: "Preferred aspect ratio for the generated image."
+            description: "Override aspect ratio for the generated image, only if explicitly requested (otherwise omit)."
           },
           background: {
             type: "string",
             enum: ["auto", "transparent", "opaque"],
-            description: "Background mode for the generated image."
+            description: "Override background mode for the generated image, only if explicitly requested (otherwise omit)."
           },
           output_format: {
             type: "string",
             enum: ["png", "webp", "jpeg"],
-            description: "Preferred output format. Omit for the default."
+            description: "Override output format, only if explicitly requested (otherwise omit)."
           },
           output_compression: {
             type: "integer",
             minimum: 1,
             maximum: 100,
-            description: "Compression quality (1-100). Omit for the default."
+            description: "Override compression quality (1-100% quality), only if explicitly requested (otherwise omit)."
           },
           quality: {
             type: "string",
             enum: ["low", "medium", "high", "auto"],
-            description: "Image quality. Default is 'auto'."
+            description: "Override image quality, only if explicitly requested (otherwise omit)."
           },
           style: {
             type: "string",
-            description: "Optional style preset (e.g., natural, photorealistic, watercolor)."
+            description: "Override style preset (e.g., natural, photorealistic, watercolor), only if explicitly requested (otherwise omit)."
           },
           allowPromptAdjustment: {
             type: "boolean",
