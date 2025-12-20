@@ -16,6 +16,37 @@ export const logContextIfVerbose = (context: OpenAIMessage[]): void => {
     logger.debug(`Full context: ${JSON.stringify(context)}`);
 };
 
+function buildEmbedSummary(message: Message): string | null {
+    if (!message.embeds?.length) {
+        return null;
+    }
+
+    // Turn embeds into a compact text snapshot (all fields) so bot messages that
+    // only contained embeds still make it into the planner and follow-ups.
+    const lines: string[] = [];
+    let embedIndex = 1;
+
+    for (const embed of message.embeds) {
+        lines.push(`[Embed ${embedIndex}]`);
+        if (embed.title) lines.push(`Title: ${embed.title}`);
+        if (embed.description) lines.push(`Description: ${embed.description}`);
+        if (embed.author?.name) lines.push(`Author: ${embed.author.name}`);
+        if (embed.url) lines.push(`URL: ${embed.url}`);
+        if (embed.image?.url) lines.push(`Image: ${embed.image.url}`);
+        if (embed.thumbnail?.url) lines.push(`Thumbnail: ${embed.thumbnail.url}`);
+        if (embed.footer?.text) lines.push(`Footer: ${embed.footer.text}`);
+        if (embed.provider?.name) lines.push(`Provider: ${embed.provider.name}`);
+        if (embed.fields?.length) {
+            for (const field of embed.fields) {
+                lines.push(`${field.name}: ${field.value ?? ''}`);
+            }
+        }
+        embedIndex += 1;
+    }
+
+    return lines.join('\n');
+}
+
 export class ContextBuilder {
     private readonly openaiService: OpenAIService;
     private readonly DEFAULT_CONTEXT_MESSAGES = 12;
@@ -93,26 +124,33 @@ export class ContextBuilder {
                     repliedMessageIndex = messageIndex;
                 }
 
-                // Include embeds with full context (as in EmbedBuilder.ts)
-                let embedIndex = 1;
-                if (m.embeds.length > 0) {
-                    formattedMessage += '\nEmbeds: ';
-                    m.embeds.forEach(embed => {
-                        if (embed.title) formattedMessage += `\n${embedIndex++}. Title: ${embed.title}`;
-                        if (embed.description) formattedMessage += `\nDescription: ${embed.description}`;
-                        if (embed.footer) formattedMessage += `\nFooter: ${embed.footer.text}`;
-                        if (embed.image) formattedMessage += `\nImage: ${embed.image.url}`;
-                        if (embed.thumbnail) formattedMessage += `\nThumbnail: ${embed.thumbnail.url}`;
-                        if (embed.author) formattedMessage += `\nAuthor: ${embed.author.name}`;
-                        if (embed.provider) formattedMessage += `\nProvider: ${embed.provider.name}`;
-                        if (embed.url) formattedMessage += `\nURL: ${embed.url}`;
-                        embedIndex++;
-                    });
+                const embedSummary = buildEmbedSummary(m);
+                if (!isBot) {
+                    if (embedSummary) {
+                        formattedMessage += `\n${embedSummary}`;
+                    }
+                }
+
+                let assistantContent = m.content?.trim() ?? '';
+                if (isBot) {
+                    // Keep the bot’s preamble and splice in any embed summary so
+                    // embed-only replies don’t vanish from context.
+                    const assistantPreamble = `[${messageIndex - 1}] At ${timestamp} ${m.author.username}${displayName !== m.author.username ? `/${displayName}` : ''} (bot) said:`;
+                    if (embedSummary) {
+                        assistantContent = assistantContent
+                            ? `${assistantContent}\n${assistantPreamble}\n${embedSummary}`
+                            : `${assistantPreamble}\n${embedSummary}`;
+                    }
+                    if (!assistantContent) {
+                        assistantContent = `${assistantPreamble} Assistant response contained only embeds.`;
+                    } else if (!assistantContent.startsWith(assistantPreamble)) {
+                        assistantContent = `${assistantPreamble} ${assistantContent}`;
+                    }
                 }
 
                 return {
                     role: isBot ? 'assistant' : 'user' as const,
-                    content: isBot ? m.content : formattedMessage
+                    content: isBot ? assistantContent : formattedMessage
                 };
             });
 

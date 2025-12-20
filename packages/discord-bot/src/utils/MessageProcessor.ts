@@ -23,15 +23,23 @@ import { config } from './env.js';
 import { Planner, Plan } from './prompting/Planner.js';
 import { TTS_DEFAULT_OPTIONS } from './openaiService.js';
 import { ContextBuilder } from './prompting/ContextBuilder.js';
-import { DEFAULT_IMAGE_MODEL, DEFAULT_TEXT_MODEL } from '../commands/image/constants.js';
+import {
+  DEFAULT_IMAGE_MODEL,
+  DEFAULT_IMAGE_OUTPUT_COMPRESSION,
+  DEFAULT_IMAGE_OUTPUT_FORMAT,
+  DEFAULT_IMAGE_QUALITY,
+  DEFAULT_TEXT_MODEL,
+  PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO,
+  EMBED_FIELD_VALUE_LIMIT
+} from '../commands/image/constants.js';
 import { resolveAspectRatioSettings } from '../commands/image/aspect.js';
 import {
   buildImageResultPresentation,
   clampPromptForContext,
   executeImageGeneration
 } from '../commands/image/sessionHelpers.js';
-import { saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
-import { recoverContextDetailsFromMessage } from '../commands/image/contextResolver.js';
+import { readFollowUpContext, saveFollowUpContext, type ImageGenerationContext } from '../commands/image/followUpCache.js';
+import { recoverContextDetailsFromMessage, type RecoveredImageContext } from '../commands/image/contextResolver.js';
 import { buildResponseMetadata } from './response/metadata.js';
 import { buildFooterEmbed } from './response/provenanceFooter.js';
 import { ResponseMetadata } from 'ethics-core';
@@ -41,7 +49,8 @@ import type {
   ImageQualityType,
   ImageRenderModel,
   ImageStylePreset,
-  ImageTextModel
+  ImageTextModel,
+  ImageOutputFormat
 } from '../commands/image/types.js';
 //import { Pinecone } from '@pinecone-database/pinecone';
 
@@ -83,6 +92,12 @@ const VALID_IMAGE_STYLES = new Set<ImageStylePreset>([
   'isometric',
   'unspecified'
 ]);
+const clampOutputCompression = (value: number | undefined | null): number => {
+  if (!Number.isFinite(value)) {
+    return DEFAULT_IMAGE_OUTPUT_COMPRESSION;
+  }
+  return Math.min(100, Math.max(1, Math.round(value as number)));
+};
 
 export class MessageProcessor {
   private readonly openaiService: OpenAIService;
@@ -177,6 +192,27 @@ export class MessageProcessor {
       });
     }
 
+    // Attempt to recover image embed metadata for the planner so it can request true variations.
+    let recoveredImageContext: RecoveredImageContext | null = null;
+    try {
+      recoveredImageContext = await recoverContextDetailsFromMessage(message);
+      if (recoveredImageContext) {
+        const ctx = recoveredImageContext.context;
+        planContext.push({
+          role: 'system',
+          content: `Recovered image embed context for follow-ups:\n` +
+            `prompt="${ctx.prompt}"\n` +
+            `textModel=${ctx.textModel} imageModel=${ctx.imageModel}\n` +
+            `aspect=${ctx.aspectRatio} size=${ctx.size} background=${ctx.background} style=${ctx.style}\n` +
+            `outputFormat=${ctx.outputFormat} compression=${ctx.outputCompression} allowPromptAdjustment=${ctx.allowPromptAdjustment}\n` +
+            `outputId=${recoveredImageContext.responseId ?? 'n/a'} inputId=${recoveredImageContext.inputId ?? 'n/a'}`
+        });
+        logger.debug(`Recovered image embed for planner: outputId=${recoveredImageContext.responseId ?? 'n/a'}, inputId=${recoveredImageContext.inputId ?? 'n/a'}, promptLength=${ctx.prompt.length}.`);
+      }
+    } catch (error) {
+      logger.debug('Failed to recover image embed context for planner:', error);
+    }
+
     //
     // Generate plan
     //
@@ -234,6 +270,13 @@ export class MessageProcessor {
           ? requestedBackground as ImageBackgroundType
           : 'auto';
 
+        let referencedContext: ImageGenerationContext | null = recoveredImageContext?.context ?? null;
+        let followUpResponseId: string | null = recoveredImageContext?.responseId ?? recoveredImageContext?.inputId ?? null;
+        if (recoveredImageContext) {
+          logger.debug(`Using recovered image context for follow-up: outputId=${recoveredImageContext.responseId ?? 'n/a'}, inputId=${recoveredImageContext.inputId ?? 'n/a'}.`);
+        }
+
+        // Normalise style before potentially inheriting values from a reference.
         const normalizedStyle = request.style
           ? request.style.toLowerCase().replace(/[^a-z0-9]+/g, '_')
           : 'unspecified';
@@ -241,10 +284,22 @@ export class MessageProcessor {
           ? normalizedStyle as ImageStylePreset
           : 'unspecified';
 
-        let referencedContext: ImageGenerationContext | null = null;
-        let followUpResponseId: string | null = null;
+        // Allow planner-supplied follow-ups only when they reference a cached or recovered context.
+        const plannerFollowUpCandidate = request.followUpResponseId?.trim();
+        if (plannerFollowUpCandidate) {
+          const cached = readFollowUpContext(plannerFollowUpCandidate);
+          const matchesRecovered = recoveredImageContext
+            && (recoveredImageContext.responseId === plannerFollowUpCandidate || recoveredImageContext.inputId === plannerFollowUpCandidate);
 
-        if (message.reference?.messageId) {
+          if (cached || matchesRecovered) {
+            referencedContext = referencedContext ?? cached ?? recoveredImageContext?.context ?? null;
+            followUpResponseId = plannerFollowUpCandidate;
+          } else {
+            logger.warn(`Planner supplied follow-up response ID "${plannerFollowUpCandidate}" that was not found in cache or recovery; ignoring.`);
+          }
+        }
+
+        if (!referencedContext && message.reference?.messageId) {
           try {
             // Fetch and parse the replied-to message so we can honour its
             // generation settings instead of relying on the planner to guess.
@@ -285,18 +340,26 @@ export class MessageProcessor {
           }
         }
 
+        const outputFormat: ImageOutputFormat = (request.outputFormat as ImageOutputFormat | undefined)
+          ?? referencedContext?.outputFormat
+          ?? DEFAULT_IMAGE_OUTPUT_FORMAT;
+        const outputCompression = clampOutputCompression(
+          request.outputCompression ?? referencedContext?.outputCompression ?? DEFAULT_IMAGE_OUTPUT_COMPRESSION
+        );
+
         // Assemble the same context structure used by the slash command pipeline so follow-ups work identically.
         if (trimmedPrompt.length > normalizedPrompt.length) {
           logger.warn('Automated image prompt exceeded embed limits; truncating to preserve follow-up usability.');
         }
 
-        // Planner-driven image generations already flow through the LLM once, so
-        // re-enabling prompt adjustments rarely adds value. Defaulting to false
-        // keeps the resulting embeds compact unless the user explicitly opted in
-        // or the referenced context demanded otherwise.
-        const allowPromptAdjustment = request.allowPromptAdjustment
-          ?? referencedContext?.allowPromptAdjustment
-          ?? false;
+        // Planner-driven image generations already flowed through the LLM once. We
+        // allow optional refinements, but if the prompt is near the embed limit we
+        // skip adjustments to avoid bloating/duplicate fields.
+        const remainingRatio = Math.max(0, (EMBED_FIELD_VALUE_LIMIT - normalizedPrompt.length) / EMBED_FIELD_VALUE_LIMIT);
+        const hasRoomForAdjustment = remainingRatio > PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO;
+        const allowPromptAdjustment = hasRoomForAdjustment
+          ? (request.allowPromptAdjustment ?? referencedContext?.allowPromptAdjustment ?? false)
+          : false;
 
         const textModel: ImageTextModel = referencedContext?.textModel ?? DEFAULT_TEXT_MODEL;
         const imageModel: ImageRenderModel = referencedContext?.imageModel ?? DEFAULT_IMAGE_MODEL;
@@ -310,10 +373,12 @@ export class MessageProcessor {
           size,
           aspectRatio,
           aspectRatioLabel,
-          quality: referencedContext?.quality ?? ('low' as ImageQualityType),
+          quality: request.quality ?? referencedContext?.quality ?? DEFAULT_IMAGE_QUALITY,
           background,
           style,
-          allowPromptAdjustment
+          allowPromptAdjustment,
+          outputFormat,
+          outputCompression
         };
 
         await responseHandler.startTyping();
@@ -326,7 +391,8 @@ export class MessageProcessor {
               nickname: message.member?.displayName ?? message.author.username,
               guildName: message.guild?.name ?? 'Direct message channel'
             },
-            followUpResponseId
+            followUpResponseId,
+            stream: false
           });
 
           const presentation = buildImageResultPresentation(context, artifacts);

@@ -17,6 +17,7 @@ interface DeveloperPromptOptions {
     username: string; // Discord username of the user that called the command
     nickname: string; // Discord nickname of the user that called the command
     guildName: string; // Discord server name where the command was called
+    remainingPromptRatio?: number;
 }
 
 export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
@@ -29,7 +30,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
     };
 
     const adjustmentClause = options.allowPromptAdjustment
-        ? 'You may refine the prompt for clarity, composition, or safety while preserving the user\'s intent.'
+        ? `You may refine the prompt for clarity, composition, or safety while preserving the user's intent. Prefer concise additions that fill missing scene/style/lighting gaps. Aim to stay within ~${Math.max(0, Math.round((options.remainingPromptRatio ?? 1) * 100))}% of the current length; keep expansions minimal when space is low.`
         : 'Do not modify, expand, or rephrase the prompt; use it exactly as provided.';
 
     const safeUsername = sanitize(options.username);
@@ -43,9 +44,9 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
         safeGuildName ? `This generation takes place in the server "${safeGuildName}".` : ''
     ].filter(Boolean).join(' ');
 
-    const reflectionInstruction = requesterName
-        ? `The reflection must address "${requesterName}" by name and explore the creative intent in two or three sentences.`
-        : 'The reflection must explore the creative intent in two or three sentences.';
+    const annotationInstruction = requesterName
+        ? `Provide a brief annotation that addresses "${requesterName}" by name and explores the creative intent in two or three sentences.`
+        : 'Provide a brief annotation that explores the creative intent in two or three sentences.';
 
     const { content } = renderPrompt('discord.image.developer', {
         userContext,
@@ -54,7 +55,7 @@ export function buildDeveloperPrompt(options: DeveloperPromptOptions): string {
         background: options.background,
         style: options.style,
         adjustmentClause,
-        reflectionInstruction
+        reflectionInstruction: annotationInstruction
     });
 
     return content;

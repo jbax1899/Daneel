@@ -167,7 +167,7 @@ export class ResponseHandler {
       }));
     }
 
-    return (await this.channel.send(messageOptions)).suppressEmbeds(); // Suppress embeds to avoid Discord auto-generating previews
+    return this.channel.send(messageOptions);
   }
 
   /**

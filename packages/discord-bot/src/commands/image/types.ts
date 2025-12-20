@@ -1,23 +1,24 @@
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
 import type { ImageGenerationQuality, ImageGenerationSize, ImageModelPricingKey } from '../../utils/pricing.js';
 
-export type ImageTextModel = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano'; // gpt-5 is not supported for prompt adjustment (yet)
+export type ImageTextModel = 'gpt-5.2' | 'gpt-5.1' | 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
 export type ImageRenderModel = ImageModelPricingKey;
 export type ImageQualityType = ImageGenerationQuality;
 export type ImageSizeType = ImageGenerationSize;
 export type ImageBackgroundType = 'auto' | 'transparent' | 'opaque';
-export type ImageStylePreset = 'natural' | 'vivid' | 'photorealistic' | 'cinematic' | 'oil_painting' | 'watercolor' | 'digital_painting' | 'line_art' | 'sketch' | 'cartoon' | 'anime' | 'comic' | 'pixel_art' | 'cyberpunk' | 'fantasy_art' | 'surrealist' | 'minimalist' | 'vintage' | 'noir' | '3d_render' | 'steampunk' | 'abstract' | 'pop_art' | 'dreamcore' | 'isometric' 
-                                | 'unspecified'; // "unspecified" is used when no style preset is specified
+export type ImageOutputFormat = 'png' | 'webp' | 'jpeg';
+export type ImageOutputCompression = number;
+export type ImageStylePreset = 'natural' | 'vivid' | 'photorealistic' | 'cinematic' | 'oil_painting' | 'watercolor' | 'digital_painting' | 'line_art' | 'sketch' | 'cartoon' | 'anime' | 'comic' | 'pixel_art' | 'cyberpunk' | 'fantasy_art' | 'surrealist' | 'minimalist' | 'vintage' | 'noir' | '3d_render' | 'steampunk' | 'abstract' | 'pop_art' | 'dreamcore' | 'isometric' | 'unspecified'; // "unspecified" is used when no style preset is specified
 
 export type ImageGenerationCallWithPrompt = ResponseOutputItem.ImageGenerationCall & {
     revised_prompt?: string | null;
     style_preset?: ImageStylePreset | null;
 };
 
-export interface ReflectionFields {
+export interface AnnotationFields {
     title: string | null;
     description: string | null;
-    reflection: string | null;
+    note: string | null;
     adjustedPrompt?: string | null;
 }
 
@@ -48,9 +49,11 @@ export interface UploadMetadata {
     revisedPrompt?: string | null;
     title?: string | null;
     description?: string | null;
-    reflectionMessage?: string | null;
+    noteMessage?: string | null;
     textModel: ImageTextModel;
     imageModel: ImageRenderModel;
+    outputFormat: ImageOutputFormat;
+    outputCompression?: ImageOutputCompression;
     quality: ImageQualityType;
     size: ImageSizeType;
     background: ImageBackgroundType;

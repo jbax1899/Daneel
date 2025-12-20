@@ -33,7 +33,9 @@ import type {
     ImageRenderModel,
     ImageSizeType,
     ImageStylePreset,
-    ImageTextModel
+    ImageTextModel,
+    ImageOutputFormat,
+    ImageOutputCompression
 } from './types.js';
 
 /**
@@ -58,6 +60,8 @@ export interface VariationSessionState {
     background: ImageBackgroundType;
     style: ImageStylePreset;
     allowPromptAdjustment: boolean;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
     timeout: NodeJS.Timeout;
     cooldownUntil: number | null;
     cooldownTimer?: NodeJS.Timeout;
@@ -90,6 +94,7 @@ const ASPECT_OPTIONS: Array<{ value: ImageGenerationContext['aspectRatio']; labe
 
 const IMAGE_MODEL_LABELS: Record<ImageRenderModel, string> = {
     'gpt-image-1-mini': 'GPT Image 1 Mini',
+    'gpt-image-1.5': 'GPT Image 1.5',
     'gpt-image-1': 'GPT Image 1'
 };
 
@@ -175,6 +180,8 @@ export function initialiseVariationSession(
         background: context.background,
         style: context.style,
         allowPromptAdjustment: context.allowPromptAdjustment ?? true,
+        outputFormat: context.outputFormat,
+        outputCompression: context.outputCompression,
         timeout: setTimeout(() => {
             disposeVariationSession(key);
         }, VARIATION_SESSION_TTL_MS),
@@ -369,6 +376,16 @@ export function buildVariationConfiguratorView(
         {
             name: 'Prompt adjustment',
             value: session.allowPromptAdjustment ? 'Enabled' : 'Disabled',
+            inline: true
+        },
+        {
+            name: 'Output format',
+            value: session.outputFormat.toUpperCase(),
+            inline: true
+        },
+        {
+            name: 'Compression',
+            value: `${session.outputCompression}%`,
             inline: true
         },
         {

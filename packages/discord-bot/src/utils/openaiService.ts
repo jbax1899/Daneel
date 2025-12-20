@@ -239,7 +239,18 @@ export class OpenAIService {
   ): Promise<OpenAIResponse> {
     // Currently only GPT-5 models are supported, as they are the most current and cost-effective.
     //TODO: Add support for other model types
-    return this.generateGPT5Response(model as GPT5ModelType, messages, options);
+    return this.generateGPT5Response(model as GPT5ModelType, messages, {
+      ...options,
+      reasoningEffort: this.normalizeReasoningEffort(options.reasoningEffort)
+    });
+  }
+
+  private normalizeReasoningEffort(value: OpenAIOptions['reasoningEffort']): OpenAIOptions['reasoningEffort'] {
+    if (value === 'minimal') {
+      // Responses API for gpt-5.x supports none/low/medium/high/xhigh; map minimal to low to stay in-range.
+      return 'low';
+    }
+    return value;
   }
 
   /**

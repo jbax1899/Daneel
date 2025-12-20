@@ -38,7 +38,7 @@
     "opusscript": "^0.0.8",
     "prism-media": "^1.3.5",
     "reindex": "^0.1.0",
-    "winston": "^3.17.0"
+    "winston": "^3.19.0"
   },
   "devDependencies": {
     "@types/body-parser": "^1.19.6",

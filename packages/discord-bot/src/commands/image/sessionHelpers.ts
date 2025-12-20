@@ -8,26 +8,29 @@ import {
     type TextModelPricingKey
 } from '../../utils/pricing.js';
 import {
+    ANNOTATION_MESSAGE_LIMIT,
     EMBED_FIELD_VALUE_LIMIT,
     EMBED_MAX_FIELDS,
     EMBED_TOTAL_FIELD_CHAR_LIMIT,
     EMBED_TITLE_LIMIT,
     IMAGE_RETRY_CUSTOM_ID_PREFIX,
-    IMAGE_VARIATION_CUSTOM_ID_PREFIX,
-    REFLECTION_MESSAGE_LIMIT
+    IMAGE_VARIATION_CUSTOM_ID_PREFIX
 } from './constants.js';
 import { isCloudinaryConfigured, uploadToCloudinary } from './cloudinary.js';
-import { generateImageWithReflection } from './openai.js';
+import { generateImageWithMetadata } from './openai.js';
 import type {
     ImageGenerationCallWithPrompt,
     ImageRenderModel,
     ImageStylePreset,
     ImageTextModel,
     PartialImagePayload,
-    ReflectionFields
+    AnnotationFields,
+    ImageOutputFormat,
+    ImageOutputCompression
 } from './types.js';
 import type { ImageGenerationContext } from './followUpCache.js';
-import { sanitizeForEmbed, setEmbedDescription, setEmbedFooterText, truncateForEmbed } from './embed.js';
+import { sanitizeForEmbed, setEmbedFooterText, truncateForEmbed } from './embed.js';
+import { PROMPT_ADJUSTMENT_MIN_REMAINING_RATIO } from './constants.js';
 
 /**
  * Provides structured metadata about a generated image so that different
@@ -40,11 +43,12 @@ export interface ImageGenerationArtifacts {
     imageModel: ImageRenderModel;
     revisedPrompt: string | null;
     finalStyle: ImageStylePreset;
-    reflection: ReflectionFields;
-    reflectionMessage: string;
+    annotations: AnnotationFields;
     finalImageBuffer: Buffer;
     finalImageFileName: string;
     imageUrl: string | null;
+    outputFormat: ImageOutputFormat;
+    outputCompression: ImageOutputCompression;
     usage: {
         inputTokens: number;
         outputTokens: number;
@@ -63,6 +67,7 @@ export interface ImageGenerationArtifacts {
 interface ExecuteImageGenerationOptions {
     followUpResponseId?: string | null;
     onPartialImage?: (payload: PartialImagePayload) => Promise<void> | void;
+    stream?: boolean;
     user: {
         username: string;
         nickname: string;
@@ -83,7 +88,7 @@ export async function executeImageGeneration(
     const start = Date.now();
     const openai = new OpenAI();
 
-    const generation = await generateImageWithReflection({
+    const generation = await generateImageWithMetadata({
         openai,
         prompt: context.prompt,
         textModel: context.textModel,
@@ -93,14 +98,17 @@ export async function executeImageGeneration(
         background: context.background,
         style: context.style,
         allowPromptAdjustment: context.allowPromptAdjustment,
+        outputFormat: context.outputFormat,
+        outputCompression: context.outputCompression,
         followUpResponseId: options.followUpResponseId,
+        stream: options.stream,
         username: options.user.username,
         nickname: options.user.nickname,
         guildName: options.user.guildName,
         onPartialImage: options.onPartialImage
     });
 
-    const { response, imageCall, finalImageBase64, reflection } = generation;
+    const { response, imageCall, finalImageBase64, annotations } = generation;
     const inputTokens = response.usage?.input_tokens ?? 0;
     const outputTokens = response.usage?.output_tokens ?? 0;
     const totalTokens = response.usage?.total_tokens ?? (inputTokens + outputTokens);
@@ -125,19 +133,22 @@ export async function executeImageGeneration(
     const totalCost = textCostEstimate.totalCost + imageCostEstimate.totalCost;
 
     const finalImageBuffer = Buffer.from(finalImageBase64, 'base64');
-    const finalImageFileName = `arete-image-${Date.now()}.png`;
+    const extension = context.outputFormat ?? 'png';
+    const finalImageFileName = `arete-image-${Date.now()}.${extension}`;
     let imageUrl: string | null = null;
 
     if (isCloudinaryConfigured) {
         try {
             imageUrl = await uploadToCloudinary(finalImageBuffer, {
                 originalPrompt: context.originalPrompt ?? context.prompt,
-                revisedPrompt: reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null,
-                title: reflection.title,
-                description: reflection.description,
-                reflectionMessage: reflection.reflection,
+                revisedPrompt: annotations.adjustedPrompt ?? imageCall.revised_prompt ?? null,
+                title: annotations.title,
+                description: annotations.description,
+                noteMessage: annotations.note,
                 textModel: context.textModel,
                 imageModel: context.imageModel,
+                outputFormat: context.outputFormat,
+                outputCompression: context.outputCompression,
                 quality: context.quality,
                 size: context.size,
                 background: context.background,
@@ -167,10 +178,7 @@ export async function executeImageGeneration(
     }
 
     const generationTimeMs = Date.now() - start;
-    const revisedPrompt = reflection.adjustedPrompt ?? imageCall.revised_prompt ?? null;
-    const reflectionMessage = reflection.reflection
-        ? truncateForEmbed(reflection.reflection, REFLECTION_MESSAGE_LIMIT, { includeTruncationNote: true })
-        : '';
+    const revisedPrompt = annotations.adjustedPrompt ?? imageCall.revised_prompt ?? null;
 
     return {
         responseId: response.id ?? null,
@@ -178,11 +186,12 @@ export async function executeImageGeneration(
         imageModel: context.imageModel,
         revisedPrompt,
         finalStyle,
-        reflection,
-        reflectionMessage,
+        annotations,
         finalImageBuffer,
         finalImageFileName,
         imageUrl,
+        outputFormat: context.outputFormat,
+        outputCompression: context.outputCompression,
         usage: {
             inputTokens,
             outputTokens,
@@ -227,7 +236,10 @@ export function buildImageResultPresentation(
     }: { followUpResponseId?: string | null } = {}
 ): ImageResultPresentation {
     const originalPrompt = context.originalPrompt ?? context.prompt;
-    const candidateRefinedPrompt = artifacts.revisedPrompt ?? context.refinedPrompt ?? null;
+    // Only surface a refined/adjusted prompt when callers allow adjustments.
+    const candidateRefinedPrompt = context.allowPromptAdjustment
+        ? (artifacts.revisedPrompt ?? context.refinedPrompt ?? null)
+        : null;
     const refinedPrompt = candidateRefinedPrompt && candidateRefinedPrompt !== originalPrompt
         ? candidateRefinedPrompt
         : null;
@@ -248,19 +260,15 @@ export function buildImageResultPresentation(
         originalPrompt: normalizedOriginalPrompt,
         refinedPrompt: normalizedRefinedPrompt,
         style: artifacts.finalStyle,
-        allowPromptAdjustment: context.allowPromptAdjustment ?? true
+        allowPromptAdjustment: Boolean(context.allowPromptAdjustment)
     };
 
     const embed = new EmbedBuilder()
         .setColor(0x5865F2)
         .setTimestamp();
 
-    const title = artifacts.reflection.title ? `🎨 ${artifacts.reflection.title}` : '🎨 Image Generation';
+    const title = artifacts.annotations.title ? `🎨 ${artifacts.annotations.title}` : '🎨 Image Generation';
     embed.setTitle(truncateForEmbed(title, EMBED_TITLE_LIMIT));
-
-    if (artifacts.reflection.description) {
-        setEmbedDescription(embed, artifacts.reflection.description);
-    }
 
     if (artifacts.imageUrl) {
         embed.setImage(artifacts.imageUrl);
@@ -317,24 +325,35 @@ export function buildImageResultPresentation(
         return truncated;
     };
 
-    const currentTruncated = recordPrompt('Current prompt', normalizedActivePrompt);
-    const originalTruncated = recordPrompt('Original prompt', normalizedOriginalPrompt);
+    let promptTruncated = false;
+    let originalTruncated = false;
+
+    const originalLabel = followUpContext.allowPromptAdjustment ? 'Original prompt' : 'Prompt';
+
+    if (normalizedRefinedPrompt) {
+        promptTruncated = recordPrompt('Prompt', normalizedActivePrompt);
+        originalTruncated = recordPrompt(originalLabel, normalizedOriginalPrompt);
+    } else {
+        promptTruncated = recordPrompt(originalLabel, normalizedOriginalPrompt);
+    }
 
     assertField('Image model', followUpContext.imageModel, { inline: true });
     assertField('Text model', followUpContext.textModel, { inline: true });
-    assertField('Quality', `${toTitleCase(followUpContext.quality)} (${followUpContext.imageModel})`, { inline: true });
+    assertField('Quality', toTitleCase(followUpContext.quality), { inline: true });
     assertField('Aspect ratio', followUpContext.aspectRatioLabel, { inline: true });
     assertField('Resolution', followUpContext.size === 'auto' ? 'Auto' : followUpContext.size, { inline: true });
     assertField('Background', toTitleCase(followUpContext.background), { inline: true });
     assertField('Prompt adjustment', followUpContext.allowPromptAdjustment ? 'Enabled' : 'Disabled', { inline: true });
+    assertField('Output format', followUpContext.outputFormat.toUpperCase(), { inline: true });
+    assertField('Compression', `${followUpContext.outputCompression}%`, { inline: true });
     assertField('Style', formatStylePreset(followUpContext.style), { inline: true });
     if (followUpResponseId) {
         assertField('Input ID', `\`${followUpResponseId}\``, { inline: true });
     }
     assertField('Output ID', artifacts.responseId ? `\`${artifacts.responseId}\`` : 'n/a', { inline: true });
 
-    const refinedTruncated = normalizedRefinedPrompt ? currentTruncated : false;
-    const activeTruncated = currentTruncated;
+    const refinedTruncated = normalizedRefinedPrompt ? promptTruncated : false;
+    const activeTruncated = promptTruncated;
 
     embed.addFields(fields);
 
@@ -375,7 +394,6 @@ export function buildImageResultPresentation(
     const components = artifacts.responseId ? [createVariationButtonRow(artifacts.responseId)] : [];
 
     return {
-        content: artifacts.reflectionMessage.trim() || undefined,
         embed,
         attachments,
         components,
