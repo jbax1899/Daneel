@@ -119,7 +119,7 @@ const planFunction = {
               type: {
                 type: "string",
                 enum: ["none", "web_search"],
-                description: "'none' performs no tool calls. 'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message (real-time information especially). Always pair this with reasoningEffort >= low."
+                description: "Only choose 'web_search' when you can produce a meaningful, non-empty query; otherwise use 'none' ('none' performs no tool calls). 'web_search' performs a web search for a given query and should be used to find information that the assistant needs to respond to the message (real-time information especially). Always pair this with reasoningEffort >= low."
               }
             },
             required: ["type"]
@@ -127,7 +127,7 @@ const planFunction = {
           webSearch: {
             type: "object",
             properties: {
-              query: { type: "string", description: "If performing a web_search, the web search query. web_search is required whenever the answer depends on versioned, time-sensitive, comparative, or externally verifiable facts (e.g., model versions, releases, benchmarks, pricing). If you cannot justify high confidence without lookup, you must perform a web_search rather than speculate." },
+              query: { type: "string", description: "If tool_choice.type is web_search, you must provide a concise, non-empty query summarizing the user’s ask; do not return an empty string. web_search is required whenever the answer depends on versioned, time-sensitive, comparative, or externally verifiable facts (e.g., model versions, releases, benchmarks, pricing). If you cannot justify high confidence without lookup, you must perform a web_search rather than speculate." },
               //allowedDomains: { type: "array", items: { type: "string" }, description: "An array of allowed domains to search within." },
               searchContextSize: { type: "string", enum: ["low", "medium", "high"], description: "Controls the breadth of external context retrieved. Use 'low' only when a single, stable fact is sufficient. Use 'medium' for comparisons, synthesis, or when confidence beyond a single source is required (e.g., model versions, release differences, benchmarks, pricing, timelines). Use 'high' only for complex, multi-factor, or high-stakes queries where missing context could materially affect correctness. Default to 'medium' when uncertainty exists." },
               /*userLocation: {
@@ -211,7 +211,9 @@ export class Planner {
     try {
       const messages: OpenAIMessage[] = [...context];
 
-      const plannerPrompt = renderPrompt('discord.planner.system').content;
+      const plannerPrompt = renderPrompt('discord.planner.system', {
+        webSearchHint: 'When the user asks for lookup/verification/what’s new/availability, choose web_search and emit a clear query (no empty strings). If you can’t form a query, fall back to tool_choice: none.'
+      }).content;
       const openaiResponse = await this.openaiService.generateResponse(
         PLANNING_MODEL,
         [
