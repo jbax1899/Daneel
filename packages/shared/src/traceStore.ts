@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: utility
  *
- * @description
- * Shared helpers and factory for persistence of response provenance metadata.
+ * @description: Shared helpers and factory for persistence of response provenance metadata.
  *
  * @impact
  * Risk: Storage failures can break audit trails and transparency features.

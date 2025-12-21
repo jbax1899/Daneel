@@ -1,7 +1,7 @@
 /**
- * @description Manages realtime session options and applies runtime updates.
- * @arete-scope utility
- * @arete-module RealtimeSessionConfig
+ * @description: Manages realtime session options and applies runtime updates.
+ * @arete-scope: utility
+ * @arete-module: RealtimeSessionConfig
  * @arete-risk: moderate - Incorrect options can break realtime sessions or increase costs.
  * @arete-ethics: moderate - Session settings influence audio handling and consent.
  */

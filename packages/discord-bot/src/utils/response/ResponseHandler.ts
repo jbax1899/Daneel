@@ -1,7 +1,7 @@
 /**
- * @description Orchestrates Discord responses (messages, embeds, DMs, reactions, typing).
- * @arete-scope interface
- * @arete-module ResponseHandler
+ * @description: Orchestrates Discord responses (messages, embeds, DMs, reactions, typing).
+ * @arete-scope: interface
+ * @arete-module: ResponseHandler
  * @arete-risk: high - Response failures can drop user interactions or spam channels.
  * @arete-ethics: moderate - Response handling affects user transparency and feedback.
  */

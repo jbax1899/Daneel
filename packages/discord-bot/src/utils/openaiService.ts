@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Handles all LLM interactions and API calls with high cost/resource impact.
+ * @description: Handles all LLM interactions and API calls with high cost/resource impact.
  *
  * @impact
  * Risk: API failures can break AI functionality or cause unexpected costs. Manages all OpenAI API communication including chat completions, embeddings, TTS, and image analysis.

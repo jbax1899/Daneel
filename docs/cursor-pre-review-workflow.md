@@ -163,8 +163,7 @@ Every module must include:
  * @arete-ethics: <critical|high|moderate|low>
  * @arete-scope: <core|utility|interface|test>
  * 
- * @description
- * <1-3 lines summarizing what this module does.>
+ * @description: <1-3 lines summarizing what this module does.>
  * 
  * @impact
  * Risk: <What could break or be compromised if mishandled.>

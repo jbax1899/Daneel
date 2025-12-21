@@ -107,9 +107,9 @@ export interface SimpleConfig {
 
 ```typescript
 /**
- * @description <1-3 lines summarizing what this module does.>
- * @arete-scope <core|utility|interface|test>
- * @arete-module <ModuleName>
+ * @description: <1-3 lines summarizing what this module does.>
+ * @arete-scope: <core|utility|interface|test>
+ * @arete-module: <ModuleName>
  * @arete-risk: <low|moderate|high> - <What could break or be compromised if mishandled.>
  * @arete-ethics: <low|moderate|high> - <What human or governance impacts errors could cause.>
  */

@@ -1,5 +1,5 @@
 /**
- * @description Serves the web app and API endpoints for reflect, traces, and GitHub webhooks.
+ * @description: Serves the web app and API endpoints for reflect, traces, and GitHub webhooks.
  * @arete-scope core
  * @arete-module WebServer
  * @arete-risk: high - Server failures can break user access or data integrity.

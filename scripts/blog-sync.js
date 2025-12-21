@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * @description Syncs blog posts from GitHub Discussions using GitHub App auth.
+ * @description: Syncs blog posts from GitHub Discussions using GitHub App auth.
  * @arete-scope utility
  * @arete-module BlogSyncScript
  * @arete-risk: low - Script misuse can overwrite blog data or exceed API limits.

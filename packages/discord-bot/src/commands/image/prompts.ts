@@ -1,7 +1,7 @@
 /**
- * @description Builds system and developer prompts for image generation requests.
- * @arete-scope utility
- * @arete-module ImagePromptBuilder
+ * @description: Builds system and developer prompts for image generation requests.
+ * @arete-scope: utility
+ * @arete-module: ImagePromptBuilder
  * @arete-risk: moderate - Prompt errors can degrade outputs or raise costs.
  * @arete-ethics: moderate - Prompt framing shapes model behavior and safety.
  */

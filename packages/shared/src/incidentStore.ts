@@ -1,7 +1,7 @@
 /**
- * @description Factory for creating the incident store with env-driven configuration and pseudonymization checks.
- * @arete-scope utility
- * @arete-module IncidentStoreFactory
+ * @description: Factory for creating the incident store with env-driven configuration and pseudonymization checks.
+ * @arete-scope: utility
+ * @arete-module: IncidentStoreFactory
  * @arete-risk: high - Misconfiguration can block incident storage or create inconsistent data paths.
  * @arete-ethics: high - Protects against storing raw Discord identifiers without hashing.
  */

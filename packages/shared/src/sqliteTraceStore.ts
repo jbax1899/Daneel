@@ -1,7 +1,7 @@
 /**
- * @description Persists provenance traces in SQLite with retry handling and validation.
- * @arete-scope utility
- * @arete-module SqliteTraceStore
+ * @description: Persists provenance traces in SQLite with retry handling and validation.
+ * @arete-scope: utility
+ * @arete-module: SqliteTraceStore
  * @arete-risk: moderate - Storage errors can drop trace records or corrupt metadata.
  * @arete-ethics: moderate - Trace accuracy underpins transparency and auditability.
  */

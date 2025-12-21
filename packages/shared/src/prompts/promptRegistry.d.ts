@@ -1,5 +1,5 @@
 /**
- * @description Type declarations for prompt registry contracts.
+ * @description: Type declarations for prompt registry contracts.
  * @arete-scope interface
  * @arete-module PromptRegistryTypes
  * @arete-risk: low - Type drift can break prompt consumers or tooling.

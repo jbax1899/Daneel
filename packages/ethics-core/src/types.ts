@@ -1,7 +1,7 @@
 /**
- * @description Defines ethics-core types used for provenance, risk, and metadata.
- * @arete-scope interface
- * @arete-module EthicsCoreRuntimeTypes
+ * @description: Defines ethics-core types used for provenance, risk, and metadata.
+ * @arete-scope: interface
+ * @arete-module: EthicsCoreRuntimeTypes
  * @arete-risk: low - Type drift can break downstream assumptions or validations.
  * @arete-ethics: low - Types document semantics without processing data.
  */

@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: core
  *
- * @description
- * Manages Discord event loading and binding for the entire bot.
+ * @description: Manages Discord event loading and binding for the entire bot.
  *
  * @impact
  * Risk: Handles dynamic event loading and dependency injection. Failures can prevent event handlers from registering, breaking core bot functionality.

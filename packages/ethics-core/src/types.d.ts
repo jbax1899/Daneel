@@ -1,5 +1,5 @@
 /**
- * @description Declares ethics-core public types for provenance and risk tiers.
+ * @description: Declares ethics-core public types for provenance and risk tiers.
  * @arete-scope interface
  * @arete-module EthicsCoreTypes
  * @arete-risk: low - Type drift can break downstream tooling or UI mappings.

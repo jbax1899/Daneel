@@ -1,7 +1,7 @@
 /**
- * @description Tests realtime streaming flow integration for audio handlers.
- * @arete-scope test
- * @arete-module RealtimeStreamingTests
+ * @description: Tests realtime streaming flow integration for audio handlers.
+ * @arete-scope: test
+ * @arete-module: RealtimeStreamingTests
  * @arete-risk: low - Test failures indicate streaming regressions only.
  * @arete-ethics: low - No user content is processed in test fixtures.
  */

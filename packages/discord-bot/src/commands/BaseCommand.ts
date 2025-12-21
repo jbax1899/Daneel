@@ -1,7 +1,7 @@
 /**
- * @description Defines shared Discord slash command types and the command contract.
- * @arete-scope interface
- * @arete-module BaseCommand
+ * @description: Defines shared Discord slash command types and the command contract.
+ * @arete-scope: interface
+ * @arete-module: BaseCommand
  * @arete-risk: low - Incorrect typing can break command registration or execution wiring.
  * @arete-ethics: low - This module is structural and does not alter user-facing behavior.
  */

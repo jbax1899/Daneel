@@ -1,7 +1,7 @@
 /**
- * @description Handles provenance footer interactions, lenses, and trace lookups.
- * @arete-scope interface
- * @arete-module ProvenanceInteractions
+ * @description: Handles provenance footer interactions, lenses, and trace lookups.
+ * @arete-scope: interface
+ * @arete-module: ProvenanceInteractions
  * @arete-risk: moderate - Interaction failures can block provenance navigation.
  * @arete-ethics: high - Provenance access affects user trust and accountability.
  */

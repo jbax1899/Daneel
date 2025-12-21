@@ -1,7 +1,7 @@
 /**
- * @description Handles rate limiting for Discord and web API interactions.
- * @arete-scope utility
- * @arete-module RateLimiter
+ * @description: Handles rate limiting for Discord and web API interactions.
+ * @arete-scope: utility
+ * @arete-module: RateLimiter
  * @arete-risk: moderate - Incorrect limits can cause abuse or block valid users.
  * @arete-ethics: moderate - Rate limits affect user access and fairness.
  */

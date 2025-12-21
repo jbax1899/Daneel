@@ -1,7 +1,7 @@
 /**
- * @description Coordinates image generation flows, retries, and embed formatting helpers.
- * @arete-scope utility
- * @arete-module ImageSessionHelpers
+ * @description: Coordinates image generation flows, retries, and embed formatting helpers.
+ * @arete-scope: utility
+ * @arete-module: ImageSessionHelpers
  * @arete-risk: moderate - Workflow errors can create duplicate charges or invalid responses.
  * @arete-ethics: moderate - Session behavior affects user expectations and transparency.
  */

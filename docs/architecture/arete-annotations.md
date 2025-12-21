@@ -4,18 +4,18 @@ This document defines the required header annotations for ARETE modules and the 
 
 ## Required Header Format
 Order is fixed:
-1) `@description`
-2) `@arete-scope`
-3) `@arete-module`
+1) `@description` (colon required)
+2) `@arete-scope` (colon required)
+3) `@arete-module` (colon required)
 4) `@arete-risk: <low|moderate|high> - ...`
 5) `@arete-ethics: <low|moderate|high> - ...`
 
 Example:
 ```ts
 /**
- * @description Handles realtime audio streaming and event dispatch for the bot.
- * @arete-scope core
- * @arete-module RealtimeEventHandler
+ * @description: Handles realtime audio streaming and event dispatch for the bot.
+ * @arete-scope: core
+ * @arete-module: RealtimeEventHandler
  * @arete-risk: high - Event handling failures can break live audio or message delivery.
  * @arete-ethics: high - Realtime audio flow affects privacy and consent expectations.
  */

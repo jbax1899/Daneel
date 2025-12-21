@@ -1,7 +1,7 @@
 /**
- * @description Plans bot actions and LLM options before responding to messages.
- * @arete-scope core
- * @arete-module Planner
+ * @description: Plans bot actions and LLM options before responding to messages.
+ * @arete-scope: core
+ * @arete-module: Planner
  * @arete-risk: high - Planning errors can trigger wrong modality or unsafe actions.
  * @arete-ethics: high - Plan selection affects user trust and safety outcomes.
  */

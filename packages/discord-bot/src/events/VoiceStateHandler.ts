@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Handles Discord voice state changes and coordinates voice session management.
+ * @description: Handles Discord voice state changes and coordinates voice session management.
  *
  * @impact
  * Risk: Manages voice connections, audio handlers, and realtime session creation. Failures can break all voice functionality or leave orphaned connections.

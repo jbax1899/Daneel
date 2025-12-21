@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: utility
  *
- * @description
- * Provides lightweight, deterministic heuristics that decide whether the planner
+ * @description: Provides lightweight, deterministic heuristics that decide whether the planner
  * should be skipped for catchup events. The filter analyzes recent conversation
  * history to weed out obvious non-response scenarios before we incur an LLM call.
  *

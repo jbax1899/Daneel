@@ -1,7 +1,7 @@
 /**
- * @description Builds safe Discord embeds with validation against platform limits.
- * @arete-scope utility
- * @arete-module ResponseEmbedBuilder
+ * @description: Builds safe Discord embeds with validation against platform limits.
+ * @arete-scope: utility
+ * @arete-module: ResponseEmbedBuilder
  * @arete-risk: low - Invalid embeds can cause message failures or truncation.
  * @arete-ethics: low - Presentation logic does not alter content semantics.
  */

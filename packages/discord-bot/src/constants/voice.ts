@@ -1,7 +1,7 @@
 /**
- * @description Defines voice processing and timeout constants for audio workflows.
- * @arete-scope utility
- * @arete-module VoiceConstants
+ * @description: Defines voice processing and timeout constants for audio workflows.
+ * @arete-scope: utility
+ * @arete-module: VoiceConstants
  * @arete-risk: moderate - Incorrect constants can destabilize audio buffers or retries.
  * @arete-ethics: moderate - Voice timing affects capture boundaries and consent.
  */

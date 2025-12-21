@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Captures and processes real-time user voice data from Discord voice channels.
+ * @description: Captures and processes real-time user voice data from Discord voice channels.
  *
  * @impact
  * Risk: Handles Opus decoding, PCM conversion, and audio chunk emission. Failures can cause audio loss, processing errors, or memory leaks.

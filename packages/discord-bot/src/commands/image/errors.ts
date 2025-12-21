@@ -1,7 +1,7 @@
 /**
- * @description Normalizes image generation errors into user-facing messages.
- * @arete-scope utility
- * @arete-module ImageErrorHandling
+ * @description: Normalizes image generation errors into user-facing messages.
+ * @arete-scope: utility
+ * @arete-module: ImageErrorHandling
  * @arete-risk: low - Incorrect mappings can mislead users or hide recoverable issues.
  * @arete-ethics: low - Error copy affects transparency but not sensitive processing.
  */

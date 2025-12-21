@@ -1,7 +1,7 @@
 /**
- * @description Public exports for shared utilities and prompt registry access.
- * @arete-scope interface
- * @arete-module SharedIndex
+ * @description: Public exports for shared utilities and prompt registry access.
+ * @arete-scope: interface
+ * @arete-module: SharedIndex
  * @arete-risk: low - Export changes can break downstream imports.
  * @arete-ethics: low - This module re-exports without processing data.
  */

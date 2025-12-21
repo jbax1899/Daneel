@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: test
  *
- * @description
- * Integration tests to ensure incidents and audit events are persisted with
+ * @description: Integration tests to ensure incidents and audit events are persisted with
  * pseudonymized Discord identifiers (namespaced HMAC) and no raw IDs leak into
  * storage.
  *

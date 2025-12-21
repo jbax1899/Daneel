@@ -1,7 +1,7 @@
 /**
- * @description Implements the /image command entry point and command wiring.
- * @arete-scope interface
- * @arete-module ImageCommand
+ * @description: Implements the /image command entry point and command wiring.
+ * @arete-scope: interface
+ * @arete-module: ImageCommand
  * @arete-risk: high - Miswiring can break image generation or overload downstream services.
  * @arete-ethics: moderate - Image generation affects user content expectations and safety.
  */

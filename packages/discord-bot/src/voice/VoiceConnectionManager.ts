@@ -1,7 +1,7 @@
 /**
- * @description Manages Discord voice connections and cleanup routines.
- * @arete-scope core
- * @arete-module VoiceConnectionManager
+ * @description: Manages Discord voice connections and cleanup routines.
+ * @arete-scope: core
+ * @arete-module: VoiceConnectionManager
  * @arete-risk: high - Connection leaks can destabilize voice playback or capture.
  * @arete-ethics: high - Voice connection control affects consent and session boundaries.
  */

@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Core real-time AI session management and WebSocket coordination.
+ * @description: Core real-time AI session management and WebSocket coordination.
  *
  * @impact
  * Risk: Session failures can break all real-time AI functionality and waste resources. Manages WebSocket connections, session lifecycle, and audio streaming coordination.

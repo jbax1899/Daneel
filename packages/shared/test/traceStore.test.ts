@@ -1,7 +1,7 @@
 /**
- * @description Validates SQLite trace storage round trips metadata correctly.
- * @arete-scope test
- * @arete-module TraceStoreTests
+ * @description: Validates SQLite trace storage round trips metadata correctly.
+ * @arete-scope: test
+ * @arete-module: TraceStoreTests
  * @arete-risk: low - Tests cover trace persistence without affecting production.
  * @arete-ethics: low - Uses synthetic metadata only.
  */

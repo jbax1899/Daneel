@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: utility
  *
- * @description
- * Shared helpers for trace store serialization and validation. Split out to
+ * @description: Shared helpers for trace store serialization and validation. Split out to
  * avoid circular imports between the trace store factory and SQLite backend.
  *
  * @impact

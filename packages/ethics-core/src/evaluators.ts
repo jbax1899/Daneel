@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Contains ethical evaluation logic and risk assessment algorithms.
+ * @description: Contains ethical evaluation logic and risk assessment algorithms.
  *
  * @impact
  * Risk: Evaluation failures can lead to inappropriate AI behavior or missed ethical concerns. Implements provenance and risk tier computation.

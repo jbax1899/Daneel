@@ -1,5 +1,5 @@
 /**
- * @description Ambient declarations for @arete/shared to support local builds.
+ * @description: Ambient declarations for @arete/shared to support local builds.
  * @arete-scope interface
  * @arete-module AreteSharedTypes
  * @arete-risk: low - Drift can break type checking or build tooling.

@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: core
  *
- * @description
- * Manages Discord slash command deployment and registration.
+ * @description: Manages Discord slash command deployment and registration.
  *
  * @impact
  * Risk: Handles command discovery, validation, and API registration. Failures can prevent users from accessing bot features or cause command registration errors.

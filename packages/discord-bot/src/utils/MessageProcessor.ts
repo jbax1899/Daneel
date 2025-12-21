@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Core message processing and AI response generation. Handles message analysis, AI model selection, and response generation.
+ * @description: Core message processing and AI response generation. Handles message analysis, AI model selection, and response generation.
  *
  * @impact
  * Risk: Processing failures can break all user interactions or generate inappropriate content. Orchestrates the entire message-to-response pipeline including context building, planning, and response delivery.

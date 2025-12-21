@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: test
  *
- * @description
- * Validates that logging utilities redact or avoid leaking sensitive Discord
+ * @description: Validates that logging utilities redact or avoid leaking sensitive Discord
  * data, and that verbose logging is gated behind explicit flags.
  *
  * @impact

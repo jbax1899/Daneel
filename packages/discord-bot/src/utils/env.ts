@@ -1,7 +1,7 @@
 /**
- * @description Loads and validates Discord bot environment configuration and defaults.
- * @arete-scope utility
- * @arete-module EnvConfig
+ * @description: Loads and validates Discord bot environment configuration and defaults.
+ * @arete-scope: utility
+ * @arete-module: EnvConfig
  * @arete-risk: high - Misconfiguration can break auth, rate limits, or cost tracking.
  * @arete-ethics: moderate - Incorrect settings can alter safety behavior or disclosure.
  */

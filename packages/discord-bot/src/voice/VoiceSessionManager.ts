@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Manages voice session state and coordinates audio event handling.
+ * @description: Manages voice session state and coordinates audio event handling.
  *
  * @impact
  * Risk: Handles session creation, audio chunk forwarding, and cleanup. Failures can cause memory leaks, orphaned sessions, or audio processing errors.

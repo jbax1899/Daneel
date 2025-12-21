@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: core
  * 
- * @description
- * Tracks OpenAI API usage and costs per channel/guild/global for budget enforcement and transparency
+ * @description: Tracks OpenAI API usage and costs per channel/guild/global for budget enforcement and transparency
  * 
  * @impact
  * Risk: Memory leaks if not properly managed; state inconsistency if concurrent updates race.

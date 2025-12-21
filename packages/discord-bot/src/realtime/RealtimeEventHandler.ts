@@ -1,7 +1,7 @@
 /**
- * @description Routes realtime API events and streams text/audio deltas.
- * @arete-scope core
- * @arete-module RealtimeEventHandler
+ * @description: Routes realtime API events and streams text/audio deltas.
+ * @arete-scope: core
+ * @arete-module: RealtimeEventHandler
  * @arete-risk: high - Event mishandling can break live audio or message delivery.
  * @arete-ethics: high - Realtime audio flow affects privacy and user expectations.
  */

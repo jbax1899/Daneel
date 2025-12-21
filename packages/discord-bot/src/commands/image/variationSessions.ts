@@ -1,7 +1,7 @@
 /**
- * @description Manages interactive image variation flows (modals, buttons, selects).
- * @arete-scope interface
- * @arete-module ImageVariationSessions
+ * @description: Manages interactive image variation flows (modals, buttons, selects).
+ * @arete-scope: interface
+ * @arete-module: ImageVariationSessions
  * @arete-risk: moderate - Interaction bugs can lock users or duplicate requests.
  * @arete-ethics: moderate - Variation prompts influence generated content.
  */

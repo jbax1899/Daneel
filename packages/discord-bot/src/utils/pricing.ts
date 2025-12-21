@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Handles all pricing calculations and estimations for text and image generation.
+ * @description: Handles all pricing calculations and estimations for text and image generation.
  * 
  * @impact
  * Risk: Incorrect pricing calculations can lead to unexpected costs.

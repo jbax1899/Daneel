@@ -1,7 +1,7 @@
 /**
- * @description Builds provenance footer embeds with trace metadata and actions.
- * @arete-scope interface
- * @arete-module ProvenanceFooter
+ * @description: Builds provenance footer embeds with trace metadata and actions.
+ * @arete-scope: interface
+ * @arete-module: ProvenanceFooter
  * @arete-risk: moderate - Footer errors can hide provenance or break user actions.
  * @arete-ethics: high - Provenance display affects transparency and accountability.
  */

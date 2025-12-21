@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Weighted scoring system for engagement decisions during catchup events, analyzing context, cost, and conversation dynamics
+ * @description: Weighted scoring system for engagement decisions during catchup events, analyzing context, cost, and conversation dynamics
  *
  * @impact
  * Risk - Overly aggressive scoring causes spam; overly conservative scoring causes missed engagement. 

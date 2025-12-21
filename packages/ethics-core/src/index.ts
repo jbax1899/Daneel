@@ -1,7 +1,7 @@
 /**
- * @description Public exports for ethics-core types and evaluators.
- * @arete-scope interface
- * @arete-module EthicsCoreIndex
+ * @description: Public exports for ethics-core types and evaluators.
+ * @arete-scope: interface
+ * @arete-module: EthicsCoreIndex
  * @arete-risk: low - Export changes can break downstream imports.
  * @arete-ethics: low - This module re-exports without processing data.
  */

@@ -1,7 +1,7 @@
 /**
- * @description Resolves image generation context from messages and defaults.
- * @arete-scope utility
- * @arete-module ImageContextResolver
+ * @description: Resolves image generation context from messages and defaults.
+ * @arete-scope: utility
+ * @arete-module: ImageContextResolver
  * @arete-risk: moderate - Incorrect context resolution can drive unintended model usage.
  * @arete-ethics: moderate - Context affects user intent and safety handling.
  */

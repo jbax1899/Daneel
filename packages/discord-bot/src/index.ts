@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: core
  *
- * @description
- * Main orchestration point controlling system initialization, authentication, and event routing.
+ * @description: Main orchestration point controlling system initialization, authentication, and event routing.
  *
  * @impact
  * Risk: Failure here can halt the application or expose tokens and credentials.

@@ -1,5 +1,5 @@
 /**
- * @description Type declarations for shared package exports.
+ * @description: Type declarations for shared package exports.
  * @arete-scope interface
  * @arete-module SharedIndexTypes
  * @arete-risk: low - Declaration drift can break downstream type checking.

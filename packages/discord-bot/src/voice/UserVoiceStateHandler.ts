@@ -1,7 +1,7 @@
 /**
- * @description Handles user voice state changes and triggers voice sessions.
- * @arete-scope core
- * @arete-module UserVoiceStateHandler
+ * @description: Handles user voice state changes and triggers voice sessions.
+ * @arete-scope: core
+ * @arete-module: UserVoiceStateHandler
  * @arete-risk: high - State handling errors can misjoin channels or leak sessions.
  * @arete-ethics: high - Voice session triggers must respect consent and privacy.
  */

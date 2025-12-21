@@ -1,7 +1,7 @@
 /**
- * @description Manages realtime WebSocket connections, reconnection, and message dispatch.
- * @arete-scope core
- * @arete-module RealtimeWebSocketManager
+ * @description: Manages realtime WebSocket connections, reconnection, and message dispatch.
+ * @arete-scope: core
+ * @arete-module: RealtimeWebSocketManager
  * @arete-risk: high - Connection churn can drop audio/text streams or leak resources.
  * @arete-ethics: high - Realtime streaming impacts privacy and user expectations.
  */

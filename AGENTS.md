@@ -33,16 +33,16 @@ This file provides default context for automation tools (Codex, Cursor) so work 
 - Use fail-open design: if uncertain, do not block execution.
 
 ## ARETE Header Format
-- Order: `@description`, `@arete-scope`, `@arete-module`, `@arete-risk`, `@arete-ethics`.
+- Order: `@description`, `@arete-scope`, `@arete-module`, `@arete-risk`, `@arete-ethics` (colon required).
 - Risk/Ethics annotations must include a short rationale on the same line.
 - Canonical reference: `docs/architecture/arete-annotations.md`.
 
 Example:
 ```ts
 /**
- * @description Handles realtime audio streaming and event dispatch for the bot.
- * @arete-scope core
- * @arete-module RealtimeEventHandler
+ * @description: Handles realtime audio streaming and event dispatch for the bot.
+ * @arete-scope: core
+ * @arete-module: RealtimeEventHandler
  * @arete-risk: high - Audio/event failures can break live conversations or leak resources.
  * @arete-ethics: high - Realtime audio handling impacts privacy and consent expectations.
  */

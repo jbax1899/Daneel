@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: interface
  *
- * @description
- * Fetches and processes news data from external sources.
+ * @description: Fetches and processes news data from external sources.
  *
  * @impact
  * Risk: Handles web search, content filtering, and news summarization. Failures can return stale data or break the command.

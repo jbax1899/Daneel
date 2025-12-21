@@ -1,16 +1,10 @@
 /**
- * @arete-module: CallCommand
- * @arete-risk: high
- * @arete-ethics: critical
+ * @description: Initiates voice conversations with AI using Discord voice channels.
  * @arete-scope: interface
- *
- * @description
- * Initiates voice conversations with AI using Discord voice channels.
- *
- * @impact
- * Risk: Handles voice channel joining, connection management, and realtime session creation. Failures can leave orphaned connections or break voice functionality.
- * Ethics: Enables AI participation in voice channels, affecting user privacy, consent, and the social dynamics of voice conversations.
-*/
+ * @arete-module: CallCommand
+ * @arete-risk: high - Handles voice channel joining, connection management, and realtime session creation; failures can orphan connections or break voice functionality.
+ * @arete-ethics: critical - Enables AI participation in voice channels, affecting user privacy, consent, and social dynamics.
+ */
 
 import { logger } from '../utils/logger.js';
 import { Command } from './BaseCommand.js';
@@ -20,7 +14,7 @@ import { VoiceStateHandler, cleanupVoiceConnection } from '../events/VoiceStateH
 
 /**
 * @name call
- * @description Have a voice conversation with the AI using Discord's voice features
+ * @description: Have a voice conversation with the AI using Discord's voice features
  * @usage /call <voice channel>
  * 1. Check if the bot is already in a voice channel in this server/guild (Discord limitation: only one voice channel at a time per server/guild) - If yes, give the user an error message
  * 2. Try to join the voice channel provided - If it fails, give the user an error message

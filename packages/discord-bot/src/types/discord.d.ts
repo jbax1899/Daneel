@@ -1,5 +1,5 @@
 /**
- * @description Extends Discord.js types with bot-specific client properties.
+ * @description: Extends Discord.js types with bot-specific client properties.
  * @arete-scope interface
  * @arete-module DiscordTypeExtensions
  * @arete-risk: low - Type drift can break command registration or tooling.

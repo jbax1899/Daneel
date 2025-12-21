@@ -4,8 +4,7 @@
  * @arete-ethics: critical
  * @arete-scope: utility
  *
- * @description
- * Manages prompt templates and rendering for AI interactions. Handles prompt loading, caching, and variable substitution.
+ * @description: Manages prompt templates and rendering for AI interactions. Handles prompt loading, caching, and variable substitution.
  *
  * @impact
  * Risk: Template errors can break AI interactions or cause unexpected behavior. Manages prompt lifecycle and variable interpolation.
