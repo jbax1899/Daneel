@@ -1,8 +1,29 @@
+/**
+ * @arete-module: SqliteIncidentStore
+ * @arete-risk: high
+ * @arete-ethics: high
+ * @arete-scope: utility
+ *
+ * @description
+ * Persists incidents and audit events to SQLite with retry/backoff handling.
+ * Discord-facing identifiers are pseudonymized via HMAC to avoid storing or
+ * logging raw IDs. Full digests are stored for uniqueness; only short prefixes
+ * should be surfaced in operator logs.
+ *
+ * @impact
+ * Risk: Storage errors or hashing mistakes can break audit trails.
+ * Ethics: Ensures incident records avoid raw Discord identifiers.
+ */
 import Database from 'better-sqlite3';
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { logger } from './logger.js';
+import {
+  pseudonymizeActorId,
+  pseudonymizeIncidentPointers,
+  shortHash
+} from './pseudonymization.js';
 
 const BUSY_MAX_ATTEMPTS = 5;
 const BUSY_RETRY_DELAY_MS = 50;
@@ -61,6 +82,7 @@ export interface AppendAuditEventInput {
 
 export interface SqliteIncidentStoreConfig {
   dbPath: string;
+  pseudonymizationSecret: string;
 }
 
 export class SqliteIncidentStore {
@@ -69,10 +91,16 @@ export class SqliteIncidentStore {
   private readonly updateStatusStatement: Database.Statement;
   private readonly getIncidentStatement: Database.Statement;
   private readonly insertAuditEvent: Database.Statement;
+  private readonly pseudonymizationSecret: string;
 
   constructor(config: SqliteIncidentStoreConfig) {
     const resolvedPath = path.resolve(config.dbPath);
     fs.mkdirSync(path.dirname(resolvedPath), { recursive: true });
+    if (!config.pseudonymizationSecret || config.pseudonymizationSecret.trim().length === 0) {
+      throw new Error('pseudonymizationSecret is required to initialize SqliteIncidentStore.');
+    }
+    // Keep the secret in-memory only; never log it or persist it.
+    this.pseudonymizationSecret = config.pseudonymizationSecret.trim();
 
     this.db = new Database(resolvedPath);
     this.db.pragma('journal_mode = WAL');
@@ -197,13 +225,26 @@ export class SqliteIncidentStore {
     const tags = this.normalizeTags(input.tags);
     const status = input.status ?? 'new';
     this.assertValidStatus(status);
+    // Pseudonymize pointers before persistence to avoid storing raw IDs.
+    const pointers = input.pointers
+      ? pseudonymizeIncidentPointers(input.pointers, this.pseudonymizationSecret)
+      : null;
+    const shortPointerIds = pointers
+      ? ['guildId', 'channelId', 'messageId']
+          .map((key) => {
+            const value = (pointers as IncidentPointers)[key];
+            return typeof value === 'string' && value.length > 0 ? `${key}=${shortHash(value)}` : null;
+          })
+          .filter((v): v is string => Boolean(v))
+          .join(', ')
+      : 'none';
 
     const runResult = await this.withRetry(() =>
       this.insertIncident.run({
         short_id: this.generateShortId(),
         status,
         tags_json: JSON.stringify(tags),
-        pointers_json: input.pointers ? JSON.stringify(input.pointers) : null,
+        pointers_json: pointers ? JSON.stringify(pointers) : null,
         remediation_applied: input.remediationApplied ? 1 : 0,
         remediation_notes: input.remediationNotes ?? null,
         created_at: now,
@@ -212,7 +253,8 @@ export class SqliteIncidentStore {
     );
 
     const id = Number(runResult.lastInsertRowid);
-    incidentLogger.info(`Incident created (id=${id})`);
+    // Log short hashes only to avoid exposing full digests in operational logs.
+    incidentLogger.info(`Incident created (id=${id}, pointers=${shortPointerIds})`);
     const row = await this.withRetry(() => this.getIncidentStatement.get(id));
     return this.mapIncidentRow(row);
   }
@@ -239,23 +281,36 @@ export class SqliteIncidentStore {
 
   async appendAuditEvent(incidentId: number, event: AppendAuditEventInput): Promise<IncidentAuditEvent> {
     const createdAt = new Date().toISOString();
+    // Actor identifiers may be raw; normalize them to HMAC hashes.
+    const actorHash = pseudonymizeActorId(event.actorHash, this.pseudonymizationSecret);
     const runResult = await this.withRetry(() =>
       this.insertAuditEvent.run({
         incident_id: incidentId,
-        actor_hash: event.actorHash ?? null,
+        actor_hash: actorHash ?? null,
         action: event.action,
         notes: event.notes ?? null,
         created_at: createdAt
       })
     );
 
+    if (actorHash) {
+      incidentLogger.info(`Audit event appended (incident=${incidentId}, actorHash=${shortHash(actorHash)})`);
+    } else {
+      incidentLogger.info(`Audit event appended (incident=${incidentId}, actorHash=none)`);
+    }
+
     return {
       id: Number(runResult.lastInsertRowid),
       incidentId,
-      actorHash: event.actorHash ?? null,
+      actorHash,
       action: event.action,
       notes: event.notes ?? null,
       createdAt
     };
+  }
+
+  close(): void {
+    // Close the SQLite handle so temp databases can be deleted cleanly in tests.
+    this.db.close();
   }
 }

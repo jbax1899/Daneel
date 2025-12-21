@@ -23,7 +23,7 @@ export {
 /**
  * Logging utilities.
  */
-export { logger, formatUsd, logLLMCostSummary } from './logger.js';
+export { logger, formatUsd, logLLMCostSummary, sanitizeLogData } from './logger.js';
 export type { LLMCostTotals, LLMCostSummaryProvider } from './logger.js';
 
 /**
@@ -38,3 +38,8 @@ export { SqliteTraceStore } from './sqliteTraceStore.js';
  */
 export * from './incidentStore.js';
 export { SqliteIncidentStore } from './sqliteIncidentStore.js';
+
+/**
+ * Pseudonymization helpers for Discord-facing identifiers.
+ */
+export { hmacId, pseudonymizeActorId, pseudonymizeIncidentPointers, shortHash } from './pseudonymization.js';

@@ -1,3 +1,17 @@
+/**
+ * @arete-module: IncidentStoreFactory
+ * @arete-risk: high
+ * @arete-ethics: high
+ * @arete-scope: utility
+ *
+ * @description
+ * Factory for creating the incident store with environment-driven configuration.
+ * Validates the pseudonymization secret so we never persist raw Discord IDs.
+ *
+ * @impact
+ * Risk: Misconfiguration can block incident storage or lead to inconsistent data.
+ * Ethics: Prevents raw Discord identifiers from being stored without hashing.
+ */
 import { logger } from './logger.js';
 import { SqliteIncidentStore } from './sqliteIncidentStore.js';
 
@@ -5,10 +19,24 @@ const incidentStoreLogger = typeof logger.child === 'function' ? logger.child({ 
 
 export type IncidentStore = SqliteIncidentStore;
 
+let cachedIncidentStore: IncidentStore | null = null;
+
+export function getDefaultIncidentStore(): IncidentStore {
+  if (!cachedIncidentStore) {
+    cachedIncidentStore = createIncidentStoreFromEnv();
+  }
+  return cachedIncidentStore;
+}
+
 export function createIncidentStoreFromEnv(): IncidentStore {
   const backend = process.env.INCIDENT_BACKEND?.trim().toLowerCase();
   if (backend && backend !== 'sqlite') {
     throw new Error(`Unsupported INCIDENT_BACKEND "${backend}". Only "sqlite" is supported.`);
+  }
+
+  const pseudonymizationSecret = process.env.INCIDENT_PSEUDONYMIZATION_SECRET?.trim();
+  if (!pseudonymizationSecret) {
+    throw new Error('Missing required environment variable: INCIDENT_PSEUDONYMIZATION_SECRET');
   }
 
   const envPath = process.env.INCIDENT_SQLITE_PATH?.trim();
@@ -16,7 +44,7 @@ export function createIncidentStoreFromEnv(): IncidentStore {
   const defaultPath = envPath || flyDefaultPath || './data/incidents.db';
 
   try {
-    return new SqliteIncidentStore({ dbPath: defaultPath });
+    return new SqliteIncidentStore({ dbPath: defaultPath, pseudonymizationSecret });
   } catch (error) {
     const code = (error as { code?: string }).code;
     const isPermission = code === 'EACCES' || code === 'EPERM';
@@ -24,11 +52,18 @@ export function createIncidentStoreFromEnv(): IncidentStore {
       incidentStoreLogger.warn(
         `Falling back to local SQLite path "./data/incidents.db" because default path "${defaultPath}" was not writable: ${String(error)}`
       );
-      return new SqliteIncidentStore({ dbPath: './data/incidents.db' });
+      return new SqliteIncidentStore({ dbPath: './data/incidents.db', pseudonymizationSecret });
     }
     throw error;
   }
 }
 
-export const defaultIncidentStore = createIncidentStoreFromEnv();
+// Expose a stable export without building the store until someone calls into it.
+export const defaultIncidentStore: IncidentStore = new Proxy({} as IncidentStore, {
+  get: (_target, prop) => {
+    const store = getDefaultIncidentStore();
+    const value = store[prop as keyof IncidentStore];
+    return typeof value === 'function' ? value.bind(store) : value;
+  }
+});
 export type { IncidentAuditEvent, IncidentPointers, IncidentRecord, IncidentStatus } from './sqliteIncidentStore.js';

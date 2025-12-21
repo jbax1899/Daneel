@@ -55,3 +55,6 @@ packages/web/vite.config.d.ts
 
 # Database
 data/
+
+# Logs
+logs/

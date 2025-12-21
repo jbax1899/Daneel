@@ -39,11 +39,12 @@ If you discover a **security**, **privacy**, or **ethical-safety** issue (such a
 - **Hosting:** Fly.io (containerized Node.js app)  
 - **Local development:** Uses a `.env` file for environment variables; **never commit this file** or share it outside your local machine.  
   - Add `.env` to `.gitignore` (already recommended).  
-  - If secrets are ever leaked, rotate them immediately and delete the file from history using `git filter-repo` or GitHub’s Secret Scanning guidance.  
+  - If secrets are ever leaked, rotate them immediately and delete the file from history using `git filter-repo` or GitHub's Secret Scanning guidance.  
 - **Runtime isolation:** Each deployment runs as a single app VM with auto-scaling off by default.  
 - **Secrets:** Managed via Fly secrets (`fly secrets set`) and never committed to version control.  
 - **Dependencies:** Monitored by Dependabot on a cycle.  
-- **Vulnerability scanning:** Performed automatically via GitHub’s built-in advisories.
+- **Vulnerability scanning:** Performed automatically via GitHub's built-in advisories.
+- **Incident pseudonymization:** Discord identifiers (guild, channel, message, user) are HMAC-SHA256 hashed with a namespaced input (e.g., `guild:<id>`) using `INCIDENT_PSEUDONYMIZATION_SECRET`. Store the full 64-hex digest for uniqueness; only show short prefixes (10-12 chars) in logs or admin views. Rotate the secret if exposure is suspected and treat unhashed legacy rows as sensitive data until backfilled.
 
 ---
 

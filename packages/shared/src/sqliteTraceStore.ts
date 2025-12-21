@@ -3,7 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type { ResponseMetadata } from 'ethics-core';
 import { logger } from './logger.js';
-import { assertValidResponseMetadata, traceStoreJsonReplacer } from './traceStore.js';
+import { assertValidResponseMetadata, traceStoreJsonReplacer } from './traceStoreUtils.js';
 
 const BUSY_MAX_ATTEMPTS = 5;
 const BUSY_RETRY_DELAY_MS = 50;
@@ -167,5 +167,10 @@ export class SqliteTraceStore {
 
   async delete(responseId: string): Promise<void> {
     await this.withRetry(() => this.deleteStatement.run(responseId));
+  }
+
+  close(): void {
+    // Close the SQLite handle so Windows can clean up temp DB files.
+    this.db.close();
   }
 }

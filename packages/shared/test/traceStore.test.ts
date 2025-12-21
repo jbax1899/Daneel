@@ -56,6 +56,7 @@ test('TraceStore round trips metadata with citation URLs', async () => {
     const deleted = await store.retrieve(metadata.responseId);
     assert.equal(deleted, null, 'deleted trace should not be retrievable');
   } finally {
+    store.close();
     await fs.rm(tempRoot, { recursive: true, force: true });
   }
 });

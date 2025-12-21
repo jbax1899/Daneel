@@ -1,9 +1,29 @@
+/**
+ * @arete-module: LoggingPrivacyTests
+ * @arete-risk: low
+ * @arete-ethics: high
+ * @arete-scope: test
+ *
+ * @description
+ * Validates that logging utilities redact or avoid leaking sensitive Discord
+ * data, and that verbose logging is gated behind explicit flags.
+ *
+ * @impact
+ * Risk: Logging regressions can leak sensitive data.
+ * Ethics: Protects user privacy by preventing raw identifiers in logs.
+ */
+
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { transports } from 'winston';
 
 import { OpenAIService, type OpenAIMessage } from '../src/utils/openaiService.js';
-import { logger } from '../src/utils/logger.js';
+import { logger, sanitizeLogData } from '../src/utils/logger.js';
 import { logContextIfVerbose } from '../src/utils/prompting/ContextBuilder.js';
+import { SqliteIncidentStore } from '@arete/shared';
 
 const createStubbedOpenAIService = () => {
     const service = new OpenAIService('test-key');
@@ -78,6 +98,91 @@ test('generateResponse logs sanitized metadata without raw message bodies', asyn
     assert.equal(metadata?.model, 'gpt-5-mini');
     assert.equal(metadata?.messageCount, 1);
     assert.equal(metadata?.toolCount, 0);
+});
+
+test('sanitizeLogData redacts Discord snowflake identifiers in strings and objects', () => {
+    const raw = 'guild 123456789012345678 channel 234567890123456789';
+    const sanitizedString = sanitizeLogData(raw);
+    assert.ok(!sanitizedString.includes('123456789012345678'));
+    assert.ok(sanitizedString.includes('[REDACTED_ID]'));
+
+    const sanitizedObject = sanitizeLogData({
+        guildId: '123456789012345678',
+        meta: { channelId: '234567890123456789' }
+    });
+    const flattened = JSON.stringify(sanitizedObject);
+    assert.ok(!flattened.includes('123456789012345678'));
+    assert.ok(flattened.includes('[REDACTED_ID]'));
+});
+
+test('logger pipeline applies sanitizer before emitting logs', () => {
+    const captured: string[] = [];
+    const streamTransport = new transports.Stream({
+        stream: {
+            write: (message: string | Buffer) => {
+                captured.push(message.toString());
+            }
+        }
+    });
+
+    logger.add(streamTransport);
+    try {
+        logger.info('Audit for guild 123456789012345678 channel 234567890123456789');
+    } finally {
+        logger.remove(streamTransport);
+    }
+
+    const output = captured.join(' ');
+    assert.ok(output.length > 0, 'Expected sanitizer output to be captured');
+    assert.ok(!output.match(/\b\d{17,19}\b/), 'Snowflake IDs should be redacted in emitted logs');
+    assert.ok(output.includes('[REDACTED_ID]'), 'Redacted placeholder should be present');
+});
+
+test('incident store logs do not emit raw Discord IDs', async () => {
+    const tempRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'privacy-logs-'));
+    const dbPath = path.join(tempRoot, 'incidents.db');
+    const store = new SqliteIncidentStore({ dbPath, pseudonymizationSecret: 'privacy-test-secret' });
+
+    const rawGuildId = '123456789012345678';
+    const rawChannelId = '234567890123456789';
+    const rawMessageId = '345678901234567890';
+    const rawUserId = '456789012345678901';
+
+    const captured: string[] = [];
+    const streamTransport = new transports.Stream({
+        stream: {
+            write: (message: string | Buffer) => {
+                captured.push(message.toString());
+            }
+        }
+    });
+
+    logger.add(streamTransport);
+    try {
+        const incident = await store.createIncident({
+            pointers: {
+                guildId: rawGuildId,
+                channelId: rawChannelId,
+                messageId: rawMessageId
+            }
+        });
+
+        await store.appendAuditEvent(incident.id, {
+            actorHash: rawUserId,
+            action: 'audit-log-test'
+        });
+    } finally {
+        logger.remove(streamTransport);
+        store.close();
+        await fs.rm(tempRoot, { recursive: true, force: true });
+    }
+
+    const output = captured.join(' ');
+    assert.ok(output.includes('Incident created'), 'Expected incident log output');
+    assert.ok(!output.includes(rawGuildId), 'Raw guild ID should not appear in logs');
+    assert.ok(!output.includes(rawChannelId), 'Raw channel ID should not appear in logs');
+    assert.ok(!output.includes(rawMessageId), 'Raw message ID should not appear in logs');
+    assert.ok(!output.includes(rawUserId), 'Raw user ID should not appear in logs');
 });
 
 test('logContextIfVerbose only emits when high verbosity flag is enabled', () => {

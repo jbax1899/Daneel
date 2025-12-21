@@ -14,6 +14,7 @@
 export {
   logger,
   formatUsd,
-  logLLMCostSummary
+  logLLMCostSummary,
+  sanitizeLogData
 } from '@arete/shared';
 export type { LLMCostTotals, LLMCostSummaryProvider } from '@arete/shared';

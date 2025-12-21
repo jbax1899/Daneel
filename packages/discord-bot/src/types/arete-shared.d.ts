@@ -60,6 +60,7 @@ declare module '@arete/shared' {
     upsert(metadata: ResponseMetadata): Promise<void>;
     retrieve(responseId: string): Promise<ResponseMetadata | null>;
     delete(responseId: string): Promise<void>;
+    close(): void;
   }
 
   export type TraceStore = SqliteTraceStore;
@@ -126,11 +127,12 @@ declare module '@arete/shared' {
   }
 
   export class SqliteIncidentStore {
-    constructor(config: { dbPath: string });
+    constructor(config: { dbPath: string; pseudonymizationSecret: string });
     createIncident(input: CreateIncidentInput): Promise<IncidentRecord>;
     getIncident(id: number): Promise<IncidentRecord | null>;
     updateStatus(id: number, status: IncidentStatus): Promise<void>;
     appendAuditEvent(incidentId: number, event: AppendAuditEventInput): Promise<IncidentAuditEvent>;
+    close(): void;
   }
 
   export type IncidentStore = SqliteIncidentStore;
@@ -152,4 +154,13 @@ declare module '@arete/shared' {
 
   export type LLMCostSummaryProvider = () => LLMCostTotals | null | undefined;
   export function logLLMCostSummary(getTotals?: LLMCostSummaryProvider): void;
+  export function sanitizeLogData<T>(value: T): T;
+
+  /**
+   * Pseudonymization helpers
+   */
+  export function hmacId(secret: string, id: string, namespace: string): string;
+  export function shortHash(hash: string, length?: number): string;
+  export function pseudonymizeActorId(actorId: string | null | undefined, secret: string): string | null;
+  export function pseudonymizeIncidentPointers(pointers: IncidentPointers, secret: string): IncidentPointers;
 }
