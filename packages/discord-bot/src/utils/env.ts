@@ -51,7 +51,8 @@ const REQUIRED_ENV_VARS: readonly string[] = [
   'CLIENT_ID',        // Discord application client ID
   'GUILD_ID',         // Discord server (guild) ID
   'OPENAI_API_KEY',   // OpenAI API key for AI functionality
-  'DEVELOPER_USER_ID' // Discord user ID of the developer for privileged access
+  'DEVELOPER_USER_ID', // Discord user ID of the developer for privileged access
+  'INCIDENT_PSEUDONYMIZATION_SECRET' // Secret key for HMAC pseudonymization of Discord IDs
 ] as const;
 
 /**
@@ -352,6 +353,7 @@ export const config = {
   clientId: process.env.CLIENT_ID!,
   guildId: process.env.GUILD_ID!,
   openaiApiKey: process.env.OPENAI_API_KEY!,
+  incidentPseudonymizationSecret: process.env.INCIDENT_PSEUDONYMIZATION_SECRET!,
   promptConfigPath,
   webBaseUrl,
   

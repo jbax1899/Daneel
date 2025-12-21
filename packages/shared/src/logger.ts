@@ -17,6 +17,52 @@ import { createLogger, format, transports } from 'winston';
 import { format as dateFnsFormat } from 'date-fns';
 
 const { combine, timestamp, printf, colorize } = format;
+const splatSymbol = Symbol.for('splat');
+
+// Discord snowflakes are 17-19 digit numeric strings. We redact them to avoid
+// accidental leakage in logs if upstream code forgets to pseudonymize.
+const DISCORD_ID_REGEX = /\b\d{17,19}\b/g;
+
+/**
+ * Recursively sanitize log data to strip raw Discord identifiers. This is a
+ * defense-in-depth layer; primary protection should still pseudonymize IDs
+ * before logging or storing.
+ */
+export function sanitizeLogData<T>(value: T): T {
+  if (typeof value === 'string') {
+    // Swap raw snowflakes for a clear placeholder.
+    return value.replace(DISCORD_ID_REGEX, '[REDACTED_ID]') as T;
+  }
+
+  if (Array.isArray(value)) {
+    // Walk arrays and sanitize each entry.
+    return value.map((entry) => sanitizeLogData(entry)) as T;
+  }
+
+  if (value && typeof value === 'object') {
+    // Walk objects so nested IDs get scrubbed too.
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, val] of Object.entries(value)) {
+      sanitized[key] = sanitizeLogData(val);
+    }
+    return sanitized as T;
+  }
+
+  return value;
+}
+
+const sanitizeFormat = format((info) => {
+  // Clean the main message field (string or structured).
+  info.message = sanitizeLogData(info.message);
+
+  // Clean any extra args passed to logger.info/debug/etc.
+  const splat = info[splatSymbol] as unknown[] | undefined;
+  if (Array.isArray(splat)) {
+    info[splatSymbol] = splat.map((item) => sanitizeLogData(item));
+  }
+
+  return info;
+});
 
 /**
  * Custom log format function
@@ -38,6 +84,7 @@ fs.mkdirSync(logDirectory, { recursive: true });
 export const logger = createLogger({
   level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: combine(
+    sanitizeFormat(),
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
     colorize({ all: true }),
     logFormat
