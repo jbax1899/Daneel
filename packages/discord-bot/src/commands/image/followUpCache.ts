@@ -1,3 +1,10 @@
+/**
+ * @description Stores follow-up image generation context for retries and variations.
+ * @arete-scope utility
+ * @arete-module ImageFollowUpCache
+ * @arete-risk: moderate - Cache mistakes can repeat incorrect prompts or settings.
+ * @arete-ethics: low - Caches user-provided inputs without additional inference.
+ */
 import type {
     ImageBackgroundType,
     ImageQualityType,

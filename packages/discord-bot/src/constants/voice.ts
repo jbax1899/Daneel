@@ -1,3 +1,10 @@
+/**
+ * @description Defines voice processing and timeout constants for audio workflows.
+ * @arete-scope utility
+ * @arete-module VoiceConstants
+ * @arete-risk: moderate - Incorrect constants can destabilize audio buffers or retries.
+ * @arete-ethics: moderate - Voice timing affects capture boundaries and consent.
+ */
 // Audio processing constants
 export const AUDIO_CONSTANTS = {
     // Minimum audio buffer size for processing (100ms at 24kHz, 16-bit mono)

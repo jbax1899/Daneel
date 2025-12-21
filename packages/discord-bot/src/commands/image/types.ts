@@ -1,3 +1,10 @@
+/**
+ * @description Defines image command types and OpenAI response helpers.
+ * @arete-scope interface
+ * @arete-module ImageTypes
+ * @arete-risk: low - Type drift can break build-time validation and runtime assumptions.
+ * @arete-ethics: low - Types document structure without changing behavior.
+ */
 import type { ResponseOutputItem } from 'openai/resources/responses/responses.js';
 import type { ImageGenerationQuality, ImageGenerationSize, ImageModelPricingKey } from '../../utils/pricing.js';
 

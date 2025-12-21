@@ -1,3 +1,10 @@
+/**
+ * @description Formats image command metadata into Discord embed-safe text.
+ * @arete-scope utility
+ * @arete-module ImageEmbedFormatting
+ * @arete-risk: low - Formatting errors can truncate or mislabel embed details.
+ * @arete-ethics: low - Embeds present metadata without additional processing.
+ */
 import { EmbedBuilder, type APIEmbedField } from 'discord.js';
 import {
     CLOUDINARY_CONTEXT_VALUE_LIMIT,

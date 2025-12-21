@@ -1,7 +1,9 @@
 /**
- * @file Event.ts
- * @description Base event class for Discord.js events with robust error handling and registration.
- * This provides a foundation for all Discord.js event handlers in the application.
+ * @description Base event class for Discord.js events with error handling and registration.
+ * @arete-scope interface
+ * @arete-module EventBase
+ * @arete-risk: moderate - Event wiring issues can prevent handlers from firing.
+ * @arete-ethics: low - This module is infrastructural and does not process content.
  */
 
 import { Client, ClientEvents } from 'discord.js';

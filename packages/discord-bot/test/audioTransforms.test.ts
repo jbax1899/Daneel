@@ -1,3 +1,10 @@
+/**
+ * @description Tests audio transform resampling behavior and buffer handling.
+ * @arete-scope test
+ * @arete-module AudioTransformsTests
+ * @arete-risk: low - Tests validate audio math without affecting runtime behavior.
+ * @arete-ethics: low - No user data is processed in test fixtures.
+ */
 import test from 'node:test';
 import { once } from 'node:events';
 import { strict as assert } from 'node:assert';

@@ -1,4 +1,11 @@
 /**
+ * @description Declares ethics-core public types for provenance and risk tiers.
+ * @arete-scope interface
+ * @arete-module EthicsCoreTypes
+ * @arete-risk: low - Type drift can break downstream tooling or UI mappings.
+ * @arete-ethics: low - Types document semantics without processing data.
+ */
+/**
  * RiskTier classifies the sensitivity of a response.
  * - low: General knowledge, casual topics
  * - medium: Nuanced advice, education, workplace

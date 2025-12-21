@@ -1,3 +1,10 @@
+/**
+ * @description Uploads generated images to Cloudinary and formats metadata for embeds.
+ * @arete-scope utility
+ * @arete-module ImageCloudinary
+ * @arete-risk: moderate - Upload failures or metadata drift can break image delivery.
+ * @arete-ethics: moderate - Handles user-generated images and related metadata.
+ */
 import { v2 as cloudinary } from 'cloudinary';
 import { logger } from '../../utils/logger.js';
 import { formatUsd } from '../../utils/pricing.js';

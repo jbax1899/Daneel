@@ -1,3 +1,10 @@
+/**
+ * @description Exercises audio playback concurrency and resource cleanup paths.
+ * @arete-scope test
+ * @arete-module AudioPlaybackHandlerConcurrencyTests
+ * @arete-risk: low - Test failures highlight concurrency regressions only.
+ * @arete-ethics: low - No user data is processed in test fixtures.
+ */
 import test from 'node:test';
 import { strict as assert } from 'node:assert';
 import { EventEmitter } from 'node:events';

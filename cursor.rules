@@ -101,22 +101,17 @@ export interface SimpleConfig {
 - Keep all public interfaces serializable for future web UI integration (e.g., Cognitive Budget panel).
 
 ## ARETE Module Tagging
+- Canonical reference: `docs/architecture/arete-annotations.md`.
 - Every module must include structured ARETE annotations in its JSDoc header.
-- Use this format for consistency and machine-parseability:
+- Use this format (and order) for consistency and machine-parseability:
 
 ```typescript
 /**
- * @arete-module: <ModuleName>
- * @arete-risk: <critical|high|moderate|low>
- * @arete-ethics: <critical|high|moderate|low>
- * @arete-scope: <core|utility|interface|test>
- * 
- * @description
- * <1-3 lines summarizing what this module does.>
- * 
- * @impact
- * Risk: <What could break or be compromised if mishandled.>
- * Ethics: <What human or governance impacts errors could cause.>
+ * @description <1-3 lines summarizing what this module does.>
+ * @arete-scope <core|utility|interface|test>
+ * @arete-module <ModuleName>
+ * @arete-risk: <low|moderate|high> - <What could break or be compromised if mishandled.>
+ * @arete-ethics: <low|moderate|high> - <What human or governance impacts errors could cause.>
  */
 ```
 

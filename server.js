@@ -1,3 +1,10 @@
+/**
+ * @description Serves the web app and API endpoints for reflect, traces, and GitHub webhooks.
+ * @arete-scope core
+ * @arete-module WebServer
+ * @arete-risk: high - Server failures can break user access or data integrity.
+ * @arete-ethics: high - Response generation and trace storage affect user trust and privacy.
+ */
 const http = require('node:http');
 const fs = require('node:fs/promises');
 const fsPromises = require('node:fs/promises');

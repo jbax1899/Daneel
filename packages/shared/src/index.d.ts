@@ -1,7 +1,9 @@
 /**
- * Public exports for the shared workspace package. This entry-point keeps
- * consumers decoupled from the underlying folder structure so that prompts and
- * registry utilities can evolve without churn in downstream imports.
+ * @description Type declarations for shared package exports.
+ * @arete-scope interface
+ * @arete-module SharedIndexTypes
+ * @arete-risk: low - Declaration drift can break downstream type checking.
+ * @arete-ethics: low - Types do not change runtime behavior.
  */
 export type { PromptCachePolicy, PromptDefinition, PromptKey, PromptMetadata, PromptVariables, RenderedPrompt } from './prompts/promptRegistry.js';
 export { PromptRegistry, getActivePromptRegistry, renderPrompt, setActivePromptRegistry } from './prompts/promptRegistry.js';

@@ -1,7 +1,9 @@
 /**
- * @file RateLimiter.ts
- * @description Handles rate limiting for Discord interactions and web API contexts.
- * Provides per-user, per-channel, per-guild, and per-session rate limiting with configurable windows.
+ * @description Handles rate limiting for Discord and web API interactions.
+ * @arete-scope utility
+ * @arete-module RateLimiter
+ * @arete-risk: moderate - Incorrect limits can cause abuse or block valid users.
+ * @arete-ethics: moderate - Rate limits affect user access and fairness.
  */
 
 type RateLimitScope = 'user' | 'channel' | 'guild' | 'session';

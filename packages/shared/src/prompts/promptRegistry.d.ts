@@ -1,4 +1,11 @@
 /**
+ * @description Type declarations for prompt registry contracts.
+ * @arete-scope interface
+ * @arete-module PromptRegistryTypes
+ * @arete-risk: low - Type drift can break prompt consumers or tooling.
+ * @arete-ethics: low - Types document prompt structure without processing data.
+ */
+/**
  * Literal union of every prompt key currently supported. Keeping this list
  * centrally defined ensures compile-time safety for all consumers.
  */

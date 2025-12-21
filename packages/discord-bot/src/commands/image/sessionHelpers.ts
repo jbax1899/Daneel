@@ -1,3 +1,10 @@
+/**
+ * @description Coordinates image generation flows, retries, and embed formatting helpers.
+ * @arete-scope utility
+ * @arete-module ImageSessionHelpers
+ * @arete-risk: moderate - Workflow errors can create duplicate charges or invalid responses.
+ * @arete-ethics: moderate - Session behavior affects user expectations and transparency.
+ */
 import { ActionRowBuilder, AttachmentBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type APIEmbedField } from 'discord.js';
 import { OpenAI } from 'openai';
 import { logger } from '../../utils/logger.js';

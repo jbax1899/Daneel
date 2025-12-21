@@ -1,17 +1,9 @@
 /**
- * Creates a Discord embed to act as a messaage footer with these components:
- * Title: Provenance
- * Description: Confidence score | Trade-offs (if any) | Citations (if any)
- * Footer: model version | chain hash | response ID | license context
- * Interactive Buttons:
- * * Explain button (get an explanation of the reasoning)
- * * Alternative Lens button (rephrase the response with a different perspective)
- * * Full Trace button (view the complete reasoning trace)
- * * Report Issue button (report incorrect or harmful information)
- * 
- * Embed color band reflects the calculated RiskTier
- * 
- * Uses types from the ethics-core package (ethics-core/src/types.ts)
+ * @description Builds provenance footer embeds with trace metadata and actions.
+ * @arete-scope interface
+ * @arete-module ProvenanceFooter
+ * @arete-risk: moderate - Footer errors can hide provenance or break user actions.
+ * @arete-ethics: high - Provenance display affects transparency and accountability.
  */
 import { EmbedBuilder } from './EmbedBuilder.js';
 import { ButtonBuilder, ButtonStyle, ActionRowBuilder } from 'discord.js';
