@@ -2,7 +2,7 @@
  * @arete-module: Pseudonymization
  * @arete-risk: moderate
  * @arete-ethics: high
- * @arete-scope: shared-privacy
+ * @arete-scope: utility
  *
  * @description
  * Utilities for namespacing and hashing Discord identifiers with HMAC-SHA256.

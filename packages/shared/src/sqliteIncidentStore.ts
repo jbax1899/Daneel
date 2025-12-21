@@ -2,7 +2,7 @@
  * @arete-module: SqliteIncidentStore
  * @arete-risk: high
  * @arete-ethics: high
- * @arete-scope: storage
+ * @arete-scope: utility
  *
  * @description
  * Persists incidents and audit events to SQLite with retry/backoff handling.

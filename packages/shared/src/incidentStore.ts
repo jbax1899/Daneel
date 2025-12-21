@@ -2,7 +2,7 @@
  * @arete-module: IncidentStoreFactory
  * @arete-risk: high
  * @arete-ethics: high
- * @arete-scope: storage
+ * @arete-scope: utility
  *
  * @description
  * Factory for creating the incident store with environment-driven configuration.
