@@ -1,7 +1,7 @@
 /**
  * @arete-module: VoiceSessionManager
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Manages voice session state and coordinates audio event handling.
@@ -180,3 +180,4 @@ export class VoiceSessionManager {
         return this.activeSessions.has(guildId);
     }
 }
+

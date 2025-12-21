@@ -9,7 +9,7 @@ const fs = require('fs');
 const path = require('path');
 
 const REQUIRED_TAGS = ['@description', '@arete-module', '@arete-risk', '@arete-ethics', '@arete-scope'];
-const ALLOWED_LEVELS = new Set(['critical', 'high', 'moderate', 'low']);
+const ALLOWED_LEVELS = new Set(['high', 'moderate', 'low']);
 const ALLOWED_SCOPES = new Set(['core', 'utility', 'interface', 'test']);
 const IGNORED_DIRS = new Set([
   '.git',

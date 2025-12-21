@@ -36,8 +36,8 @@ Cursor and Traycer are configured to follow the project's ethical and technical 
 - **Accountability**: All changes must maintain audit trails
 
 ### ARETE Module Tagging
-- `@arete-risk`: Technical fragility (critical, high, moderate, low)
-- `@arete-ethics`: Human impact sensitivity (critical, high, moderate, low)
+- `@arete-risk`: Technical fragility (high, high, moderate, low)
+- `@arete-ethics`: Human impact sensitivity (high, high, moderate, low)
 - `@arete-scope`: Logical role (core, utility, interface, test)
 - `@description`: 1-3 line summary of module purpose
 - `@impact`: Separate Risk and Ethics impact statements
@@ -46,8 +46,8 @@ Cursor and Traycer are configured to follow the project's ethical and technical 
 ```typescript
 /**
  * @arete-module: <ModuleName>
- * @arete-risk: <critical|high|moderate|low>
- * @arete-ethics: <critical|high|moderate|low>
+ * @arete-risk: <high|high|moderate|low>
+ * @arete-ethics: <high|high|moderate|low>
  * @arete-scope: <core|utility|interface|test>
  * 
  * @description: <1-3 lines summarizing what this module does.>

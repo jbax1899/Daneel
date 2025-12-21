@@ -1,7 +1,7 @@
 /**
  * @arete-module: MessageCreate
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Handles the 'messageCreate' event from Discord.js, processing messages that mention the bot or are replies. Manages engagement logic, catch-up thresholds, and bot-to-bot conversation limits.
@@ -669,3 +669,4 @@ export class MessageCreate extends Event {
     return undefined;
   }
 }
+

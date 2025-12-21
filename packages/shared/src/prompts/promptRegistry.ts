@@ -1,7 +1,7 @@
 /**
  * @arete-module: PromptRegistry
  * @arete-risk: moderate
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: utility
  *
  * @description: Manages prompt templates and rendering for AI interactions. Handles prompt loading, caching, and variable substitution.
@@ -176,7 +176,7 @@ export class PromptRegistry {
   /**
    * Ensures that each requested key has a corresponding definition. This is
    * handy for startup checks so operators immediately know if their overrides
-   * omitted any critical prompts.
+   * omitted any high-severity prompts.
    */
   public assertKeys(keys: PromptKey[]): void {
     for (const key of keys) {
@@ -287,3 +287,4 @@ export const renderPrompt = (key: PromptKey, variables: PromptVariables = {}): R
 if (!activePromptRegistry) {
   activePromptRegistry = new PromptRegistry();
 }
+

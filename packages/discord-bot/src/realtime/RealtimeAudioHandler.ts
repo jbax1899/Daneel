@@ -1,7 +1,7 @@
 /**
  * @arete-module: RealtimeAudioHandler
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Manages real-time audio streaming to OpenAI Realtime API.
@@ -170,3 +170,4 @@ export class RealtimeAudioHandler {
         }
     }
 }
+

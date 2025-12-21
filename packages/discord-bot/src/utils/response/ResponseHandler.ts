@@ -396,7 +396,7 @@ export class ResponseHandler {
 
       logger.info(`Presence updated: ${status} with ${activities.length} activities`);
     } catch (error) {
-      logger.warn('Failed to set presence:', error); // Not a critical error
+      logger.warn('Failed to set presence:', error); // Not a high-severity error
     }
   }
 

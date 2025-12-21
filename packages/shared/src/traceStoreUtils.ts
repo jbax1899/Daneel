@@ -1,7 +1,7 @@
 /**
  * @arete-module: TraceStoreUtils
  * @arete-risk: moderate
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: utility
  *
  * @description: Shared helpers for trace store serialization and validation. Split out to
@@ -78,3 +78,4 @@ export function assertValidResponseMetadata(
     }
   }
 }
+

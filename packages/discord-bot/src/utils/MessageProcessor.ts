@@ -1,7 +1,7 @@
 /**
  * @arete-module: MessageProcessor
- * @arete-risk: critical
- * @arete-ethics: critical
+ * @arete-risk: high
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Core message processing and AI response generation. Handles message analysis, AI model selection, and response generation.
@@ -667,3 +667,4 @@ export async function cleanupTTSFile(ttsPath: string): Promise<void> {
     logger.debug(`Failed to delete TTS file ${ttsPath}: ${err?.message ?? err}`);
   }
 }
+

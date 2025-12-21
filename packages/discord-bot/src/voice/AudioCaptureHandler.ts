@@ -1,7 +1,7 @@
 /**
  * @arete-module: AudioCaptureHandler
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Captures and processes real-time user voice data from Discord voice channels.
@@ -177,3 +177,4 @@ export class AudioCaptureHandler extends EventEmitter {
 }
 
 export type { AudioChunkEvent };
+

@@ -478,7 +478,7 @@ a:hover, a:focus {
 }
 
 /* Ensure sticky header works throughout full page */
-/* CRITICAL: For sticky to work throughout the page when inside a section, */
+/* HIGH: For sticky to work throughout the page when inside a section, */
 /* the section must not create a containing block that limits sticky positioning */
 .hero:has(.site-header-sticky),
 .site-section:has(.site-header-sticky),

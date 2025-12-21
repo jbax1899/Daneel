@@ -1,7 +1,7 @@
 /**
  * @arete-module: OpenAIService
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
  * @description: Handles all LLM interactions and API calls with high cost/resource impact.
@@ -943,3 +943,4 @@ async function ensureDirectories(): Promise<void> {
     throw new Error('Failed to initialize output directories');
   }
 }
+
