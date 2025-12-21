@@ -1,11 +1,10 @@
 /**
  * @arete-module: OpenAIService
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Handles all LLM interactions and API calls with high cost/resource impact.
+ * @description: Handles all LLM interactions and API calls with high cost/resource impact.
  *
  * @impact
  * Risk: API failures can break AI functionality or cause unexpected costs. Manages all OpenAI API communication including chat completions, embeddings, TTS, and image analysis.
@@ -944,3 +943,4 @@ async function ensureDirectories(): Promise<void> {
     throw new Error('Failed to initialize output directories');
   }
 }
+

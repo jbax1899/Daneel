@@ -1,3 +1,10 @@
+/**
+ * @description: Handles user voice state changes and triggers voice sessions.
+ * @arete-scope: core
+ * @arete-module: UserVoiceStateHandler
+ * @arete-risk: high - State handling errors can misjoin channels or leak sessions.
+ * @arete-ethics: high - Voice session triggers must respect consent and privacy.
+ */
 import { VoiceState } from 'discord.js';
 import { logger } from '../utils/logger.js';
 import { getVoiceConnection } from '@discordjs/voice';

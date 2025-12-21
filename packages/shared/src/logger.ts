@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: utility
  *
- * @description
- * Winston-based logging utility with console and file transports. Provides structured logging for all bot operations.
+ * @description: Winston-based logging utility with console and file transports. Provides structured logging for all bot operations.
  *
  * @impact
  * Risk: Logging failures can make debugging difficult but won't break core functionality.
@@ -105,7 +104,7 @@ export const logger = createLogger({
 
 /**
  * LLM Cost tracking utilities
- * @description Provides cost awareness for AI-assisted development
+ * @description: Provides cost awareness for AI-assisted development
  */
 
 /**
@@ -124,7 +123,7 @@ export const formatUsd = (amount: number): string => {
 
 /**
  * Log LLM cost summary for current session
- * @description Provides cost awareness for AI-assisted development
+ * @description: Provides cost awareness for AI-assisted development
  */
 export interface LLMCostTotals {
   totalCostUsd: number;

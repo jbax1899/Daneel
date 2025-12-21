@@ -1,3 +1,10 @@
+/**
+ * @description: Builds safe Discord embeds with validation against platform limits.
+ * @arete-scope: utility
+ * @arete-module: ResponseEmbedBuilder
+ * @arete-risk: low - Invalid embeds can cause message failures or truncation.
+ * @arete-ethics: low - Presentation logic does not alter content semantics.
+ */
 import { APIEmbed, APIEmbedField, ColorResolvable, EmbedBuilder as DiscordEmbedBuilder } from 'discord.js';
 import { logger } from '../logger.js';
 

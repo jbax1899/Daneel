@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Manual Blog Sync Utility
- * 
- * This script allows you to manually sync blog posts from GitHub Discussions
- * using GitHub App authentication instead of personal access tokens.
+ * @description: Syncs blog posts from GitHub Discussions using GitHub App auth.
+ * @arete-scope utility
+ * @arete-module BlogSyncScript
+ * @arete-risk: low - Script misuse can overwrite blog data or exceed API limits.
+ * @arete-ethics: low - Operates on public repo content without user data.
  */
 
 // Load environment variables from .env file

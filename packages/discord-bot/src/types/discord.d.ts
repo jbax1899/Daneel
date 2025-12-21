@@ -1,7 +1,9 @@
 /**
- * @file discord.d.ts
- * @description TypeScript type declarations for Discord.js extensions
- * Extends the base Discord.js types with custom application-specific types.
+ * @description: Extends Discord.js types with bot-specific client properties.
+ * @arete-scope interface
+ * @arete-module DiscordTypeExtensions
+ * @arete-risk: low - Type drift can break command registration or tooling.
+ * @arete-ethics: low - Types do not change runtime behavior.
  */
 
 import { Collection, Client as DiscordClient } from 'discord.js';

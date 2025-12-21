@@ -1,3 +1,10 @@
+/**
+ * @description: Tests realtime streaming flow integration for audio handlers.
+ * @arete-scope: test
+ * @arete-module: RealtimeStreamingTests
+ * @arete-risk: low - Test failures indicate streaming regressions only.
+ * @arete-ethics: low - No user content is processed in test fixtures.
+ */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { RealtimeAudioHandler } from '../src/realtime/RealtimeAudioHandler.js';

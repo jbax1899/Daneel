@@ -8,8 +8,8 @@
 const fs = require('fs');
 const path = require('path');
 
-const REQUIRED_TAGS = ['@arete-module', '@arete-risk', '@arete-ethics', '@arete-scope'];
-const ALLOWED_LEVELS = new Set(['critical', 'high', 'moderate', 'low']);
+const REQUIRED_TAGS = ['@description', '@arete-module', '@arete-risk', '@arete-ethics', '@arete-scope'];
+const ALLOWED_LEVELS = new Set(['high', 'moderate', 'low']);
 const ALLOWED_SCOPES = new Set(['core', 'utility', 'interface', 'test']);
 const IGNORED_DIRS = new Set([
   '.git',
@@ -53,6 +53,14 @@ function extractTagValue(block, tag) {
   return match ? match[1].trim() : null;
 }
 
+function normalizeLevel(value) {
+  if (!value) {
+    return null;
+  }
+  const levelToken = value.split('-')[0]?.trim().toLowerCase();
+  return levelToken || null;
+}
+
 function validateFile(filePath) {
   if (!filePath.endsWith('.ts') || filePath.endsWith('.d.ts')) {
     return;
@@ -84,19 +92,25 @@ function validateFile(filePath) {
     values[tag] = value;
   }
 
-  const riskLevel = values['@arete-risk'];
-  if (riskLevel && !ALLOWED_LEVELS.has(riskLevel)) {
+  const riskValue = values['@arete-risk'];
+  const riskLevel = normalizeLevel(riskValue);
+  if (riskValue && !riskLevel) {
+    logError(relativePath, 'Missing @arete-risk level before description.');
+  } else if (riskLevel && !ALLOWED_LEVELS.has(riskLevel)) {
     logError(
       relativePath,
-      `Invalid @arete-risk level "${riskLevel}". Expected one of: ${Array.from(ALLOWED_LEVELS).join(', ')}.`
+      `Invalid @arete-risk level "${riskLevel}" (from "${riskValue}"). Expected one of: ${Array.from(ALLOWED_LEVELS).join(', ')}.`
     );
   }
 
-  const ethicsLevel = values['@arete-ethics'];
-  if (ethicsLevel && !ALLOWED_LEVELS.has(ethicsLevel)) {
+  const ethicsValue = values['@arete-ethics'];
+  const ethicsLevel = normalizeLevel(ethicsValue);
+  if (ethicsValue && !ethicsLevel) {
+    logError(relativePath, 'Missing @arete-ethics level before description.');
+  } else if (ethicsLevel && !ALLOWED_LEVELS.has(ethicsLevel)) {
     logError(
       relativePath,
-      `Invalid @arete-ethics level "${ethicsLevel}". Expected one of: ${Array.from(ALLOWED_LEVELS).join(', ')}.`
+      `Invalid @arete-ethics level "${ethicsLevel}" (from "${ethicsValue}"). Expected one of: ${Array.from(ALLOWED_LEVELS).join(', ')}.`
     );
   }
 
@@ -123,4 +137,3 @@ if (hasErrors) {
 }
 
 process.exit(0);
-

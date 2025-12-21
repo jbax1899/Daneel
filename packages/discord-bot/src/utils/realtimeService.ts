@@ -1,11 +1,10 @@
 /**
  * @arete-module: RealtimeService
- * @arete-risk: critical
- * @arete-ethics: critical
+ * @arete-risk: high
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Core real-time AI session management and WebSocket coordination.
+ * @description: Core real-time AI session management and WebSocket coordination.
  *
  * @impact
  * Risk: Session failures can break all real-time AI functionality and waste resources. Manages WebSocket connections, session lifecycle, and audio streaming coordination.
@@ -197,3 +196,4 @@ export class RealtimeSession extends EventEmitter {
         }));
     }
 }
+

@@ -1,3 +1,10 @@
+/**
+ * @description: Verifies TTS cleanup deletes generated speech artifacts safely.
+ * @arete-scope: test
+ * @arete-module: TtsCleanupTests
+ * @arete-risk: low - Tests validate cleanup behavior without affecting runtime paths.
+ * @arete-ethics: low - No user content is processed in test fixtures.
+ */
 import test from 'node:test';
 import { strict as assert } from 'node:assert';
 import fs from 'node:fs';

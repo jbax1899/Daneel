@@ -1,11 +1,10 @@
 /**
  * @arete-module: TraceStore
  * @arete-risk: moderate
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: utility
  *
- * @description
- * Shared helpers and factory for persistence of response provenance metadata.
+ * @description: Shared helpers and factory for persistence of response provenance metadata.
  *
  * @impact
  * Risk: Storage failures can break audit trails and transparency features.
@@ -49,3 +48,4 @@ export function createTraceStoreFromEnv(): TraceStore {
 }
 
 export const defaultTraceStore = createTraceStoreFromEnv();
+

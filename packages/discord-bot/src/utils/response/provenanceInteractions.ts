@@ -1,6 +1,9 @@
 /**
- * Provenance interaction helpers: lens catalogue, explanation generation, session state,
- * metadata lookup, and handlers backing the provenance footer controls.
+ * @description: Handles provenance footer interactions, lenses, and trace lookups.
+ * @arete-scope: interface
+ * @arete-module: ProvenanceInteractions
+ * @arete-risk: moderate - Interaction failures can block provenance navigation.
+ * @arete-ethics: high - Provenance access affects user trust and accountability.
  */
 import { defaultTraceStore } from '@arete/shared';
 import type {

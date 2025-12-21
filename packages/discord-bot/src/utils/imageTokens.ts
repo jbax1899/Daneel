@@ -1,3 +1,10 @@
+/**
+ * @description: Tracks image generation token budgets and refresh cadence.
+ * @arete-scope: utility
+ * @arete-module: ImageTokenManager
+ * @arete-risk: moderate - Token miscounts can skew rate limiting or cost controls.
+ * @arete-ethics: low - Token tracking does not process user content directly.
+ */
 import { logger } from './logger.js';
 import { getImageModelTokenMultiplier, imageConfig } from '../config/imageConfig.js';
 import type { ImageQualityType, ImageRenderModel } from '../commands/image/types.js';

@@ -1,16 +1,9 @@
 /**
- * @arete-module: IncidentStoreFactory
- * @arete-risk: high
- * @arete-ethics: high
+ * @description: Factory for creating the incident store with env-driven configuration and pseudonymization checks.
  * @arete-scope: utility
- *
- * @description
- * Factory for creating the incident store with environment-driven configuration.
- * Validates the pseudonymization secret so we never persist raw Discord IDs.
- *
- * @impact
- * Risk: Misconfiguration can block incident storage or lead to inconsistent data.
- * Ethics: Prevents raw Discord identifiers from being stored without hashing.
+ * @arete-module: IncidentStoreFactory
+ * @arete-risk: high - Misconfiguration can block incident storage or create inconsistent data paths.
+ * @arete-ethics: high - Protects against storing raw Discord identifiers without hashing.
  */
 import { logger } from './logger.js';
 import { SqliteIncidentStore } from './sqliteIncidentStore.js';

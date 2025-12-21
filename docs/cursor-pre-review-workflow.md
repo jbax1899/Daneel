@@ -159,12 +159,11 @@ Every module must include:
 ```typescript
 /**
  * @arete-module: <ModuleName>
- * @arete-risk: <critical|high|moderate|low>
- * @arete-ethics: <critical|high|moderate|low>
+ * @arete-risk: <high|high|moderate|low>
+ * @arete-ethics: <high|high|moderate|low>
  * @arete-scope: <core|utility|interface|test>
  * 
- * @description
- * <1-3 lines summarizing what this module does.>
+ * @description: <1-3 lines summarizing what this module does.>
  * 
  * @impact
  * Risk: <What could break or be compromised if mishandled.>
@@ -290,3 +289,4 @@ This approach scales well with team growth, maintains high standards, and ensure
 3. Customizing prompts for project architecture
 4. Adapting the checklist for project-specific requirements
 5. Modifying success metrics for project goals
+

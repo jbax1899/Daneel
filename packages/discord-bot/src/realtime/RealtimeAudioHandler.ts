@@ -1,11 +1,10 @@
 /**
  * @arete-module: RealtimeAudioHandler
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Manages real-time audio streaming to OpenAI Realtime API.
+ * @description: Manages real-time audio streaming to OpenAI Realtime API.
  *
  * @impact
  * Risk: Handles audio buffering, speaker annotation, and commit timing. Failures can cause audio desync, dropped frames, or API errors.
@@ -171,3 +170,4 @@ export class RealtimeAudioHandler {
         }
     }
 }
+

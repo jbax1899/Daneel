@@ -1,3 +1,10 @@
+/**
+ * @description: Resolves aspect ratio inputs into concrete image size settings.
+ * @arete-scope: utility
+ * @arete-module: ImageAspectResolver
+ * @arete-risk: low - Incorrect mapping can yield unexpected dimensions or UI labels.
+ * @arete-ethics: low - This module handles formatting without sensitive data.
+ */
 import type { ImageGenerationContext } from './followUpCache.js';
 import type { ImageSizeType } from './types.js';
 

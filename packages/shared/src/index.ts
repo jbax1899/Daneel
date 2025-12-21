@@ -1,7 +1,9 @@
 /**
- * Public exports for the shared workspace package. This entry-point keeps
- * consumers decoupled from the underlying folder structure so that prompts and
- * registry utilities can evolve without churn in downstream imports.
+ * @description: Public exports for shared utilities and prompt registry access.
+ * @arete-scope: interface
+ * @arete-module: SharedIndex
+ * @arete-risk: low - Export changes can break downstream imports.
+ * @arete-ethics: low - This module re-exports without processing data.
  */
 
 export type {

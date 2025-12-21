@@ -1,3 +1,10 @@
+/**
+ * @description: Provides shared constants for the image command and embed limits.
+ * @arete-scope: utility
+ * @arete-module: ImageCommandConstants
+ * @arete-risk: low - Constant drift can cause UI truncation or mismatched defaults.
+ * @arete-ethics: low - Constants are non-sensitive configuration values.
+ */
 // Pull resolved defaults from the central image configuration so every caller
 // sees the same values even when operators override them via environment
 // variables.

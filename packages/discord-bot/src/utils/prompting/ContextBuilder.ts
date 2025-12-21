@@ -1,3 +1,10 @@
+/**
+ * @description: Builds message context payloads for LLM prompts and logging.
+ * @arete-scope: core
+ * @arete-module: ContextBuilder
+ * @arete-risk: high - Context mistakes can mislead model outputs or omit safeguards.
+ * @arete-ethics: high - Context selection influences user privacy and fairness.
+ */
 import { Message } from 'discord.js';
 import { OpenAIMessage, OpenAIService } from '../openaiService.js';
 import { logger } from '../logger.js';

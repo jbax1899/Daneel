@@ -1,3 +1,10 @@
+/**
+ * @description: Provides PCM resampling and audio transform helpers for voice handling.
+ * @arete-scope: utility
+ * @arete-module: AudioTransforms
+ * @arete-risk: high - Audio corruption can break playback or distort speech.
+ * @arete-ethics: high - Voice processing impacts privacy and consent expectations.
+ */
 import { Transform, TransformCallback } from 'stream';
 import { AUDIO_CONSTANTS } from '../constants/voice.js';
 

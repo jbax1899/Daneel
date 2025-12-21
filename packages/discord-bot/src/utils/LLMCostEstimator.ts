@@ -4,12 +4,11 @@
  * @arete-ethics: high
  * @arete-scope: core
  * 
- * @description
- * Tracks OpenAI API usage and costs per channel/guild/global for budget enforcement and transparency
+ * @description: Tracks OpenAI API usage and costs per channel/guild/global for budget enforcement and transparency
  * 
  * @impact
  * Risk: Memory leaks if not properly managed; state inconsistency if concurrent updates race.
- * Ethics: Provides cost transparency and enables budget controls; critical for responsible AI resource consumption.
+ * Ethics: Provides cost transparency and enables budget controls; high-importance for responsible AI resource consumption.
  */
 
 import { logger, logLLMCostSummary, type LLMCostTotals } from './logger.js';
@@ -25,7 +24,7 @@ import type { ChannelContextManager } from '../state/ChannelContextManager.js';
  * 
  * @impact
  * Risk: Memory leaks if not properly managed; state inconsistency if concurrent updates race.
- * Ethics: Provides cost transparency and enables budget controls; critical for responsible AI resource consumption.
+ * Ethics: Provides cost transparency and enables budget controls; high-importance for responsible AI resource consumption.
  */
 const costLogger = logger.child({ module: 'llmCostEstimator' });
 

@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: test
  *
- * @description
- * Unit tests to ensure Discord identifiers are namespaced, hashed, and safely
+ * @description: Unit tests to ensure Discord identifiers are namespaced, hashed, and safely
  * shortened for display without leaking raw values.
  *
  * @impact

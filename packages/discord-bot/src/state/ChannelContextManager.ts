@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: core
  * 
- * @description
- * In-memory state manager tracking recent messages and metrics per channel for engagement decisions.
+ * @description: In-memory state manager tracking recent messages and metrics per channel for engagement decisions.
  * 
  * @impact
  * Risk: Memory leaks if eviction fails; state inconsistency if concurrent updates race. Excessive reduction/manipulation/deletion of context can lead to poor decision making.

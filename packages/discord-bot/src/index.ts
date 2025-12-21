@@ -1,11 +1,10 @@
 /**
  * @arete-module: Main
- * @arete-risk: critical
- * @arete-ethics: critical
+ * @arete-risk: high
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Main orchestration point controlling system initialization, authentication, and event routing.
+ * @description: Main orchestration point controlling system initialization, authentication, and event routing.
  *
  * @impact
  * Risk: Failure here can halt the application or expose tokens and credentials.
@@ -929,3 +928,4 @@ appServer.listen(WEBHOOK_PORT, () => {
   console.log(`GitHub webhook server listening on port ${WEBHOOK_PORT}`);
 });
 */
+

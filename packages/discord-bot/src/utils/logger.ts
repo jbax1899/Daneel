@@ -4,8 +4,7 @@
  * @arete-ethics: moderate
  * @arete-scope: utility
  *
- * @description
- * Re-export shared Winston-based logging utilities to keep a single source of truth.
+ * @description: Re-export shared Winston-based logging utilities to keep a single source of truth.
  *
  * @impact
  * Risk: Logging failures can make debugging difficult but won't break core functionality.

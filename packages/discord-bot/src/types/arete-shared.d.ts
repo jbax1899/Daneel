@@ -1,6 +1,9 @@
 /**
- * Local ambient declarations for @arete/shared to keep the Discord bot happy when building from source.
- * Keep this file in sync with the package's public surface area.
+ * @description: Ambient declarations for @arete/shared to support local builds.
+ * @arete-scope interface
+ * @arete-module AreteSharedTypes
+ * @arete-risk: low - Drift can break type checking or build tooling.
+ * @arete-ethics: low - Types do not change runtime behavior.
  */
 declare module '@arete/shared' {
   import type { ResponseMetadata } from 'ethics-core';

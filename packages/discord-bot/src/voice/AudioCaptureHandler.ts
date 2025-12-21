@@ -1,11 +1,10 @@
 /**
  * @arete-module: AudioCaptureHandler
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Captures and processes real-time user voice data from Discord voice channels.
+ * @description: Captures and processes real-time user voice data from Discord voice channels.
  *
  * @impact
  * Risk: Handles Opus decoding, PCM conversion, and audio chunk emission. Failures can cause audio loss, processing errors, or memory leaks.
@@ -178,3 +177,4 @@ export class AudioCaptureHandler extends EventEmitter {
 }
 
 export type { AudioChunkEvent };
+

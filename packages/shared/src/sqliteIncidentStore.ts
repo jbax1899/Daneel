@@ -4,8 +4,7 @@
  * @arete-ethics: high
  * @arete-scope: utility
  *
- * @description
- * Persists incidents and audit events to SQLite with retry/backoff handling.
+ * @description: Persists incidents and audit events to SQLite with retry/backoff handling.
  * Discord-facing identifiers are pseudonymized via HMAC to avoid storing or
  * logging raw IDs. Full digests are stored for uniqueness; only short prefixes
  * should be surfaced in operator logs.

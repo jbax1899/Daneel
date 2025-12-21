@@ -1,11 +1,10 @@
 /**
  * @arete-module: AudioPlaybackHandler
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Manages AI-generated audio playback to Discord voice channels.
+ * @description: Manages AI-generated audio playback to Discord voice channels.
  *
  * @impact
  * Risk: Handles audio queuing, pipeline management, and playback coordination. Failures can cause audio glitches, dropped responses, or channel disruption.
@@ -272,3 +271,4 @@ export class AudioPlaybackHandler {
         this.pipelineCleanupTimers.clear();
     }
 }
+

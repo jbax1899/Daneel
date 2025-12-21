@@ -1,3 +1,10 @@
+/**
+ * @description: Plans bot actions and LLM options before responding to messages.
+ * @arete-scope: core
+ * @arete-module: Planner
+ * @arete-risk: high - Planning errors can trigger wrong modality or unsafe actions.
+ * @arete-ethics: high - Plan selection affects user trust and safety outcomes.
+ */
 import { renderPrompt } from '../env.js';
 import { logger } from '../logger.js';
 import { OpenAIService, OpenAIMessage, OpenAIOptions, OpenAIResponse, SupportedModel, TTS_DEFAULT_OPTIONS } from '../openaiService.js';

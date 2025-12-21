@@ -1,11 +1,10 @@
 /**
  * @arete-module: VoiceStateHandler
- * @arete-risk: critical
- * @arete-ethics: critical
+ * @arete-risk: high
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Handles Discord voice state changes and coordinates voice session management.
+ * @description: Handles Discord voice state changes and coordinates voice session management.
  *
  * @impact
  * Risk: Manages voice connections, audio handlers, and realtime session creation. Failures can break all voice functionality or leave orphaned connections.
@@ -288,3 +287,4 @@ export async function cleanupVoiceConnection(connection: VoiceConnection | null,
 }
 
 export default VoiceStateHandler;
+

@@ -1,11 +1,10 @@
 /**
  * @arete-module: VoiceSessionManager
  * @arete-risk: high
- * @arete-ethics: critical
+ * @arete-ethics: high
  * @arete-scope: core
  *
- * @description
- * Manages voice session state and coordinates audio event handling.
+ * @description: Manages voice session state and coordinates audio event handling.
  *
  * @impact
  * Risk: Handles session creation, audio chunk forwarding, and cleanup. Failures can cause memory leaks, orphaned sessions, or audio processing errors.
@@ -181,3 +180,4 @@ export class VoiceSessionManager {
         return this.activeSessions.has(guildId);
     }
 }
+

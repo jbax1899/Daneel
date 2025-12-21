@@ -1,7 +1,9 @@
 /**
- * @file ResponseHandler.ts
- * @description Manages how the bot responds to messages in Discord.
- * Handles different response types including text replies, embeds, DMs, and reactions.
+ * @description: Orchestrates Discord responses (messages, embeds, DMs, reactions, typing).
+ * @arete-scope: interface
+ * @arete-module: ResponseHandler
+ * @arete-risk: high - Response failures can drop user interactions or spam channels.
+ * @arete-ethics: moderate - Response handling affects user transparency and feedback.
  */
 
 import { Message, MessageCreateOptions, MessageReplyOptions, EmbedBuilder as DiscordEmbedBuilder, TextBasedChannel, User, MessageEditOptions, ActivityOptions } from 'discord.js';
@@ -394,7 +396,7 @@ export class ResponseHandler {
 
       logger.info(`Presence updated: ${status} with ${activities.length} activities`);
     } catch (error) {
-      logger.warn('Failed to set presence:', error); // Not a critical error
+      logger.warn('Failed to set presence:', error); // Not a high-severity error
     }
   }
 
