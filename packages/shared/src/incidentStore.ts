@@ -19,6 +19,15 @@ const incidentStoreLogger = typeof logger.child === 'function' ? logger.child({ 
 
 export type IncidentStore = SqliteIncidentStore;
 
+let cachedIncidentStore: IncidentStore | null = null;
+
+export function getDefaultIncidentStore(): IncidentStore {
+  if (!cachedIncidentStore) {
+    cachedIncidentStore = createIncidentStoreFromEnv();
+  }
+  return cachedIncidentStore;
+}
+
 export function createIncidentStoreFromEnv(): IncidentStore {
   const backend = process.env.INCIDENT_BACKEND?.trim().toLowerCase();
   if (backend && backend !== 'sqlite') {
@@ -49,5 +58,12 @@ export function createIncidentStoreFromEnv(): IncidentStore {
   }
 }
 
-export const defaultIncidentStore = createIncidentStoreFromEnv();
+// Expose a stable export without building the store until someone calls into it.
+export const defaultIncidentStore: IncidentStore = new Proxy({} as IncidentStore, {
+  get: (_target, prop) => {
+    const store = getDefaultIncidentStore();
+    const value = store[prop as keyof IncidentStore];
+    return typeof value === 'function' ? value.bind(store) : value;
+  }
+});
 export type { IncidentAuditEvent, IncidentPointers, IncidentRecord, IncidentStatus } from './sqliteIncidentStore.js';
