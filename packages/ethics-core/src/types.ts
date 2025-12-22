@@ -43,7 +43,7 @@ export type Citation = {
 export type ResponseMetadata = {
     responseId: string;           // Unique short ID
     provenance: Provenance;       // Epistemic origin
-    confidence: ConfidenceScore;  // 0.0–1.0 confidence
+    confidence: ConfidenceScore;  // 0.0-1.0 confidence
     riskTier: RiskTier;           // Sensitivity classification
     tradeoffCount: number;        // Number of competing values surfaced
     chainHash: string;            // Cryptographic hash of reasoning chain
@@ -51,4 +51,5 @@ export type ResponseMetadata = {
     modelVersion: string;         // e.g., "gpt-5-mini"
     staleAfter: string;           // ISO 8601 timestamp
     citations: Citation[];        // Sources consulted
+    imageDescriptions?: string[]; // Optional image description payloads captured during response generation
 }

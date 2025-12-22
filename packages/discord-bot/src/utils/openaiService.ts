@@ -21,6 +21,7 @@ import { ActivityOptions } from 'discord.js';
 import { estimateTextCost, formatUsd, createCostBreakdown, type GPT5ModelType, type ModelCostBreakdown, type TextModelPricingKey } from './pricing.js';
 import type { LLMCostEstimator } from './LLMCostEstimator.js';
 import { generateImageDescriptionRequest } from './imageProcessing/imageDescription.js';
+import { IMAGE_DESCRIPTION_CONFIG, type ImageDescriptionModelType } from '../constants/imageProcessing.js';
 
 // ====================
 // Type Declarations
@@ -183,7 +184,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
-export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
+export const IMAGE_DESCRIPTION_MODEL: ImageDescriptionModelType = IMAGE_DESCRIPTION_CONFIG.model;
 export const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType = 'text-embedding-3-small';
 const METADATA_MARKER = '<ARETE_METADATA>'; // Marker appended to chat completions so we can reliably split conversational text and metadata
 
@@ -697,21 +698,21 @@ export class OpenAIService {
       const imageDescriptionResult = await generateImageDescriptionRequest(this.openai, {
         imageUrl,
         context,
-        model: IMAGE_DESCRIPTION_MODEL as GPT5ModelType
+        model: IMAGE_DESCRIPTION_MODEL
       });
 
       const imageDescriptionResponse = imageDescriptionResult.response;
       if (imageDescriptionResponse.usage) {
         const inputTokens = imageDescriptionResponse.usage.input_tokens;
         const outputTokens = imageDescriptionResponse.usage.output_tokens;
-        const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL as GPT5ModelType, inputTokens, outputTokens);
+        const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL as TextModelPricingKey, inputTokens, outputTokens);
         imageDescriptionResponse.usage.cost = formatUsd(cost.totalCost);
       }
 
       if (this.costEstimator && imageDescriptionResult.usage) {
         try {
           const breakdown: ModelCostBreakdown = createCostBreakdown(
-            IMAGE_DESCRIPTION_MODEL as GPT5ModelType,
+            IMAGE_DESCRIPTION_MODEL as TextModelPricingKey,
             imageDescriptionResult.usage.promptTokens,
             imageDescriptionResult.usage.completionTokens,
             channelContext?.channelId,

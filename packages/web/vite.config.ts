@@ -91,5 +91,6 @@ export default defineConfig({
       '@styles': fileURLToPath(new URL('./src/styles', import.meta.url)),
       '@theme': fileURLToPath(new URL('./src/theme', import.meta.url)),
     },
+    dedupe: ['react', 'react-dom'],
   },
 });
