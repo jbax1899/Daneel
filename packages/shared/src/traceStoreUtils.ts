@@ -62,6 +62,17 @@ export function assertValidResponseMetadata(
     throw new Error(`Trace record "${source}" for response "${responseId}" is invalid (citations must be an array).`);
   }
 
+  if (record.imageDescriptions !== undefined) {
+    if (!Array.isArray(record.imageDescriptions)) {
+      throw new Error(`Trace record "${source}" for response "${responseId}" is invalid (imageDescriptions must be an array).`);
+    }
+    for (const entry of record.imageDescriptions) {
+      if (typeof entry !== 'string') {
+        throw new Error(`Trace record "${source}" for response "${responseId}" is invalid (imageDescriptions entries must be strings).`);
+      }
+    }
+  }
+
   for (const citation of record.citations) {
     if (!citation || typeof citation !== 'object') {
       throw new Error(`Trace record "${source}" for response "${responseId}" is invalid (citation must be object).`);

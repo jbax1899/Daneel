@@ -15,12 +15,13 @@ import { fileURLToPath } from 'url';
 import path, { dirname } from 'path';
 import fs from 'fs';
 import OpenAI from 'openai';
-import fetch from 'node-fetch';
 import { logger } from './logger.js';
 import { renderPrompt } from './env.js';
 import { ActivityOptions } from 'discord.js';
 import { estimateTextCost, formatUsd, createCostBreakdown, type GPT5ModelType, type ModelCostBreakdown, type TextModelPricingKey } from './pricing.js';
 import type { LLMCostEstimator } from './LLMCostEstimator.js';
+import { generateImageDescriptionRequest } from './imageProcessing/imageDescription.js';
+import { IMAGE_DESCRIPTION_CONFIG, type ImageDescriptionModelType } from '../constants/imageProcessing.js';
 
 // ====================
 // Type Declarations
@@ -183,7 +184,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const OUTPUT_PATH = path.resolve(__dirname, '..', 'output');
 const TTS_OUTPUT_PATH = path.join(OUTPUT_PATH, 'tts');
-export const IMAGE_DESCRIPTION_MODEL: SupportedModel = 'gpt-5-mini';
+export const IMAGE_DESCRIPTION_MODEL: ImageDescriptionModelType = IMAGE_DESCRIPTION_CONFIG.model;
 export const DEFAULT_EMBEDDING_MODEL: EmbeddingModelType = 'text-embedding-3-small';
 const METADATA_MARKER = '<ARETE_METADATA>'; // Marker appended to chat completions so we can reliably split conversational text and metadata
 
@@ -694,70 +695,26 @@ export class OpenAIService {
     channelContext?: { channelId: string; guildId?: string }
   ): Promise<OpenAIResponse> {
     try {
-      // Download the image from the URL
-      const response = await fetch(imageUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to download image: ${response.statusText}`);
-      }
-      
-      // Get the image data as a buffer
-      const imageBuffer = await response.arrayBuffer();
-      
-      // Convert the image to base64
-      const base64Image = Buffer.from(imageBuffer).toString('base64');
-      
-      // Get the content type from the response headers or default to jpeg
-      const contentType = response.headers.get('content-type') || 'image/jpeg';
-      
-      const chatResponse = await this.openai.chat.completions.create({
-        model: IMAGE_DESCRIPTION_MODEL,
-        messages: [{
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Describe the image in a structured, observant way.
-              Focus on recurring themes, subject types (people, animals, objects, symbols), and overall visual styles.
-              Be neutral, brief, and descriptive — do not interpret or advise.
-              ${context ? `Additional context: ${context}` : ''}`
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: `data:${contentType};base64,${base64Image}`,
-                detail: 'high'
-              }
-            }
-          ]
-        }]
+      const imageDescriptionResult = await generateImageDescriptionRequest(this.openai, {
+        imageUrl,
+        context,
+        model: IMAGE_DESCRIPTION_MODEL
       });
 
-      const choice = chatResponse.choices[0];
-      const imageDescriptionResponse: OpenAIResponse = {
-        normalizedText: choice.message.content || null,
-        message: {
-          role: 'assistant',
-          content: choice.message.content || '',
-        },
-        finish_reason: choice.finish_reason || 'stop',
-        usage: chatResponse.usage ? (() => {
-          const inputTokens = chatResponse.usage.prompt_tokens || 0;
-          const outputTokens = chatResponse.usage.completion_tokens || 0;
-          const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL as GPT5ModelType, inputTokens, outputTokens);
-          return {
-            input_tokens: inputTokens,
-            output_tokens: outputTokens,
-            total_tokens: chatResponse.usage.total_tokens,
-            cost: formatUsd(cost.totalCost)
-          };
-        })() : undefined
-      };
-      if (this.costEstimator && chatResponse.usage) {
+      const imageDescriptionResponse = imageDescriptionResult.response;
+      if (imageDescriptionResponse.usage) {
+        const inputTokens = imageDescriptionResponse.usage.input_tokens;
+        const outputTokens = imageDescriptionResponse.usage.output_tokens;
+        const cost = estimateTextCost(IMAGE_DESCRIPTION_MODEL as TextModelPricingKey, inputTokens, outputTokens);
+        imageDescriptionResponse.usage.cost = formatUsd(cost.totalCost);
+      }
+
+      if (this.costEstimator && imageDescriptionResult.usage) {
         try {
           const breakdown: ModelCostBreakdown = createCostBreakdown(
-            IMAGE_DESCRIPTION_MODEL as GPT5ModelType,
-            chatResponse.usage.prompt_tokens || 0,
-            chatResponse.usage.completion_tokens || 0,
+            IMAGE_DESCRIPTION_MODEL as TextModelPricingKey,
+            imageDescriptionResult.usage.promptTokens,
+            imageDescriptionResult.usage.completionTokens,
             channelContext?.channelId,
             channelContext?.guildId
           );

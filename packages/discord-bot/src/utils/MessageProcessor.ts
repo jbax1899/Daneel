@@ -437,7 +437,7 @@ export class MessageProcessor {
             role: 'system',
             content: `User also uploaded images with these automatically generated descriptions: 
             ${flatImageDescriptions}
-            Pass through these descriptions exactly as recieved, with a header like 'Descriptions of attached image(s):' and with each description prefixed like '[Image #]: ', and placed all within a code block (\`\`\`example\`\`\`) at the end of your response.`
+            Use these descriptions for reasoning.`
           });
         }
 
@@ -502,6 +502,13 @@ export class MessageProcessor {
             };
           }
 
+          if (imageDescriptions.length > 0) {
+            responseMetadata = {
+              ...responseMetadata,
+              imageDescriptions: [...imageDescriptions]
+            };
+          }
+
           // Build provenance footer
           let footerPayload: ReturnType<typeof buildFooterEmbed> | null = null;
           try {
@@ -531,6 +538,7 @@ export class MessageProcessor {
 
           // Get the assistant's response
           const responseText = aiResponse.message?.content || 'No response generated.';
+          const finalResponseText = responseText;
 
           // If the response is to be read out loud, generate speech (TTS)
           let ttsPath: string | null = null;
@@ -548,7 +556,7 @@ export class MessageProcessor {
           }
 
           // If the assistant has a response, send it
-          if (responseText) {
+          if (finalResponseText) {
             // Is this a TTS response?
             if (ttsPath) {
               // TTS - Special rules (if we're sending a TTS too, put the text transcript in a code block)
@@ -556,7 +564,7 @@ export class MessageProcessor {
               const fileBuffer = await fs.promises.readFile(ttsPath);
 
               // If we're sending a TTS too, put the text transcript in a code block
-              const cleanResponseText = responseText.replace(/\n/g, ' ').replace(/`/g, ''); // Replace newlines with spaces, remove backticks (since we are putting it in a code block)
+              const cleanResponseText = finalResponseText.replace(/\n/g, ' ').replace(/`/g, ''); // Replace newlines with spaces, remove backticks (since we are putting it in a code block)
 
               // Send the response
               await responseHandler.sendMessage(
@@ -603,7 +611,7 @@ export class MessageProcessor {
 
               // Send the response with footer
               await responseHandler.sendMessage(
-                responseText,
+                finalResponseText,
                 [],
                 directReply,
                 footerEmbeds.length === 0,
@@ -615,7 +623,7 @@ export class MessageProcessor {
               // Save trace asynchronously
               await persistTrace();
             }
-            logger.debug(`Response sent (${responseText}) for message: ${message.content.slice(0, 100)}...`);
+            logger.debug(`Response sent (${finalResponseText}) for message: ${message.content.slice(0, 100)}...`);
           }
         } finally {
           responseHandler.stopTyping(); // Stop typing indicator
@@ -652,6 +660,7 @@ export class MessageProcessor {
     return results.find(r => !r.allowed) ?? { allowed: true };
   }
 }
+
 
 export async function cleanupTTSFile(ttsPath: string): Promise<void> {
   if (!ttsPath) return;

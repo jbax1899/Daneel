@@ -47,4 +47,5 @@ export type ResponseMetadata = {
     modelVersion: string;
     staleAfter: string;
     citations: Citation[];
+    imageDescriptions?: string[];
 };
