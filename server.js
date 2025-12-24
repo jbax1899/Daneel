@@ -615,7 +615,7 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
 
     // Check if CAPTCHA should be skipped first.
     // Skip when explicitly disabled, during development, or when not configured.
-    const skipCaptcha = !process.env.TURNSTILE_SECRET_KEY;
+    const skipCaptcha = !(process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SITE_KEY);
     
     // Extract Turnstile token (priority: header → body → query param)
     let turnstileToken = null;
@@ -1186,10 +1186,11 @@ const handleRuntimeConfigRequest = async (req, res) => {
       return;
     }
 
+    const hasTurnstileKeys = Boolean(
+      process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SITE_KEY
+    );
     const payload = {
-      turnstileSiteKey: process.env.TURNSTILE_SECRET_KEY
-        ? (process.env.TURNSTILE_SITE_KEY || '')
-        : ''
+      turnstileSiteKey: hasTurnstileKeys ? process.env.TURNSTILE_SITE_KEY : ''
     };
 
     res.statusCode = 200;
