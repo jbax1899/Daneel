@@ -25,9 +25,9 @@ Services:
   (Requires Fly CLI: https://fly.io/docs/flyctl/install/)
   TODO: add interactive prompts in the deploy scripts for setting Fly secrets (`fly secrets set`).
   Note: we use three separate Fly apps to mirror the Docker Compose service split.
+  Note: web uses `BACKEND_HOST=arete-backend.internal` in `deploy/fly.web.toml`; update it if the backend app name changes.
 
 ## Notes
 - Only the web service is exposed on host port 8080 (`http://localhost:8080`) to avoid admin privileges.
 - The backend listens internally on port 3000 and stores data in `/data` (Docker volume: `arete-data`).
-- Blog post JSONs are expected to move to backend-owned storage under `/data` and be served via backend endpoints.
-  (Current backend code still writes to the web build output; this will be resolved in issue #97.)
+- Blog post JSONs are stored in backend-owned storage under `/data/blog-posts` and served via backend endpoints.

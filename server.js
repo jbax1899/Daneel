@@ -17,6 +17,9 @@ require('dotenv').config();
 
 // Resolve the directory containing the built frontend assets.
 const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');
+// Durable storage location for backend-owned content.
+const DATA_DIR = process.env.ARETE_DATA_DIR || '/data';
+const BLOG_POSTS_DIR = path.join(DATA_DIR, 'blog-posts');
 
 // Model parameters
 const DEFAULT_MODEL = 'gpt-5-mini';
@@ -87,14 +90,12 @@ function verifyGitHubSignature(secret, body, signature) {
 }
 
 /**
- * Writes a blog post to the file system based on GitHub discussion data
+ * Writes a blog post to backend-owned storage based on GitHub discussion data.
  */
 async function writeBlogPost(discussion) {
-  const BLOG_POSTS_DIR = path.join(DIST_DIR, 'blog-posts');
-  
   try {
     await fsPromises.mkdir(BLOG_POSTS_DIR, { recursive: true });
-    
+
     const postObject = {
       number: discussion.number,
       title: discussion.title,
@@ -109,24 +110,24 @@ async function writeBlogPost(discussion) {
       discussionUrl: discussion.html_url,
       commentCount: discussion.comments || 0
     };
-    
+
     const postFilePath = path.join(BLOG_POSTS_DIR, `${discussion.number}.json`);
     await fsPromises.writeFile(postFilePath, JSON.stringify(postObject, null, 2));
-    
+
     const indexFilePath = path.join(BLOG_POSTS_DIR, 'index.json');
     let indexArray = [];
     try {
       const indexContent = await fsPromises.readFile(indexFilePath, 'utf8');
       indexArray = JSON.parse(indexContent);
     } catch (error) {
-      // If file doesn't exist or is invalid, start with empty array
+      // If file doesn't exist or is invalid, start with empty array.
       indexArray = [];
     }
-    
-    // Remove existing entry if present
+
+    // Remove existing entry if present.
     indexArray = indexArray.filter(post => post.number !== discussion.number);
-    
-    // Add new/updated entry
+
+    // Add new/updated entry.
     indexArray.push({
       number: discussion.number,
       title: discussion.title,
@@ -138,10 +139,10 @@ async function writeBlogPost(discussion) {
       createdAt: discussion.created_at,
       updatedAt: discussion.updated_at
     });
-    
-    // Sort by number descending (newest first)
+
+    // Sort by number descending (newest first).
     indexArray.sort((a, b) => b.number - a.number);
-    
+
     await fsPromises.writeFile(indexFilePath, JSON.stringify(indexArray, null, 2));
   } catch (error) {
     console.error('Error writing blog post:', error);
@@ -234,38 +235,35 @@ const resolveAsset = async (requestPath) => {
 };
 
 /**
- * Writes a blog post JSON file for a GitHub discussion.
- * Files are written directly to the dist directory so they're immediately
- * available to the HTTP server without requiring a rebuild.
+ * Reads the blog index file (or returns an empty array when missing).
  */
-async function writeBlogPost(discussion) {
-  const BLOG_POSTS_DIR = path.join(DIST_DIR, 'blog-posts');
-
+const readBlogIndex = async () => {
   try {
-    await fs.mkdir(BLOG_POSTS_DIR, { recursive: true });
-
-    const postObject = {
-      number: discussion.number,
-      title: discussion.title,
-      body: discussion.body,
-      author: {
-        login: discussion.user.login,
-        avatarUrl: discussion.user.avatar_url,
-        profileUrl: discussion.user.html_url
-      },
-      createdAt: discussion.created_at,
-      updatedAt: discussion.updated_at,
-      discussionUrl: discussion.html_url,
-      commentCount: discussion.comments || 0
-    };
-
-    const postFilePath = path.join(BLOG_POSTS_DIR, `${discussion.number}.json`);
-    await fs.writeFile(postFilePath, JSON.stringify(postObject, null, 2));
+    const indexContent = await fsPromises.readFile(path.join(BLOG_POSTS_DIR, 'index.json'), 'utf8');
+    const parsed = JSON.parse(indexContent);
+    return Array.isArray(parsed) ? parsed : [];
   } catch (error) {
-    console.error('Failed to write blog post:', error);
-    throw error;
+    return [];
   }
-}
+};
+
+/**
+ * Reads a single blog post by number (returns undefined when missing).
+ */
+const readBlogPost = async (postNumber) => {
+  try {
+    const postContent = await fsPromises.readFile(
+      path.join(BLOG_POSTS_DIR, `${postNumber}.json`),
+      'utf8'
+    );
+    return JSON.parse(postContent);
+  } catch (error) {
+    if (error && error.code !== 'ENOENT') {
+      throw error;
+    }
+    return undefined;
+  }
+};
 
 /**
  * Builds a short log entry for monitoring within Fly.io logs.
@@ -1184,6 +1182,74 @@ const handleWebhookRequest = async (req, res) => {
   }
 };
 
+/**
+ * Handles requests to the /api/blog-posts endpoint.
+ */
+const handleBlogIndexRequest = async (req, res) => {
+  try {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      logRequest(req, res, 'blog index method-not-allowed');
+      return;
+    }
+
+    const indexArray = await readBlogIndex();
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(indexArray));
+    logRequest(req, res, `blog index count=${indexArray.length}`);
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+    logRequest(req, res, `blog index error ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+};
+
+/**
+ * Handles requests to the /api/blog-posts/:id endpoint.
+ */
+const handleBlogPostRequest = async (req, res, postId) => {
+  try {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      logRequest(req, res, 'blog post method-not-allowed');
+      return;
+    }
+
+    if (!/^\d+$/.test(postId)) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid post id' }));
+      logRequest(req, res, 'blog post invalid-id');
+      return;
+    }
+
+    const post = await readBlogPost(postId);
+    if (!post) {
+      res.statusCode = 404;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Post not found' }));
+      logRequest(req, res, `blog post missing id=${postId}`);
+      return;
+    }
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify(post));
+    logRequest(req, res, `blog post id=${postId}`);
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+    logRequest(req, res, `blog post error ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+};
+
 // Initialize services
 try {
   initializeServices();
@@ -1204,6 +1270,18 @@ const server = http.createServer(async (req, res) => {
     // Handle /api/webhook/github endpoint
     if (parsedUrl.pathname === '/api/webhook/github') {
       await handleWebhookRequest(req, res);
+      return;
+    }
+
+    // Handle blog post API endpoints
+    if (parsedUrl.pathname === '/api/blog-posts' || parsedUrl.pathname === '/api/blog-posts/') {
+      await handleBlogIndexRequest(req, res);
+      return;
+    }
+
+    if (parsedUrl.pathname.startsWith('/api/blog-posts/')) {
+      const postId = parsedUrl.pathname.split('/').pop();
+      await handleBlogPostRequest(req, res, postId);
       return;
     }
     
