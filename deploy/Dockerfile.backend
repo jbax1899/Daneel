@@ -22,7 +22,5 @@ RUN npm run build --workspace=@arete/shared \
   && npm run build --workspace=ethics-core \
   && npm prune --omit=dev --legacy-peer-deps
 
-RUN mkdir -p /app/packages/web/dist/blog-posts
-
 EXPOSE 3000
 CMD ["node", "server.js"]

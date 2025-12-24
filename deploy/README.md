@@ -10,6 +10,13 @@ Services:
 ## Prerequisites
 - Ensure `.env` is present at the repo root.
 
+## Required environment
+- backend: `OPENAI_API_KEY`, `GITHUB_WEBHOOK_SECRET`
+- discord-bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
+
+## Optional environment
+- backend: `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY` (both required to enable CAPTCHA)
+
 ## Start
 `docker compose -f deploy/compose.yml up --build`
 
@@ -26,8 +33,13 @@ Services:
   TODO: add interactive prompts in the deploy scripts for setting Fly secrets (`fly secrets set`).
   Note: we use three separate Fly apps to mirror the Docker Compose service split.
   Note: web uses `BACKEND_HOST=arete-backend.internal` in `deploy/fly.web.toml`; update it if the backend app name changes.
+  Secrets per app:
+  - backend: `OPENAI_API_KEY`, `GITHUB_WEBHOOK_SECRET`
+  - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`
+  - bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
 
 ## Notes
 - Only the web service is exposed on host port 8080 (`http://localhost:8080`) to avoid admin privileges.
 - The backend listens internally on port 3000 and stores data in `/data` (Docker volume: `arete-data`).
 - Blog post JSONs are stored in backend-owned storage under `/data/blog-posts` and served via backend endpoints.
+- The web app fetches runtime config from `/config.json` (proxied to the backend) to read `TURNSTILE_SITE_KEY`.

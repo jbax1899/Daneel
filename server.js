@@ -448,7 +448,6 @@ const initializeServices = () => {
   console.log('TURNSTILE_SECRET_KEY:', process.env.TURNSTILE_SECRET_KEY ? 'SET' : 'NOT SET');
   console.log('TURNSTILE_SITE_KEY:', process.env.TURNSTILE_SITE_KEY ? 'SET' : 'NOT SET');
   console.log('NODE_ENV:', process.env.NODE_ENV || 'NOT SET');
-  console.log('SKIP_CAPTCHA:', process.env.SKIP_CAPTCHA || 'NOT SET');
   
   if (!process.env.OPENAI_API_KEY) {
     throw new Error('OPENAI_API_KEY environment variable is required');
@@ -548,16 +547,6 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
       return;
     }
     
-    // Verify Turnstile configuration
-    if (!process.env.TURNSTILE_SECRET_KEY) {
-      res.statusCode = 503;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-store');
-      res.end(JSON.stringify({ error: 'CAPTCHA verification not configured' }));
-      logRequest(req, res, 'reflect captcha-not-configured');
-      return;
-    }
-
     // Allow GET and POST requests
     if (req.method !== 'GET' && req.method !== 'POST') {
       res.statusCode = 405;
@@ -624,8 +613,9 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
       return;
     }
 
-    // Check if CAPTCHA should be skipped first
-    const skipCaptcha = process.env.NODE_ENV === 'development' || process.env.SKIP_CAPTCHA === 'true';
+    // Check if CAPTCHA should be skipped first.
+    // Skip when explicitly disabled, during development, or when not configured.
+    const skipCaptcha = !process.env.TURNSTILE_SECRET_KEY;
     
     // Extract Turnstile token (priority: header → body → query param)
     let turnstileToken = null;
@@ -713,8 +703,9 @@ const handleReflectRequest = async (req, res, parsedUrl) => {
     try {
       // Skip CAPTCHA verification in development mode
       if (skipCaptcha) {
-        console.log('Skipping CAPTCHA verification in development mode');
-        logRequest(req, res, `reflect captcha-skipped-dev-mode ip=${clientIp}`);
+        const reason = !process.env.TURNSTILE_SECRET_KEY ? 'not-configured' : 'dev-mode';
+        console.log(`Skipping CAPTCHA verification (${reason})`);
+        logRequest(req, res, `reflect captcha-skipped-${reason} ip=${clientIp}`);
       } else {
         // Debug: Log CAPTCHA verification info (without exposing sensitive data)
         console.log('CAPTCHA verification debug:');
@@ -1183,6 +1174,38 @@ const handleWebhookRequest = async (req, res) => {
 };
 
 /**
+ * Handles requests to the /config.json endpoint.
+ */
+const handleRuntimeConfigRequest = async (req, res) => {
+  try {
+    if (req.method !== 'GET') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      logRequest(req, res, 'config method-not-allowed');
+      return;
+    }
+
+    const payload = {
+      turnstileSiteKey: process.env.TURNSTILE_SECRET_KEY
+        ? (process.env.TURNSTILE_SITE_KEY || '')
+        : ''
+    };
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-store');
+    res.end(JSON.stringify(payload));
+    logRequest(req, res, 'config ok');
+  } catch (error) {
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Internal server error' }));
+    logRequest(req, res, `config error ${error instanceof Error ? error.message : 'unknown error'}`);
+  }
+};
+
+/**
  * Handles requests to the /api/blog-posts endpoint.
  */
 const handleBlogIndexRequest = async (req, res) => {
@@ -1270,6 +1293,12 @@ const server = http.createServer(async (req, res) => {
     // Handle /api/webhook/github endpoint
     if (parsedUrl.pathname === '/api/webhook/github') {
       await handleWebhookRequest(req, res);
+      return;
+    }
+
+    // Handle runtime config endpoint
+    if (parsedUrl.pathname === '/config.json') {
+      await handleRuntimeConfigRequest(req, res);
       return;
     }
 

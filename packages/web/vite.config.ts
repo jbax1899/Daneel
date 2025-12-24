@@ -57,19 +57,14 @@ const cspPlugin = () => ({
 // Vite configuration keeps things lean while allowing TypeScript paths for components and styles.
 export default defineConfig({
   plugins: [react(), cspPlugin()],
-  define: {
-    // In production, require real Turnstile keys. Only use test keys as fallback in development.
-    // WARNING: If VITE_TURNSTILE_SITE_KEY is not set in production, CAPTCHA will not work!
-    'import.meta.env.VITE_TURNSTILE_SITE_KEY': JSON.stringify(
-      process.env.VITE_TURNSTILE_SITE_KEY || 
-      (process.env.NODE_ENV === 'production' ? '' : '1x00000000000000000000BB') // Test key fallback for development only
-    ),
-    'import.meta.env.VITE_SKIP_CAPTCHA': JSON.stringify(process.env.VITE_SKIP_CAPTCHA || 'false'),
-  },
   server: {
     port: 5173,
     proxy: {
       '/api': {
+        target: 'http://localhost:3000',
+        changeOrigin: true,
+      },
+      '/config.json': {
         target: 'http://localhost:3000',
         changeOrigin: true,
       },

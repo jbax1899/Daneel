@@ -3,13 +3,12 @@ import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import ProvenanceFooter from './ProvenanceFooter';
 import type { ResponseMetadata } from 'ethics-core';
 import examplePrompts from '../data/examplePrompts.json';
+import { loadRuntimeConfig } from '../utils/runtimeConfig';
 
 // Module augmentation for Vite environment variables
 declare global {
   interface ImportMetaEnv {
     readonly DEV: boolean;
-    readonly VITE_TURNSTILE_SITE_KEY: string;
-    readonly VITE_SKIP_CAPTCHA: string;
   }
 
   interface ImportMeta {
@@ -125,6 +124,7 @@ const AskMeAnything = (): JSX.Element => {
   const [isTurnstileReady, setIsTurnstileReady] = useState(false);
   const [turnstileKey, setTurnstileKey] = useState(0);
   const [isTurnstileMounted, setIsTurnstileMounted] = useState(false);
+  const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const abortRef = useRef<AbortController | null>(null);
   const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
@@ -164,28 +164,43 @@ const AskMeAnything = (): JSX.Element => {
     inputRef.current?.focus();
   };
 
+  useEffect(() => {
+    let isMounted = true;
+
+    loadRuntimeConfig()
+      .then((config) => {
+        if (isMounted) {
+          setTurnstileSiteKey(config.turnstileSiteKey);
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setTurnstileSiteKey('');
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Check if Turnstile site key is valid (not empty or missing)
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY;
   const hasValidSiteKey = turnstileSiteKey && turnstileSiteKey.trim().length > 0;
 
-  // Skip CAPTCHA in development mode, unless explicitly disabled via VITE_SKIP_CAPTCHA
-  // Also skip CAPTCHA if site key is missing/invalid (production misconfiguration)
-  // If VITE_SKIP_CAPTCHA is explicitly set to 'false', require CAPTCHA even in dev mode (but still need valid key)
-  const isDevelopment = import.meta.env.VITE_SKIP_CAPTCHA === 'true' || 
-    (import.meta.env.DEV && import.meta.env.VITE_SKIP_CAPTCHA !== 'false') ||
-    !hasValidSiteKey; // Skip CAPTCHA if site key is missing (treat as misconfigured)
+  // Skip CAPTCHA when the site key is missing or invalid.
+  const isCaptchaDisabled = !hasValidSiteKey;
 
   // Turnstile callback functions
   // According to Cloudflare docs: tokens are max 2048 chars, expire after 300s, single-use only
       const onTurnstileVerify = (token: string) => {
         console.log('[Turnstile] onTurnstileVerify called with token:', token ? `${token.substring(0, 30)}...` : 'null');
         // Check if using test keys (test keys generate shorter dummy tokens like "XXXX.DUMMY.TOKEN.XXXX")
-        const isTestKey = import.meta.env.VITE_TURNSTILE_SITE_KEY?.startsWith('1x00000000000000000000') || 
-                          import.meta.env.VITE_TURNSTILE_SITE_KEY?.startsWith('2x00000000000000000000') ||
-                          import.meta.env.VITE_TURNSTILE_SITE_KEY?.startsWith('3x00000000000000000000');
+        const isTestKey = turnstileSiteKey.startsWith('1x00000000000000000000') || 
+                          turnstileSiteKey.startsWith('2x00000000000000000000') ||
+                          turnstileSiteKey.startsWith('3x00000000000000000000');
         
         // Log token generation (for debugging)
-        console.log('[Turnstile] Token details - length:', token?.length || 0, 'site key:', import.meta.env.VITE_TURNSTILE_SITE_KEY?.substring(0, 20), 'isTestKey:', isTestKey);
+        console.log('[Turnstile] Token details - length:', token?.length || 0, 'site key:', turnstileSiteKey.substring(0, 20), 'isTestKey:', isTestKey);
         
         // Validate token - test keys generate shorter tokens, production tokens should be ~200+ chars
         if (!token) {
@@ -245,7 +260,7 @@ const AskMeAnything = (): JSX.Element => {
   // Guard execution to when widget is mounted and ready
   // Fallback: if onLoad doesn't fire (can happen with test keys + invisible mode), try executing after delay
   useEffect(() => {
-    if (!isDevelopment && hasValidSiteKey && turnstileRef.current && !turnstileError) {
+    if (!isCaptchaDisabled && turnstileRef.current && !turnstileError) {
       // If widget is mounted, execute immediately
       if (isTurnstileMounted) {
         const timer = setTimeout(() => {
@@ -281,7 +296,7 @@ const AskMeAnything = (): JSX.Element => {
       }
     }
     return undefined;
-  }, [turnstileKey, isDevelopment, hasValidSiteKey, turnstileError, isTurnstileMounted]);
+  }, [turnstileKey, isCaptchaDisabled, hasValidSiteKey, turnstileError, isTurnstileMounted]);
 
   // Auto-resize textarea based on content
   useEffect(() => {
@@ -349,7 +364,7 @@ const AskMeAnything = (): JSX.Element => {
 
     // Fallback: trigger execution if token isn't pre-fetched to avoid deadlock
     let resolvedToken = turnstileToken;
-    if (!isDevelopment && !resolvedToken) {
+    if (!isCaptchaDisabled && !resolvedToken) {
       if (turnstileRef.current) {
         // Execute challenge and wait for token
         turnstileRef.current.execute();
@@ -400,7 +415,7 @@ const AskMeAnything = (): JSX.Element => {
       };
       
       // Only add CAPTCHA token if we have one (not in development mode)
-      if (!isDevelopment && resolvedToken) {
+      if (!isCaptchaDisabled && resolvedToken) {
         headers['x-turnstile-token'] = resolvedToken;
       }
       
@@ -595,14 +610,14 @@ const AskMeAnything = (): JSX.Element => {
             <button 
               type="submit" 
               className="interaction-submit" 
-              disabled={isLoading || (!isDevelopment && !isTurnstileReady)}
-              aria-label={isLoading ? "Submitting question" : (!isDevelopment && !isTurnstileReady ? "Complete CAPTCHA to submit" : "Submit question")}
+                disabled={isLoading || (!isCaptchaDisabled && !isTurnstileReady)}
+                aria-label={isLoading ? "Submitting question" : (!isCaptchaDisabled && !isTurnstileReady ? "Complete CAPTCHA to submit" : "Submit question")}
             >
               {isLoading ? (
                 <>
                   <span className="spinner" aria-hidden="true" />
                 </>
-              ) : !isDevelopment && !isTurnstileReady ? (
+                ) : !isCaptchaDisabled && !isTurnstileReady ? (
                 <span className="hourglass" aria-label="Complete CAPTCHA verification">⏳</span>
               ) : (
                 'Go'
@@ -630,7 +645,7 @@ const AskMeAnything = (): JSX.Element => {
         )}
         {/* Render Turnstile widget in Invisible mode - requires manual execute() calls for deterministic timing */}
         {/* Only render if we have a valid site key and CAPTCHA is required */}
-        {hasValidSiteKey && !isDevelopment && !turnstileError && (
+        {hasValidSiteKey && !isCaptchaDisabled && !turnstileError && (
           <div className="interaction-captcha">
             <Turnstile
               ref={turnstileRef}
@@ -653,14 +668,14 @@ const AskMeAnything = (): JSX.Element => {
             />
           </div>
         )}
-        {!isDevelopment && turnstileError && (
+        {!isCaptchaDisabled && turnstileError && (
           <div 
             className="interaction-captcha interaction-captcha-visible"
             aria-label="Complete CAPTCHA verification to submit your question"
           >
             <Turnstile
               key={turnstileKey}
-              siteKey={import.meta.env.VITE_TURNSTILE_SITE_KEY}
+              siteKey={turnstileSiteKey}
               onSuccess={onTurnstileVerify}
               onError={onTurnstileError}
               onExpire={onTurnstileExpire}
