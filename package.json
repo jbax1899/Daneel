@@ -13,10 +13,10 @@
         "validate-arete-tags": "node scripts/validate-arete-tags.js",
         "blog-sync": "node scripts/blog-sync.js",
         "pre-review": "npm run validate-arete-tags && npm run type-check && npm run lint-check",
-        "type-check": "pnpm tsc --noEmit",
-        "lint-check": "pnpm eslint packages/",
-        "ethics-check": "pnpm tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\"",
-        "risk-check": "pnpm tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
+        "type-check": "npx tsc --noEmit",
+        "lint-check": "npx eslint packages/",
+        "ethics-check": "npx tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\"",
+        "risk-check": "npx tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
         "full-pre-review": "npm run pre-review && npm run ethics-check && npm run risk-check"
     },
     "devDependencies": {

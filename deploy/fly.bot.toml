@@ -1,0 +1,17 @@
+# Fly app: discord bot (no HTTP service)
+app = 'arete-bot'
+primary_region = 'ord'
+
+[build]
+  dockerfile = 'deploy/Dockerfile.bot'
+
+[env]
+  NODE_ENV = 'production'
+
+[processes]
+  app = 'node packages/discord-bot/dist/index.js'
+
+[[vm]]
+  cpu_kind = 'shared'
+  cpus = 1
+  memory = '512mb'

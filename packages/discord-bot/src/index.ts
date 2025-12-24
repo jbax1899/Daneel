@@ -791,7 +791,7 @@ client.on(Events.InteractionCreate, async interaction => {
     if (customId === 'report_issue') {
       logger.info(`Report Issue button clicked by user: ${interaction.user.id} on message: ${interaction.message.id} (${interaction.message.url})`);
       await interaction.reply({
-        content: "This feature isn't active yet. To report ethical or security issues, please follow the instructions in [SECURITY.md](https://github.com/arete-org/arete/blob/main/SECURITY.md).",
+        content: "This feature isn't active yet. To report ethical or security issues, please follow the instructions in [SECURITY.md](https://github.com/arete-org/arete/blob/main/docs/SECURITY.md).",
         flags: [1 << 6] // [1 << 6] = EPHEMERAL
       });
       return;

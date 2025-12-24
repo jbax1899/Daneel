@@ -1,0 +1,19 @@
+FROM node:22-slim as build
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY packages/web/package.json packages/web/package.json
+COPY packages/ethics-core/package.json packages/ethics-core/package.json
+
+RUN npm ci --legacy-peer-deps
+
+COPY packages/web/ packages/web/
+COPY packages/ethics-core/ packages/ethics-core/
+
+RUN npm run build --workspace=@arete/web
+
+FROM caddy:2.10.2-alpine
+
+COPY --from=build /app/packages/web/dist /usr/share/caddy
+COPY deploy/Caddyfile /etc/caddy/Caddyfile

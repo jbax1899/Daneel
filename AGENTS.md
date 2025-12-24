@@ -15,7 +15,7 @@ This file provides default context for automation tools (Codex, Cursor) so work 
 - Web app: `packages/web/src`
 - Server wrapper: `server.js`
 - Environment templates: `.env.example`
-- Project docs: `README.md`, `PHILOSOPHY.md`, `SECURITY.md`
+- Project docs: `README.md`, `docs/PHILOSOPHY.md`, `docs/SECURITY.md`
 
 ## Preferred Context (load first)
 - `cursor.rules` (authoritative development rules)
