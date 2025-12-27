@@ -43,14 +43,13 @@ const setCorsHeaders = (res: ServerResponse, req: IncomingMessage): void => {
     origin.toLowerCase() !== 'null' &&
     sanitizedAllowedOrigins.includes(origin);
 
-  const allowOrigin = isAllowedOrigin ? origin : sanitizedAllowedOrigins[0];
-
-  if (!allowOrigin) {
-    // No safe origin configured; do not set permissive CORS headers.
+  if (!isAllowedOrigin || !origin) {
+    // No safe origin matched; omit credentialed CORS headers.
     return;
   }
 
-  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Turnstile-Token, X-Session-Id');
   res.setHeader('Access-Control-Allow-Credentials', 'true');
