@@ -59,6 +59,32 @@ get_env_value() {
   echo "${line#*=}"
 }
 
+get_or_create_trace_token() {
+  local env_path="$1"
+  local existing
+  existing=$(get_env_value "$env_path" "TRACE_API_TOKEN" || true)
+  if [[ -n "$existing" ]]; then
+    echo "$existing"
+    return
+  fi
+
+  local token
+  token=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+  echo "Generated TRACE_API_TOKEN for deployment."
+
+  if [[ -f "$env_path" ]]; then
+    if grep -q "^TRACE_API_TOKEN=" "$env_path"; then
+      sed -i "s/^TRACE_API_TOKEN=.*/TRACE_API_TOKEN=${token}/" "$env_path"
+    else
+      echo "TRACE_API_TOKEN=${token}" >> "$env_path"
+    fi
+  else
+    echo "TRACE_API_TOKEN=${token}" > "$env_path"
+  fi
+
+  echo "$token"
+}
+
 ensure_secrets() {
   local app_name="$1"
   shift
@@ -75,6 +101,8 @@ ensure_secrets() {
       value=$(get_env_value "$env_path" "$secret" || true)
       if [[ -n "$value" ]]; then
         echo "Using $secret from $env_path."
+      elif [[ "$secret" == "TRACE_API_TOKEN" ]]; then
+        value=$(get_or_create_trace_token "$env_path")
       else
         read -r -p "Enter value for $secret (required for $app_name): " value
       fi
@@ -128,11 +156,11 @@ backend_app_name=$(get_app_name "$SCRIPT_DIR/fly.backend.toml")
 web_app_name=$(get_app_name "$SCRIPT_DIR/fly.web.toml")
 
 echo "Configuring backend secrets..."
-ensure_secrets "$backend_app_name" OPENAI_API_KEY
+ensure_secrets "$backend_app_name" OPENAI_API_KEY TRACE_API_TOKEN
 ensure_optional_secrets "$backend_app_name" TURNSTILE_SECRET_KEY TURNSTILE_SITE_KEY GITHUB_WEBHOOK_SECRET
 
 echo "Configuring bot secrets..."
-ensure_secrets "$bot_app_name" DISCORD_TOKEN CLIENT_ID GUILD_ID OPENAI_API_KEY DEVELOPER_USER_ID INCIDENT_PSEUDONYMIZATION_SECRET
+ensure_secrets "$bot_app_name" DISCORD_TOKEN CLIENT_ID GUILD_ID OPENAI_API_KEY DEVELOPER_USER_ID INCIDENT_PSEUDONYMIZATION_SECRET TRACE_API_TOKEN
 
 echo "Deploying backend..."
 fly deploy -c "$SCRIPT_DIR/fly.backend.toml"

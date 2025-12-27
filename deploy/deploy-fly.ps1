@@ -70,6 +70,35 @@ function Get-EnvValueFromFile {
   return $null
 }
 
+function Get-OrCreate-TraceToken {
+  param([string]$EnvPath)
+  $existing = Get-EnvValueFromFile -EnvPath $EnvPath -Key 'TRACE_API_TOKEN'
+  if ($existing -and $existing.Trim().Length -gt 0) {
+    return $existing.Trim()
+  }
+
+  $bytes = New-Object byte[] 32
+  $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+  $rng.GetBytes($bytes)
+  $rng.Dispose()
+  $token = ($bytes | ForEach-Object { $_.ToString('x2') }) -join ''
+
+  Write-Host "Generated TRACE_API_TOKEN for deployment."
+  if (Test-Path $EnvPath) {
+    $content = Get-Content $EnvPath
+    if ($content -match '^(TRACE_API_TOKEN=)') {
+      $content = $content -replace '^(TRACE_API_TOKEN=).*', "`$1$token"
+      Set-Content -Path $EnvPath -Value $content -Encoding UTF8
+    } else {
+      Add-Content -Path $EnvPath -Value "TRACE_API_TOKEN=$token"
+    }
+  } else {
+    Set-Content -Path $EnvPath -Value "TRACE_API_TOKEN=$token" -Encoding UTF8
+  }
+
+  return $token
+}
+
 function Ensure-FlySecrets {
   param(
     [string]$AppName,
@@ -86,6 +115,8 @@ function Ensure-FlySecrets {
       $value = Get-EnvValueFromFile -EnvPath $EnvPath -Key $secret
       if ($value) {
         Write-Host "Using $secret from $EnvPath."
+      } elseif ($secret -eq 'TRACE_API_TOKEN') {
+        $value = Get-OrCreate-TraceToken -EnvPath $EnvPath
       } else {
         $value = Read-Host "Enter value for $secret (required for $AppName)"
       }
@@ -131,13 +162,13 @@ $webAppName = Get-FlyAppName -ConfigPath (Join-Path $configRoot 'fly.web.toml')
 
 Write-Host "Configuring backend secrets..."
 Ensure-FlySecrets -AppName $backendAppName `
-  -RequiredSecrets @('OPENAI_API_KEY') `
+  -RequiredSecrets @('OPENAI_API_KEY', 'TRACE_API_TOKEN') `
   -OptionalSecrets @('TURNSTILE_SECRET_KEY', 'TURNSTILE_SITE_KEY', 'GITHUB_WEBHOOK_SECRET') `
   -EnvPath $envPath
 
 Write-Host "Configuring bot secrets..."
 Ensure-FlySecrets -AppName $botAppName `
-  -RequiredSecrets @('DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPENAI_API_KEY', 'DEVELOPER_USER_ID', 'INCIDENT_PSEUDONYMIZATION_SECRET') `
+  -RequiredSecrets @('DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPENAI_API_KEY', 'DEVELOPER_USER_ID', 'INCIDENT_PSEUDONYMIZATION_SECRET', 'TRACE_API_TOKEN') `
   -OptionalSecrets @() `
   -EnvPath $envPath
 
