@@ -264,7 +264,8 @@ const server = http.createServer(async (req, res) => {
 
 // --- Server startup ---
 const port = Number(process.env.PORT || 3000);
-server.listen(port, '0.0.0.0', () => {
-  logger.info(`Simple server available on port ${port}`);
+const host = process.env.HOST || '::';
+server.listen(port, host, () => {
+  logger.info(`Simple server available on ${host}:${port}`);
 });
 

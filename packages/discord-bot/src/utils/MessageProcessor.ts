@@ -537,21 +537,45 @@ export class MessageProcessor {
                 headers['X-Arete-Trace-Token'] = config.traceApiToken;
               }
 
-              const response = await fetch(`${config.backendBaseUrl}/api/traces`, {
-                method: 'POST',
-                headers,
-                body: JSON.stringify(responseMetadata)
-              });
-              if (!response.ok) {
-                const errorText = await response.text();
-                throw new Error(`Trace API ${response.status}: ${errorText}`);
+              const traceUrl = `${config.backendBaseUrl}/api/traces`;
+              const maxAttempts = 3;
+
+              for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+                try {
+                  const response = await fetch(traceUrl, {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify(responseMetadata)
+                  });
+                  if (!response.ok) {
+                    const errorText = await response.text();
+                    if (response.status >= 500 && attempt < maxAttempts) {
+                      logger.warn(
+                        `Trace API retry ${attempt}/${maxAttempts} failed with ${response.status}; backing off before retry.`
+                      );
+                      await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+                      continue;
+                    }
+                    throw new Error(`Trace API ${response.status}: ${errorText}`);
+                  }
+                  logger.debug(
+                    `Persisted response metadata for response ${responseMetadata.responseId} via backend API.`
+                  );
+                  return;
+                } catch (error) {
+                  if (attempt < maxAttempts) {
+                    logger.warn(
+                      `Trace API attempt ${attempt}/${maxAttempts} failed; retrying. Error: ${(error as Error)?.message ?? error}`
+                    );
+                    await new Promise(resolve => setTimeout(resolve, 250 * attempt));
+                    continue;
+                  }
+                  throw error;
+                }
               }
-              logger.debug(
-                `Persisted response metadata for response ${responseMetadata.responseId} via backend API.`
-              );
             } catch (error) {
               logger.error(
-                `Failed to persist response metadata for response ${responseMetadata.responseId}: ${(
+                `Failed to persist response metadata for response ${responseMetadata.responseId} (backend: ${config.backendBaseUrl}): ${(
                   error as Error
                 )?.message ?? error}`
               );
