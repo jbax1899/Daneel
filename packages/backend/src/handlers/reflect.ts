@@ -377,16 +377,14 @@ const createReflectHandler = ({
       logger.error(`Token length: ${turnstileToken?.length || 0}`);
       logger.error(`Secret key configured: ${!!process.env.TURNSTILE_SECRET_KEY}`);
 
-      const errorMessage = error instanceof Error ? error.message : String(error);
-
       res.statusCode = 502;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
       res.setHeader('Cache-Control', 'no-store');
       res.end(JSON.stringify({
         error: 'CAPTCHA verification service unavailable',
-        details: errorMessage
+        details: 'Please try again later.'
       }));
-      logRequest(req, res, `reflect captcha-service-error ${errorMessage}`);
+      logRequest(req, res, 'reflect captcha-service-error');
       return;
     }
 
