@@ -6,7 +6,7 @@
  * @arete-ethics: high - Incorrect metadata harms transparency and user trust.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import type { SimpleRateLimiter } from '../services/rateLimiter';
+import { SimpleRateLimiter } from '../services/rateLimiter';
 import type { SimpleOpenAIService, OpenAIResponseMetadata, ResponseMetadataRuntimeContext } from '../services/openaiService';
 import type { ResponseMetadata } from '../ethics-core';
 import { runtimeConfig } from '../config';
@@ -433,17 +433,47 @@ const createReflectHandler = ({
 
     // --- Rate limiting ---
     // Fail open when rate limiters are unavailable so we do not block traffic.
-    if (!ipRateLimiter || !sessionRateLimiter) {
-      res.statusCode = 503;
-      res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({
-        error: 'Service temporarily unavailable. Please try again later.'
-      }));
-      logRequest(req, res, 'reflect rate-limiter-unavailable');
-      return;
-    }
+    const getLimiter = (
+      limiter: SimpleRateLimiter | null,
+      label: string,
+      limitKey: string,
+      windowKey: string,
+      defaultLimit: number,
+      defaultWindowMs: number
+    ): SimpleRateLimiter => {
+      if (limiter) {
+        return limiter;
+      }
 
-    const ipRateLimitResult = ipRateLimiter.check(clientIp);
+      logger.warn(`Rate limiter "${label}" missing; creating a fallback limiter.`);
+      const limitRaw = process.env[limitKey];
+      const windowRaw = process.env[windowKey];
+      const limit = limitRaw ? Number.parseInt(limitRaw, 10) : defaultLimit;
+      const windowMs = windowRaw ? Number.parseInt(windowRaw, 10) : defaultWindowMs;
+      return new SimpleRateLimiter({
+        limit: Number.isFinite(limit) && limit > 0 ? limit : defaultLimit,
+        window: Number.isFinite(windowMs) && windowMs > 0 ? windowMs : defaultWindowMs
+      });
+    };
+
+    const activeIpRateLimiter = getLimiter(
+      ipRateLimiter,
+      'ip',
+      'WEB_API_RATE_LIMIT_IP',
+      'WEB_API_RATE_LIMIT_IP_WINDOW_MS',
+      3,
+      60000
+    );
+    const activeSessionRateLimiter = getLimiter(
+      sessionRateLimiter,
+      'session',
+      'WEB_API_RATE_LIMIT_SESSION',
+      'WEB_API_RATE_LIMIT_SESSION_WINDOW_MS',
+      5,
+      60000
+    );
+
+    const ipRateLimitResult = activeIpRateLimiter.check(clientIp);
     if (!ipRateLimitResult.allowed) {
       res.statusCode = 429;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
@@ -457,7 +487,7 @@ const createReflectHandler = ({
       return;
     }
 
-    const sessionRateLimitResult = sessionRateLimiter.check(sessionId);
+    const sessionRateLimitResult = activeSessionRateLimiter.check(sessionId);
     if (!sessionRateLimitResult.allowed) {
       res.statusCode = 429;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');

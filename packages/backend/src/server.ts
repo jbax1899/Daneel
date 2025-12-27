@@ -236,8 +236,21 @@ const server = http.createServer(async (req, res) => {
                    parsedUrl.pathname.endsWith('.html') || parsedUrl.pathname.startsWith('/embed');
 
     if (isHtml) {
+      const forwardedProto = typeof req.headers['x-forwarded-proto'] === 'string'
+        ? req.headers['x-forwarded-proto']
+        : undefined;
+      const scheme = forwardedProto?.split(',')[0].trim() || 'http';
+      const hostHeader = typeof req.headers.host === 'string' ? req.headers.host.trim() : '';
+      const requestOrigin = hostHeader ? `${scheme}://${hostHeader}` : '';
+
+      // Always allow self + current host, then merge configured frame ancestors.
+      const mergedFrameAncestors = [
+        "'self'",
+        ...(requestOrigin ? [requestOrigin] : []),
+        ...runtimeConfig.csp.frameAncestors
+      ];
       const normalizedFrameAncestors = [...new Set(
-        runtimeConfig.csp.frameAncestors.map(domain => domain.replace(/\/+$/, ''))
+        mergedFrameAncestors.map(domain => domain.replace(/\/+$/, ''))
       )];
 
       const csp = [

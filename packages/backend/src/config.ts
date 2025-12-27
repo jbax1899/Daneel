@@ -39,10 +39,17 @@ const defaultAllowedOrigins = [
   'http://localhost:8080',
   'http://localhost:3000'
 ];
+const defaultFrameAncestors = [
+  "'self'",
+  'https://arete-web.fly.dev',
+  'https://ai.jordanmakes.dev',
+  'https://jordanmakes.fly.dev',
+  ...defaultAllowedOrigins
+];
 
 // --- Environment parsing ---
 const allowedOrigins = parseCsvEnv(process.env.ARETE_ALLOWED_ORIGINS, defaultAllowedOrigins);
-const frameAncestors = parseCsvEnv(process.env.ARETE_FRAME_ANCESTORS, allowedOrigins);
+const frameAncestors = parseCsvEnv(process.env.ARETE_FRAME_ANCESTORS, defaultFrameAncestors);
 
 // --- Runtime config ---
 const runtimeConfig: RuntimeConfig = {
