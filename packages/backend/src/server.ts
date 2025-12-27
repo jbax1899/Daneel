@@ -126,6 +126,10 @@ const maxTraceBodyBytesEnv = parseInt(process.env.TRACE_API_MAX_BODY_BYTES || '2
 const maxTraceBodyBytes = Number.isFinite(maxTraceBodyBytesEnv) && maxTraceBodyBytesEnv > 0
   ? maxTraceBodyBytesEnv
   : 200000;
+const maxReflectBodyBytesEnv = parseInt(process.env.REFLECT_API_MAX_BODY_BYTES || '20000', 10);
+const maxReflectBodyBytes = Number.isFinite(maxReflectBodyBytesEnv) && maxReflectBodyBytesEnv > 0
+  ? maxReflectBodyBytesEnv
+  : 20000;
 const traceToken = process.env.TRACE_API_TOKEN?.trim() || null;
 
 const { handleTraceRequest, handleTraceUpsertRequest } = createTraceHandlers({
@@ -152,7 +156,8 @@ const handleReflectRequest = createReflectHandler({
   sessionRateLimiter,
   storeTrace: storeTraceWithStore,
   logRequest,
-  buildResponseMetadata
+  buildResponseMetadata,
+  maxReflectBodyBytes
 });
 
 // --- HTTP server ---

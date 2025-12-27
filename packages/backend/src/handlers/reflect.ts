@@ -25,6 +25,7 @@ type ReflectHandlerDeps = {
   storeTrace: (metadata: ResponseMetadata) => Promise<void>;
   logRequest: LogRequest;
   buildResponseMetadata: BuildResponseMetadata;
+  maxReflectBodyBytes: number;
 };
 
 const setCorsHeaders = (res: ServerResponse, req: IncomingMessage): void => {
@@ -66,7 +67,8 @@ const createReflectHandler = ({
   sessionRateLimiter,
   storeTrace,
   logRequest,
-  buildResponseMetadata
+  buildResponseMetadata,
+  maxReflectBodyBytes
 }: ReflectHandlerDeps) => async (req: IncomingMessage, res: ServerResponse, parsedUrl: URL): Promise<void> => {
   try {
     // --- CORS and preflight handling ---
@@ -96,7 +98,40 @@ const createReflectHandler = ({
     if (req.method === 'POST') {
       try {
         let body = '';
+        let bodyBytes = 0;
+        let bodyTooLarge = false;
+
+        // Enforce request size limits early to avoid buffering oversized payloads.
+        const contentLengthHeader = req.headers['content-length'];
+        if (contentLengthHeader) {
+          const contentLength = Number(contentLengthHeader);
+          if (Number.isFinite(contentLength) && contentLength > maxReflectBodyBytes) {
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(JSON.stringify({ error: 'Request payload too large' }));
+            logRequest(req, res, `reflect payload-too-large contentLength=${contentLength}`);
+            return;
+          }
+        }
+
         req.on('data', chunk => {
+          if (bodyTooLarge) {
+            return;
+          }
+
+          bodyBytes += chunk.length;
+          if (bodyBytes > maxReflectBodyBytes) {
+            bodyTooLarge = true;
+            res.statusCode = 413;
+            res.setHeader('Content-Type', 'application/json; charset=utf-8');
+            res.setHeader('Cache-Control', 'no-store');
+            res.end(JSON.stringify({ error: 'Request payload too large' }));
+            logRequest(req, res, 'reflect payload-too-large');
+            req.destroy();
+            return;
+          }
+
           body += chunk.toString();
         });
 
@@ -104,6 +139,10 @@ const createReflectHandler = ({
           req.on('end', () => resolve());
           req.on('error', reject);
         });
+
+        if (bodyTooLarge) {
+          return;
+        }
 
         // Only parse JSON when a body is present.
         if (body) {
