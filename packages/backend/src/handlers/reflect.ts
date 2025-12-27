@@ -191,7 +191,21 @@ const createReflectHandler = ({
     }
 
     // --- CAPTCHA token extraction ---
-    const skipCaptcha = !(process.env.TURNSTILE_SECRET_KEY && process.env.TURNSTILE_SITE_KEY);
+    const hasTurnstileSecret = Boolean(process.env.TURNSTILE_SECRET_KEY);
+    const hasTurnstileSite = Boolean(process.env.TURNSTILE_SITE_KEY);
+    if (hasTurnstileSecret !== hasTurnstileSite) {
+      res.statusCode = 503;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      res.end(JSON.stringify({
+        error: 'CAPTCHA verification not configured',
+        details: 'TURNSTILE_SECRET_KEY and TURNSTILE_SITE_KEY must both be set'
+      }));
+      logRequest(req, res, 'reflect captcha-misconfigured');
+      return;
+    }
+
+    const skipCaptcha = !(hasTurnstileSecret && hasTurnstileSite);
 
     let turnstileToken: string | null = null;
     let tokenSource = 'none';

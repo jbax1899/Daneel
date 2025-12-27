@@ -20,6 +20,8 @@ type WebhookDeps = {
 const createWebhookHandler = ({ writeBlogPost, verifyGitHubSignature, logRequest }: WebhookDeps) =>
   async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     try {
+      const maxBodyBytes = 256 * 1024;
+
       // --- Method validation ---
       if (req.method !== 'POST') {
         res.statusCode = 405;
@@ -50,11 +52,46 @@ const createWebhookHandler = ({ writeBlogPost, verifyGitHubSignature, logRequest
 
       // --- Body capture (raw bytes for signature) ---
       const chunks: Buffer[] = [];
-      req.on('data', chunk => chunks.push(chunk));
+      let bodyBytes = 0;
+      let bodyTooLarge = false;
+
+      const contentLengthHeader = req.headers['content-length'];
+      if (contentLengthHeader) {
+        const contentLength = Number(contentLengthHeader);
+        if (Number.isFinite(contentLength) && contentLength > maxBodyBytes) {
+          res.statusCode = 413;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: 'Payload too large' }));
+          logRequest(req, res, `webhook payload-too-large contentLength=${contentLength}`);
+          return;
+        }
+      }
+
+      req.on('data', chunk => {
+        if (bodyTooLarge) {
+          return;
+        }
+
+        bodyBytes += chunk.length;
+        if (bodyBytes > maxBodyBytes) {
+          bodyTooLarge = true;
+          res.statusCode = 413;
+          res.setHeader('Content-Type', 'application/json; charset=utf-8');
+          res.end(JSON.stringify({ error: 'Payload too large' }));
+          logRequest(req, res, 'webhook payload-too-large');
+          req.destroy();
+          return;
+        }
+
+        chunks.push(chunk);
+      });
       await new Promise<void>((resolve, reject) => {
         req.on('end', () => resolve());
         req.on('error', reject);
       });
+      if (bodyTooLarge) {
+        return;
+      }
       const body = Buffer.concat(chunks);
 
       // --- Signature verification ---
