@@ -1,6 +1,6 @@
 /**
  * @description: Resolves static assets and MIME types for the web frontend.
- * @arete-scope: backend
+ * @arete-scope: interface
  * @arete-module: AssetResolver
  * @arete-risk: low - Asset resolution failures affect UI delivery.
  * @arete-ethics: low - Static asset handling has minimal ethics impact.
@@ -100,3 +100,4 @@ const createAssetResolver = (distDir: string) => {
 };
 
 export { MIME_MAP, createAssetResolver };
+

@@ -1,6 +1,6 @@
 /**
  * @description: Minimal OpenAI client wrapper and response metadata builder for reflect API.
- * @arete-scope: backend
+ * @arete-scope: utility
  * @arete-module: ReflectOpenAIService
  * @arete-risk: high - Incorrect handling can degrade responses or metadata integrity.
  * @arete-ethics: high - Misreported provenance impacts trust and transparency.
@@ -173,3 +173,4 @@ const buildResponseMetadata = (
 
 export type { OpenAIResponseMetadata, ResponseMetadataRuntimeContext };
 export { SimpleOpenAIService, buildResponseMetadata };
+

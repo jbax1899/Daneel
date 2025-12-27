@@ -1,6 +1,6 @@
 /**
  * @description: Handles /api/reflect requests and dispatches AI responses with metadata.
- * @arete-scope: backend
+ * @arete-scope: interface
  * @arete-module: ReflectHandler
  * @arete-risk: high - Failures block AI responses and provenance capture.
  * @arete-ethics: high - Incorrect metadata harms transparency and user trust.
@@ -527,4 +527,5 @@ Guidelines:
 };
 
 export { createReflectHandler };
+
 

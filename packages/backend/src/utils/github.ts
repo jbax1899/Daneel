@@ -1,9 +1,9 @@
 /**
  * @description: Verifies GitHub webhook signatures for incoming requests.
- * @arete-scope: backend
+ * @arete-scope: utility
  * @arete-module: GitHubWebhookVerifier
- * @arete-risk: medium - Incorrect verification could accept spoofed payloads.
- * @arete-ethics: medium - Spoofed data could mislead users or poison content.
+ * @arete-risk: moderate - Incorrect verification could accept spoofed payloads.
+ * @arete-ethics: moderate - Spoofed data could mislead users or poison content.
  */
 import crypto from 'node:crypto';
 import { logger } from '../shared/logger';
@@ -33,3 +33,5 @@ function verifyGitHubSignature(secret: string, body: Buffer, signature: string):
 }
 
 export { verifyGitHubSignature };
+
+

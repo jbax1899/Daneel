@@ -1,6 +1,6 @@
 /**
  * @description: Serves the web app and API endpoints for reflect, traces, and GitHub webhooks.
- * @arete-scope: backend
+ * @arete-scope: core
  * @arete-module: WebServer
  * @arete-risk: high - Server failures can break user access or data integrity.
  * @arete-ethics: high - Response generation and trace storage affect user trust and privacy.
@@ -262,3 +262,4 @@ const port = Number(process.env.PORT || 3000);
 server.listen(port, '0.0.0.0', () => {
   logger.info(`Simple server available on port ${port}`);
 });
+

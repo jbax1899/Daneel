@@ -1,9 +1,9 @@
 /**
  * @description: Handles GitHub webhook ingestion for blog updates.
- * @arete-scope: backend
+ * @arete-scope: interface
  * @arete-module: WebhookHandler
- * @arete-risk: medium - Malformed payloads can break sync if not guarded.
- * @arete-ethics: medium - Accepting spoofed payloads could mislead users.
+ * @arete-risk: moderate - Malformed payloads can break sync if not guarded.
+ * @arete-ethics: moderate - Accepting spoofed payloads could mislead users.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { GitHubDiscussion } from '../storage/blogStore';
@@ -135,3 +135,5 @@ const createWebhookHandler = ({ writeBlogPost, verifyGitHubSignature, logRequest
   };
 
 export { createWebhookHandler };
+
+

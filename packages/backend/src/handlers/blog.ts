@@ -1,8 +1,8 @@
 /**
  * @description: Handles blog index and post read endpoints.
- * @arete-scope: backend
+ * @arete-scope: interface
  * @arete-module: BlogHandlers
- * @arete-risk: medium - Blog retrieval failures degrade content availability.
+ * @arete-risk: moderate - Blog retrieval failures degrade content availability.
  * @arete-ethics: low - Public content delivery has minimal ethics impact.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
@@ -90,3 +90,5 @@ const createBlogHandlers = ({ blogStore, logRequest }: { blogStore: BlogStore; l
 };
 
 export { createBlogHandlers };
+
+

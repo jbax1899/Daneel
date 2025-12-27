@@ -1,6 +1,6 @@
 /**
  * @description: Handles trace retrieval and persistence endpoints.
- * @arete-scope: backend
+ * @arete-scope: interface
  * @arete-module: TraceHandlers
  * @arete-risk: high - Trace loss undermines transparency guarantees.
  * @arete-ethics: high - Provenance access impacts user trust and auditability.
@@ -291,3 +291,4 @@ const createTraceHandlers = ({
 };
 
 export { createTraceHandlers };
+
