@@ -42,9 +42,13 @@ type GenerateResponseResult = {
 // --- OpenAI client wrapper ---
 class SimpleOpenAIService {
   private readonly apiKey: string;
+  private readonly requestTimeoutMs: number;
+  private readonly retryAttempts: number;
 
   constructor(apiKey: string) {
     this.apiKey = apiKey;
+    this.requestTimeoutMs = 15000;
+    this.retryAttempts = 1;
   }
 
   async generateResponse(
@@ -52,21 +56,60 @@ class SimpleOpenAIService {
     messages: Array<{ role: string; content: string }>,
     options: Record<string, unknown> = {}
   ): Promise<GenerateResponseResult> {
+    const requestBody = JSON.stringify({
+      model: model,
+      messages: messages,
+      max_completion_tokens: 4000,
+      ...options
+    });
+
+    const performRequest = async (attempt: number): Promise<Response> => {
+      let abortSignal: AbortSignal;
+      try {
+        abortSignal = AbortSignal.timeout(this.requestTimeoutMs);
+      } catch {
+        const controller = new AbortController();
+        setTimeout(() => controller.abort(), this.requestTimeoutMs);
+        abortSignal = controller.signal;
+      }
+
+      try {
+        // Abort slow upstream calls to keep /api/reflect from hanging indefinitely.
+        return await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: requestBody,
+          signal: abortSignal
+        });
+      } catch (error) {
+        if (error instanceof Error && error.name === 'AbortError') {
+          throw new Error(`OpenAI request timed out after ${this.requestTimeoutMs}ms`);
+        }
+
+        // Small backoff for transient transport failures.
+        if (attempt < this.retryAttempts) {
+          const backoffMs = 300 * (attempt + 1);
+          await new Promise(resolve => setTimeout(resolve, backoffMs));
+          return performRequest(attempt + 1);
+        }
+
+        throw error;
+      }
+    };
+
     // --- OpenAI request ---
     // Build the request payload for the chat completions API.
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: model,
-        messages: messages,
-        max_completion_tokens: 4000,
-        ...options
-      }),
-    });
+    let response = await performRequest(0);
+    let retryCount = 0;
+    while (!response.ok && response.status >= 500 && retryCount < this.retryAttempts) {
+      const backoffMs = 300 * (retryCount + 1);
+      await new Promise(resolve => setTimeout(resolve, backoffMs));
+      retryCount += 1;
+      response = await performRequest(retryCount);
+    }
 
     // --- Transport error handling ---
     if (!response.ok) {
