@@ -3,7 +3,7 @@ app = 'arete-web'
 primary_region = 'ord'
 
 [build]
-  dockerfile = 'deploy/Dockerfile.web'
+  dockerfile = 'Dockerfile.web'
 
 [env]
   BACKEND_HOST = 'arete-backend.internal'
@@ -14,6 +14,7 @@ primary_region = 'ord'
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 1
+  max_machines_running = 1
 
   [[services.ports]]
     port = 80
@@ -27,3 +28,8 @@ primary_region = 'ord'
     hard_limit = 25
     soft_limit = 20
     type = 'connections'
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

@@ -1,14 +1,19 @@
 :80 {
-  @api path /api/*
-  reverse_proxy @api {$BACKEND_HOST}:3000
+  handle /api/* {
+    reverse_proxy {$BACKEND_HOST}:3000
+  }
 
-  @trace path /trace/*
-  reverse_proxy @trace {$BACKEND_HOST}:3000
+  handle /trace/*.json {
+    reverse_proxy {$BACKEND_HOST}:3000
+  }
 
-  @config path /config.json
-  reverse_proxy @config {$BACKEND_HOST}:3000
+  handle /config.json {
+    reverse_proxy {$BACKEND_HOST}:3000
+  }
 
-  root * /usr/share/caddy
-  try_files {path} /index.html
-  file_server
+  handle {
+    root * /usr/share/caddy
+    try_files {path} /index.html
+    file_server
+  }
 }

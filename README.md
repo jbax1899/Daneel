@@ -53,10 +53,10 @@ GITHUB_WEBHOOK_SECRET=your_github_webhook_secret
 **Required Services:**
 - Discord Bot Token and Client ID
 - OpenAI API Key
-- GitHub webhook secret (for blog sync via GitHub Discussions)
 
 **Optional Services:**
 - Cloudflare Turnstile CAPTCHA keys (for web API abuse protection; requires both site + secret keys)
+- GitHub webhook secret (for blog sync via GitHub Discussions)
 
 **Cloudflare Turnstile Setup:**
 1. Navigate to the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?to=/:account/turnstile)

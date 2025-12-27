@@ -1087,9 +1087,9 @@ const handleWebhookRequest = async (req, res) => {
     }
 
     if (!process.env.GITHUB_WEBHOOK_SECRET) {
-      res.statusCode = 503;
+      res.statusCode = 200;
       res.setHeader('Content-Type', 'application/json; charset=utf-8');
-      res.end(JSON.stringify({ error: 'GitHub webhook secret not configured' }));
+      res.end(JSON.stringify({ message: 'Ignored: webhook not configured' }));
       logRequest(req, res, 'webhook secret-not-configured');
       return;
     }
@@ -1277,6 +1277,77 @@ const handleBlogPostRequest = async (req, res, postId) => {
   }
 };
 
+/**
+ * Handles requests to store trace metadata via POST /api/traces.
+ */
+const handleTraceUpsertRequest = async (req, res) => {
+  try {
+    if (req.method !== 'POST') {
+      res.statusCode = 405;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Method not allowed' }));
+      logRequest(req, res, 'trace upsert method-not-allowed');
+      return;
+    }
+
+    let body = '';
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    await new Promise((resolve, reject) => {
+      req.on('end', resolve);
+      req.on('error', reject);
+    });
+
+    if (!body) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Missing request body' }));
+      logRequest(req, res, 'trace upsert missing-body');
+      return;
+    }
+
+    let payload;
+    try {
+      payload = JSON.parse(body);
+    } catch (error) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Invalid JSON body' }));
+      logRequest(req, res, 'trace upsert invalid-json');
+      return;
+    }
+
+    const responseId = payload?.responseId || payload?.id;
+    if (!responseId) {
+      res.statusCode = 400;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({ error: 'Missing responseId' }));
+      logRequest(req, res, 'trace upsert missing-responseId');
+      return;
+    }
+
+    const normalizedMetadata = {
+      ...payload,
+      responseId
+    };
+
+    await traceStore.upsert(normalizedMetadata);
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ ok: true, responseId }));
+    logRequest(req, res, `trace upsert success ${responseId}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'unknown error';
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/json; charset=utf-8');
+    res.end(JSON.stringify({ error: 'Failed to store trace' }));
+    logRequest(req, res, `trace upsert error ${errorMessage}`);
+  }
+};
+
 // Initialize services
 try {
   initializeServices();
@@ -1317,7 +1388,12 @@ const server = http.createServer(async (req, res) => {
       await handleBlogPostRequest(req, res, postId);
       return;
     }
-    
+
+    if (parsedUrl.pathname === '/api/traces') {
+      await handleTraceUpsertRequest(req, res);
+      return;
+    }
+
     // Handle /api/reflect endpoint
     if (parsedUrl.pathname === '/api/reflect') {
       await handleReflectRequest(req, res, parsedUrl);

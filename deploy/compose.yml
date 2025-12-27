@@ -40,6 +40,8 @@ services:
       dockerfile: deploy/Dockerfile.bot
     env_file:
       - ../.env
+    environment:
+      - BACKEND_BASE_URL=http://backend:3000
     networks:
       - backend-network
     restart: unless-stopped

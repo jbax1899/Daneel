@@ -242,6 +242,16 @@ if (!webBaseUrl) {
 }
 logger.info(`Using web base URL: ${webBaseUrl}`);
 
+const rawBackendBaseUrl = process.env.BACKEND_BASE_URL?.trim();
+const fallbackBackendBaseUrl = flyAppName
+  ? 'http://arete-backend.internal:3000'
+  : 'http://localhost:3000';
+const backendBaseUrl = rawBackendBaseUrl && rawBackendBaseUrl.length > 0
+  ? rawBackendBaseUrl.replace(/\/+$/, '')
+  : fallbackBackendBaseUrl;
+
+logger.info(`Using backend base URL: ${backendBaseUrl}`);
+
 // Instantiate the shared prompt registry and expose it to downstream modules.
 export const promptRegistry = new PromptRegistry({ overridePath: promptConfigPath });
 setActivePromptRegistry(promptRegistry);
@@ -360,6 +370,7 @@ export const config = {
   incidentPseudonymizationSecret: process.env.INCIDENT_PSEUDONYMIZATION_SECRET!,
   promptConfigPath,
   webBaseUrl,
+  backendBaseUrl,
   
   // Bot mention names for engagement detection
   botMentionNames: getStringArrayEnv('BOT_MENTION_NAMES', DEFAULT_BOT_MENTION_NAMES),

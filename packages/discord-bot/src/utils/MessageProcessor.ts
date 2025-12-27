@@ -42,7 +42,6 @@ import { recoverContextDetailsFromMessage, type RecoveredImageContext } from '..
 import { buildResponseMetadata } from './response/metadata.js';
 import { buildFooterEmbed } from './response/provenanceFooter.js';
 import { ResponseMetadata } from 'ethics-core';
-import { defaultTraceStore } from '@arete/shared';
 import type {
   ImageBackgroundType,
   ImageQualityType,
@@ -525,8 +524,20 @@ export class MessageProcessor {
           // Save trace asynchronously
           const persistTrace = async () => {
             try {
-              await defaultTraceStore.upsert(responseMetadata);
-              logger.debug(`Persisted response metadata for response ${responseMetadata.responseId} to trace store.`);
+              const response = await fetch(`${config.backendBaseUrl}/api/traces`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(responseMetadata)
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Trace API ${response.status}: ${errorText}`);
+              }
+              logger.debug(
+                `Persisted response metadata for response ${responseMetadata.responseId} via backend API.`
+              );
             } catch (error) {
               logger.error(
                 `Failed to persist response metadata for response ${responseMetadata.responseId}: ${(

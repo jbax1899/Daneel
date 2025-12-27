@@ -3,7 +3,7 @@ app = 'arete-backend'
 primary_region = 'ord'
 
 [build]
-  dockerfile = 'deploy/Dockerfile.backend'
+  dockerfile = 'Dockerfile.backend'
 
 [env]
   NODE_ENV = 'production'
@@ -16,6 +16,7 @@ primary_region = 'ord'
   auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 1
+  max_machines_running = 1
 
   [services.concurrency]
     hard_limit = 25
@@ -25,3 +26,8 @@ primary_region = 'ord'
 [[mounts]]
   source      = 'provenance_data'
   destination = '/data'
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "256mb"

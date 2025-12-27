@@ -11,11 +11,12 @@ Services:
 - Ensure `.env` is present at the repo root.
 
 ## Required environment
-- backend: `OPENAI_API_KEY`, `GITHUB_WEBHOOK_SECRET`
+- backend: `OPENAI_API_KEY`
 - discord-bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
 
 ## Optional environment
 - backend: `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY` (both required to enable CAPTCHA)
+- backend: `GITHUB_WEBHOOK_SECRET` (enables blog sync)
 
 ## Start
 `docker compose -f deploy/compose.yml up --build`
@@ -27,15 +28,15 @@ Services:
 - Backend: `fly deploy -c deploy/fly.backend.toml`
 - Web: `fly deploy -c deploy/fly.web.toml`
 - Bot: `fly deploy -c deploy/fly.bot.toml`
-- All three (bash): `./scripts/deploy-fly.sh`
-- All three (PowerShell): `./scripts/deploy-fly.ps1`
+- All three (bash): `./deploy/deploy-fly.sh`
+- All three (PowerShell): `./deploy/deploy-fly.ps1`
   (Requires Fly CLI: https://fly.io/docs/flyctl/install/)
   TODO: add interactive prompts in the deploy scripts for setting Fly secrets (`fly secrets set`).
   Note: we use three separate Fly apps to mirror the Docker Compose service split.
   Note: web uses `BACKEND_HOST=arete-backend.internal` in `deploy/fly.web.toml`; update it if the backend app name changes.
   Secrets per app:
-  - backend: `OPENAI_API_KEY`, `GITHUB_WEBHOOK_SECRET`
-  - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`
+  - backend: `OPENAI_API_KEY`
+  - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `GITHUB_WEBHOOK_SECRET`
   - bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
 
 ## Notes
