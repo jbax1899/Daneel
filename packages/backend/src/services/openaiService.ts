@@ -53,14 +53,12 @@ class SimpleOpenAIService {
 
   async generateResponse(
     model: string,
-    messages: Array<{ role: string; content: string }>,
-    options: Record<string, unknown> = {}
+    messages: Array<{ role: string; content: string }>
   ): Promise<GenerateResponseResult> {
     const requestBody = JSON.stringify({
       model: model,
       messages: messages,
-      max_completion_tokens: 4000,
-      ...options
+      max_completion_tokens: 4000
     });
 
     const performRequest = async (attempt: number): Promise<Response> => {

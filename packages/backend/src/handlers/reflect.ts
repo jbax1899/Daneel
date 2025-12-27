@@ -7,7 +7,11 @@
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { SimpleRateLimiter } from '../services/rateLimiter';
-import type { SimpleOpenAIService, OpenAIResponseMetadata, ResponseMetadataRuntimeContext } from '../services/openaiService';
+import type {
+  SimpleOpenAIService,
+  OpenAIResponseMetadata,
+  ResponseMetadataRuntimeContext
+} from '../services/openaiService';
 import type { ResponseMetadata } from '../ethics-core';
 import { runtimeConfig } from '../config';
 import { logger } from '../shared/logger';
@@ -542,14 +546,7 @@ Guidelines:
       // Dispatch the request to OpenAI.
       const aiResponse = await openaiService.generateResponse(
         runtimeConfig.openai.defaultModel,
-        messages,
-        {
-          reasoningEffort: runtimeConfig.openai.defaultReasoningEffort,
-          verbosity: runtimeConfig.openai.defaultVerbosity,
-          channelContext: {
-            channelId: sessionId
-          }
-        }
+        messages
       );
 
       const { normalizedText, metadata: assistantMetadata } = aiResponse;
