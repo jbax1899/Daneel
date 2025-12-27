@@ -27,6 +27,8 @@ import { IMAGE_DESCRIPTION_CONFIG, type ImageDescriptionModelType } from '../con
 // Type Declarations
 // ====================
 
+type ResponseCreateParams = Parameters<OpenAI['responses']['create']>[0];
+
 export type { GPT5ModelType } from './pricing.js';
 export type SupportedModel = GPT5ModelType;
 export type EmbeddingModelType = 'text-embedding-3-small'; // Dimensions: 1546
@@ -71,7 +73,7 @@ export interface OpenAIOptions {
   functions?: Array<{
     name: string;
     description?: string;
-    parameters: Record<string, any>;
+    parameters: Record<string, unknown>;
   }>;
   function_call?: { name: string } | 'auto' | 'none' | 'required' | null;
   tool_choice?: {
@@ -173,6 +175,29 @@ interface ResponseOutputItemExtended {
   }>;
   finish_reason?: string;
 }
+
+type OpenAIWebSearchTool = {
+  type: 'web_search';
+  filters?: { allowed_domains?: string[] };
+  search_context_size?: 'low' | 'medium' | 'high';
+  user_location?: {
+    type?: 'approximate' | 'exact';
+    country?: string;
+    city?: string;
+    region?: string;
+    timezone?: string;
+  };
+};
+
+type OpenAIFunctionTool = {
+  type: 'function';
+  name: string;
+  description?: string;
+  parameters?: Record<string, unknown>;
+  strict?: boolean;
+};
+
+type OpenAITool = OpenAIWebSearchTool | OpenAIFunctionTool;
 
 // ====================
 // Constants / Variables
@@ -286,14 +311,14 @@ export class OpenAIService {
         return true;
       });
 
-      const tools: any[] = []; // Initialize tools array
+      const tools: OpenAITool[] = []; // Initialize tools array
       const doingWebSearch = typeof options.tool_choice === 'object' && 
                               options.tool_choice !== null && 
                               options.tool_choice.type === 'web_search';
       
       // Add web search tool if enabled
       if (doingWebSearch) {
-        const webSearchTool: any = {
+        const webSearchTool: OpenAIWebSearchTool = {
           type: 'web_search',
         };
 
@@ -329,7 +354,7 @@ export class OpenAIService {
       }
 
       // Create request payload to pass to OpenAI
-      const requestPayload: any = {
+      const requestPayload: ResponseCreateParams = {
         model,
         input: [
           ...validMessages,
@@ -342,7 +367,7 @@ export class OpenAIService {
         ],
         ...(reasoningEffort && { reasoning: { effort: reasoningEffort } }),
         ...(verbosity && { text: { verbosity } }),
-        ...(tools.length > 0 && { tools })
+        ...(tools.length > 0 && { tools: tools as ResponseCreateParams['tools'] })
       };
 
       const toolNames = tools

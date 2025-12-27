@@ -29,8 +29,30 @@ const normalizeProvenance = (provenance: string): 'Retrieved' | 'Inferred' | 'Sp
   return 'Inferred'; // Default to 'Inferred' when unknown
 };
 
+type BackendCitation = {
+  title?: string;
+  url?: string | URL;
+  snippet?: string;
+};
+
+type BackendMetadata = {
+  responseId?: string;
+  id?: string;
+  provenance?: string;
+  confidence?: number;
+  riskTier?: string;
+  tradeoffCount?: number;
+  chainHash?: string;
+  licenseContext?: string;
+  model?: string;
+  reasoningEffort?: string;
+  staleAfter?: string;
+  runtimeContext?: { modelVersion?: string };
+  citations?: BackendCitation[];
+};
+
 // Normalize backend metadata to ResponseMetadata format
-const normalizeMetadata = (backendMetadata: any): ResponseMetadata => {
+const normalizeMetadata = (backendMetadata: BackendMetadata): ResponseMetadata => {
   // Type guard: check if backendMetadata already matches ResponseMetadata structure
   // We also need to ensure confidence is properly normalized even in this path
   if (backendMetadata && 
@@ -41,7 +63,10 @@ const normalizeMetadata = (backendMetadata: any): ResponseMetadata => {
       (backendMetadata.provenance === 'Retrieved' || backendMetadata.provenance === 'Inferred' || backendMetadata.provenance === 'Speculative') &&
       Array.isArray(backendMetadata.citations)) {
     // Convert string URLs to URL objects if needed
-    const processedCitations = backendMetadata.citations.map((citation: any) => {
+    const processedCitations = backendMetadata.citations.map((citation) => {
+      if (citation.url instanceof URL) {
+        return citation;
+      }
       if (typeof citation.url === 'string') {
         try {
           return {
@@ -53,7 +78,7 @@ const normalizeMetadata = (backendMetadata: any): ResponseMetadata => {
           return null;
         }
       }
-      return citation;
+      return null;
     }).filter(Boolean);
     
     // Ensure confidence is valid even if type guard passed
@@ -94,11 +119,14 @@ const normalizeMetadata = (backendMetadata: any): ResponseMetadata => {
 
   // Process citations if they exist
   if (backendMetadata.citations && Array.isArray(backendMetadata.citations)) {
-    normalized.citations = backendMetadata.citations.map((citation: any) => {
+    normalized.citations = backendMetadata.citations.map((citation) => {
       try {
+        if (!citation.url) {
+          return null;
+        }
         return {
           title: citation.title || 'Untitled',
-          url: new URL(citation.url),
+          url: citation.url instanceof URL ? citation.url : new URL(citation.url),
           snippet: citation.snippet
         };
       } catch (error) {

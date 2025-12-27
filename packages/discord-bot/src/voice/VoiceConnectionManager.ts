@@ -70,8 +70,7 @@ export class VoiceConnectionManager {
 
             // Stop any ongoing audio playback
             try {
-                const connectionAny = connection as any;
-                const subscription = connectionAny.state?.subscription;
+                const subscription = connection.state?.subscription;
                 if (subscription) {
                     logger.debug('[cleanupVoiceConnection] Unsubscribing from audio subscription');
                     subscription.unsubscribe();

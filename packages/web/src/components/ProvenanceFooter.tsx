@@ -1,3 +1,4 @@
+import type { CSSProperties } from 'react';
 import { Link } from 'react-router-dom';
 import type { ResponseMetadata, RiskTier, Citation } from '@arete/backend/ethics-core';
 
@@ -19,6 +20,7 @@ const ProvenanceFooter = ({ metadata }: ProvenanceFooterProps): JSX.Element | nu
 
   // Extract risk tier color based on riskTier (matching ethics-core)
   const riskTierColor = RISK_TIER_COLORS[metadata.riskTier] || RISK_TIER_COLORS.Low;
+  const riskStyle = { '--risk-color': riskTierColor } as CSSProperties;
 
   // Format confidence as percentage if available
   const formatConfidence = (confidence: number): string => {
@@ -65,7 +67,7 @@ const ProvenanceFooter = ({ metadata }: ProvenanceFooterProps): JSX.Element | nu
       className="provenance-footer"
       role="complementary"
       aria-label="Response provenance and metadata"
-      style={{ ['--risk-color' as any]: riskTierColor }}
+      style={riskStyle}
     >
       <div className="provenance-header">
         Reasoning - {metadata.provenance}

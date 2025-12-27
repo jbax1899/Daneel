@@ -58,10 +58,22 @@ const REQUIRED_ENV_VARS: readonly string[] = [
   'INCIDENT_PSEUDONYMIZATION_SECRET' // Secret key for HMAC pseudonymization of Discord IDs
 ] as const;
 
+type RateLimitDefaults = {
+  USER_LIMIT: number;
+  USER_WINDOW_MS: number;
+  CHANNEL_LIMIT: number;
+  CHANNEL_WINDOW_MS: number;
+  GUILD_LIMIT: number;
+  GUILD_WINDOW_MS: number;
+  RATE_LIMIT_USER: 'true' | 'false';
+  RATE_LIMIT_CHANNEL: 'true' | 'false';
+  RATE_LIMIT_GUILD: 'true' | 'false';
+};
+
 /**
  * Default rate limit configurations
  */
-const DEFAULT_RATE_LIMITS: Record<string, any> = {
+const DEFAULT_RATE_LIMITS: RateLimitDefaults = {
   // Per-user: 5 messages per minute
   USER_LIMIT: 5,
   USER_WINDOW_MS: 60_000,
@@ -75,7 +87,7 @@ const DEFAULT_RATE_LIMITS: Record<string, any> = {
   RATE_LIMIT_USER: 'true',
   RATE_LIMIT_CHANNEL: 'true',
   RATE_LIMIT_GUILD: 'true'
-} as const;
+};
 
 /**
  * Limits on channel/thread visibility

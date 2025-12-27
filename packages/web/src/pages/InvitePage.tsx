@@ -2,22 +2,25 @@ import React, { useState } from 'react';
 import Header from '@components/Header';
 import Footer from '@components/Footer';
 
+type ToastState = { message: string; visible: boolean };
+type ToastSetter = React.Dispatch<React.SetStateAction<ToastState>>;
+
 const InvitePage: React.FC = () => {
-  const [cloneToast, setCloneToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [installToast, setInstallToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [devToast, setDevToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [buildToast, setBuildToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [launchToast, setLaunchToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [deployToast, setDeployToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [requiredToast, setRequiredToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
-  const [optionalToast, setOptionalToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
+  const [cloneToast, setCloneToast] = useState<ToastState>({ message: '', visible: false });
+  const [installToast, setInstallToast] = useState<ToastState>({ message: '', visible: false });
+  const [devToast, setDevToast] = useState<ToastState>({ message: '', visible: false });
+  const [buildToast, setBuildToast] = useState<ToastState>({ message: '', visible: false });
+  const [launchToast, setLaunchToast] = useState<ToastState>({ message: '', visible: false });
+  const [deployToast, setDeployToast] = useState<ToastState>({ message: '', visible: false });
+  const [requiredToast, setRequiredToast] = useState<ToastState>({ message: '', visible: false });
+  const [optionalToast, setOptionalToast] = useState<ToastState>({ message: '', visible: false });
 
   // Breadcrumb items for invite page
   const breadcrumbItems = [
     { label: 'Self-Hosting Setup' }
   ];
 
-  const showToast = (setter: any, message: string) => {
+  const showToast = (setter: ToastSetter, message: string) => {
     setter({ message, visible: true });
     setTimeout(() => setter({ message: '', visible: false }), 2000);
   };

@@ -27,8 +27,7 @@ import { SqliteIncidentStore } from '@arete/backend/shared';
 
 const createStubbedOpenAIService = () => {
     const service = new OpenAIService('test-key');
-    // @ts-expect-error overriding private field for testing
-    service.openai = {
+    const openaiStub = {
         responses: {
         create: async (_payload: unknown) => ({
                 output: [
@@ -48,9 +47,11 @@ const createStubbedOpenAIService = () => {
                     input_tokens: 10,
                     output_tokens: 5
                 }
-            }) as any
+            })
         }
-    } as any;
+    };
+    // @ts-expect-error overriding private field for testing
+    service.openai = openaiStub;
 
     return service;
 };

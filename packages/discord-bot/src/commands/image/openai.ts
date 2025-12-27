@@ -38,6 +38,9 @@ import type {
 } from './types.js';
 import { mapResponseError } from './errors.js';
 
+type ResponseCreateParams = Parameters<OpenAI['responses']['create']>[0];
+type ResponseStreamParams = Parameters<OpenAI['responses']['stream']>[0];
+
 interface GenerateImageOptions {
     openai: OpenAI;
     prompt: string;
@@ -131,8 +134,8 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
 
     const toolChoice: ToolChoiceTypes = { type: 'image_generation' };
 
-    const requestPayload = {
-        model: textModel,
+    const requestPayload: ResponseCreateParams = {
+        model: textModel as ResponseCreateParams['model'],
         input,
         tools: [imageTool],
         tool_choice: toolChoice,
@@ -147,7 +150,7 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
 
     if (shouldStream) {
         const partialImages: string[] = [];
-        const streamingPayload = { ...requestPayload, stream: true as const };
+        const streamingPayload: ResponseStreamParams = { ...requestPayload, stream: true };
         const stream = await openai.responses.stream(streamingPayload);
 
         stream.on('response.image_generation_call.partial_image', event => {
@@ -173,7 +176,7 @@ export async function generateImageWithMetadata(options: GenerateImageOptions): 
         response = await stream.finalResponse();
         partials = partialImages;
     } else {
-        response = await openai.responses.create(requestPayload as any);
+        response = await openai.responses.create(requestPayload);
         partials = [];
     }
 

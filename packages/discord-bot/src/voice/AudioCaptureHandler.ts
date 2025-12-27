@@ -11,7 +11,7 @@
  * Ethics: Processes user voice data in real-time, directly affecting privacy, consent, and the handling of sensitive audio information.
  */
 
-import { VoiceConnection } from '@discordjs/voice';
+import type { VoiceConnection, VoiceReceiver } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';
 import { AUDIO_CONSTANTS, TIMEOUT_CONSTANTS } from '../constants/voice.js';
@@ -26,6 +26,13 @@ interface AudioChunkEvent {
     guildId: string;
     userId: string;
     audioBuffer: Buffer;
+}
+
+interface AudioCaptureDebugInfo {
+    captureInitialized: number;
+    activeReceivers: number;
+    audioChunkListeners: number;
+    speakerSilenceListeners: number;
 }
 
 export class AudioCaptureHandler extends EventEmitter {
@@ -78,7 +85,7 @@ export class AudioCaptureHandler extends EventEmitter {
         return `${guildId}:${userId}`;
     }
 
-    private startReceiverStream(guildId: string, userId: string, receiver: any): void {
+    private startReceiverStream(guildId: string, userId: string, receiver: VoiceReceiver): void {
         const captureKey = this.getCaptureKey(guildId, userId);
         if (this.activeReceivers.has(captureKey)) {
             logger.debug(`[${captureKey}] Receiver already active`);
@@ -166,7 +173,7 @@ export class AudioCaptureHandler extends EventEmitter {
         logger.debug(`Cleaned up audio capture for guild ${guildId}`);
     }
 
-    public getDebugInfo(): any {
+    public getDebugInfo(): AudioCaptureDebugInfo {
         return {
             captureInitialized: this.captureInitialized.size,
             activeReceivers: this.activeReceivers.size,
