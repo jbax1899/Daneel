@@ -23,5 +23,11 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "date-fns": "^4.1.0",
+    "js-yaml": "^4.1.0",
+    "winston": "^3.19.0"
   }
 }

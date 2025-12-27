@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 COPY packages/discord-bot/package.json packages/discord-bot/package.json
 COPY packages/backend/package.json packages/backend/tsconfig.json packages/backend/
 
-RUN npm ci --legacy-peer-deps --include=dev
+RUN npm install --legacy-peer-deps --include=dev
 
 COPY packages/backend/src/ packages/backend/src/
 COPY packages/discord-bot/ packages/discord-bot/
