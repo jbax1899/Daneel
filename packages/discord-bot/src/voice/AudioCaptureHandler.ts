@@ -12,6 +12,7 @@
  */
 
 import type { VoiceConnection, VoiceReceiver } from '@discordjs/voice';
+import { EndBehaviorType } from '@discordjs/voice';
 import { logger } from '../utils/logger.js';
 import prism from 'prism-media';
 import { AUDIO_CONSTANTS, TIMEOUT_CONSTANTS } from '../constants/voice.js';
@@ -96,7 +97,7 @@ export class AudioCaptureHandler extends EventEmitter {
 
         const opusStream = receiver.subscribe(userId, {
             end: {
-                behavior: 'afterSilence',
+                behavior: EndBehaviorType.AfterSilence,
                 duration: TIMEOUT_CONSTANTS.SILENCE_DURATION,
             },
         });

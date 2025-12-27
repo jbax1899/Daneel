@@ -2,6 +2,16 @@ import js from '@eslint/js';
 import tseslint from '@typescript-eslint/eslint-plugin';
 import tsparser from '@typescript-eslint/parser';
 import reactHooks from 'eslint-plugin-react-hooks';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+let prettierConfig = null;
+
+try {
+  prettierConfig = require('eslint-config-prettier');
+} catch {
+  prettierConfig = null;
+}
 
 export default [
   js.configs.recommended,
@@ -98,6 +108,6 @@ export default [
       '**/*.js',
       '*.d.ts',
     ],
-    extends: ['prettier'],
   },
+  ...(prettierConfig ? [prettierConfig] : []),
 ];

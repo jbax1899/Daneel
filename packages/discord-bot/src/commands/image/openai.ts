@@ -9,6 +9,8 @@ import { OpenAI } from 'openai';
 import type {
     Response,
     ResponseInput,
+    ResponseCreateParamsNonStreaming,
+    ResponseCreateParamsStreaming,
     Tool,
     ToolChoiceTypes
 } from 'openai/resources/responses/responses.js';
@@ -38,8 +40,8 @@ import type {
 } from './types.js';
 import { mapResponseError } from './errors.js';
 
-type ResponseCreateParams = Parameters<OpenAI['responses']['create']>[0];
-type ResponseStreamParams = Parameters<OpenAI['responses']['stream']>[0];
+type ResponseCreateParams = ResponseCreateParamsNonStreaming;
+type ResponseStreamParams = ResponseCreateParamsStreaming;
 
 interface GenerateImageOptions {
     openai: OpenAI;

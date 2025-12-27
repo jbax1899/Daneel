@@ -16,12 +16,17 @@ import { RealtimeEventHandler } from '../src/realtime/RealtimeEventHandler.js';
 import type { RealtimeSession } from '../src/utils/realtimeService.js';
 import type { AudioPlaybackHandler } from '../src/voice/AudioPlaybackHandler.js';
 
+type SentItemContent = { type: string; text?: string };
+type SentItem = { content: SentItemContent[] };
+type SentPayload = { type: string; item?: SentItem };
+type TestWebSocket = WebSocket & { sent: SentPayload[] };
+
 class MockWebSocket {
-    public sent: Array<Record<string, unknown>> = [];
+    public sent: SentPayload[] = [];
     public readyState = 1;
 
     send(payload: string) {
-        this.sent.push(JSON.parse(payload) as Record<string, unknown>);
+        this.sent.push(JSON.parse(payload) as SentPayload);
     }
 }
 
@@ -63,7 +68,7 @@ const waitForPipeline = async (session: { audioPipeline: Promise<void> }) => {
 
 test('RealtimeAudioHandler annotates speaker label before commit', async () => {
     const handler = new RealtimeAudioHandler();
-    const ws = new MockWebSocket() as unknown as WebSocket;
+    const ws = new MockWebSocket() as unknown as TestWebSocket;
     const eventHandler = new MockEventHandler();
     const chunk = Buffer.from([0, 1, 2, 3]);
 
@@ -74,9 +79,9 @@ test('RealtimeAudioHandler annotates speaker label before commit', async () => {
     assert.equal(ws.sent[0].type, 'input_audio_buffer.append');
     assert.equal(ws.sent[1].type, 'input_audio_buffer.append');
     assert.equal(ws.sent[2].type, 'conversation.item.create');
-    assert.equal(ws.sent[2].item.content[0].type, 'input_text');
-    assert.match(ws.sent[2].item.content[0].text, /Alice/);
-    assert.equal(ws.sent[2].item.content[1].type, 'input_audio_buffer');
+    assert.equal(ws.sent[2].item?.content[0]?.type, 'input_text');
+    assert.match(ws.sent[2].item?.content[0]?.text ?? '', /Alice/);
+    assert.equal(ws.sent[2].item?.content[1]?.type, 'input_audio_buffer');
     assert.equal(ws.sent[3].type, 'input_audio_buffer.commit');
     assert.equal(eventHandler.collected, 1);
 });
@@ -84,7 +89,7 @@ test('RealtimeAudioHandler annotates speaker label before commit', async () => {
 test('VoiceSessionManager forwards multi-speaker audio with display names', async () => {
     const manager = new VoiceSessionManager();
     const audioCapture = new AudioCaptureHandler();
-    const realtimeSession = new FakeRealtimeSession() as unknown as RealtimeSession;
+    const realtimeSession = new FakeRealtimeSession() as unknown as RealtimeSession & FakeRealtimeSession;
     const participants = new Map([
         ['user-1', 'Alice'],
         ['user-2', 'Bob'],
@@ -107,7 +112,7 @@ test('VoiceSessionManager forwards multi-speaker audio with display names', asyn
     await waitForPipeline(session);
 
     assert.deepEqual(
-        realtimeSession.chunks.map(({ speaker }) => speaker),
+        realtimeSession.chunks.map(({ speaker }: { speaker: string }) => speaker),
         ['Alice', 'Bob'],
     );
     assert.deepEqual(Array.from(realtimeSession.chunks[0].buffer.values()), [1, 2]);

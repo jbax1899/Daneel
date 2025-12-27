@@ -51,6 +51,8 @@ type BackendMetadata = {
   citations?: BackendCitation[];
 };
 
+type MappedCitation = { title: string; url: URL; snippet?: string };
+
 // Normalize backend metadata to ResponseMetadata format
 const normalizeMetadata = (backendMetadata: BackendMetadata): ResponseMetadata => {
   // Type guard: check if backendMetadata already matches ResponseMetadata structure
@@ -65,21 +67,26 @@ const normalizeMetadata = (backendMetadata: BackendMetadata): ResponseMetadata =
     // Convert string URLs to URL objects if needed
     const processedCitations = backendMetadata.citations.map((citation) => {
       if (citation.url instanceof URL) {
-        return citation;
+        return {
+          title: citation.title || 'Untitled',
+          url: citation.url,
+          ...(citation.snippet ? { snippet: citation.snippet } : {})
+        } as MappedCitation;
       }
       if (typeof citation.url === 'string') {
         try {
           return {
-            ...citation,
-            url: new URL(citation.url)
-          };
+            title: citation.title || 'Untitled',
+            url: new URL(citation.url),
+            ...(citation.snippet ? { snippet: citation.snippet } : {})
+          } as MappedCitation;
         } catch (error) {
           console.warn('Invalid citation URL:', citation.url, error);
           return null;
         }
       }
       return null;
-    }).filter(Boolean);
+    }).filter((citation): citation is MappedCitation => citation !== null);
     
     // Ensure confidence is valid even if type guard passed
     const validConfidence = typeof backendMetadata.confidence === 'number' && 
@@ -127,13 +134,13 @@ const normalizeMetadata = (backendMetadata: BackendMetadata): ResponseMetadata =
         return {
           title: citation.title || 'Untitled',
           url: citation.url instanceof URL ? citation.url : new URL(citation.url),
-          snippet: citation.snippet
-        };
+          ...(citation.snippet ? { snippet: citation.snippet } : {})
+        } as MappedCitation;
       } catch (error) {
         console.warn('Invalid citation URL:', citation.url, error);
         return null;
       }
-    }).filter(Boolean);
+    }).filter((citation): citation is MappedCitation => citation !== null);
   }
 
   return normalized;
