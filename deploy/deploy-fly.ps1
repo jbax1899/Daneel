@@ -169,7 +169,7 @@ Ensure-FlySecrets -AppName $backendAppName `
 Write-Host "Configuring bot secrets..."
 Ensure-FlySecrets -AppName $botAppName `
   -RequiredSecrets @('DISCORD_TOKEN', 'CLIENT_ID', 'GUILD_ID', 'OPENAI_API_KEY', 'DEVELOPER_USER_ID', 'INCIDENT_PSEUDONYMIZATION_SECRET', 'TRACE_API_TOKEN') `
-  -OptionalSecrets @() `
+  -OptionalSecrets @('CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET') `
   -EnvPath $envPath
 
 Write-Host "Deploying backend..."

@@ -161,6 +161,7 @@ ensure_optional_secrets "$backend_app_name" TURNSTILE_SECRET_KEY TURNSTILE_SITE_
 
 echo "Configuring bot secrets..."
 ensure_secrets "$bot_app_name" DISCORD_TOKEN CLIENT_ID GUILD_ID OPENAI_API_KEY DEVELOPER_USER_ID INCIDENT_PSEUDONYMIZATION_SECRET TRACE_API_TOKEN
+ensure_optional_secrets "$bot_app_name" CLOUDINARY_CLOUD_NAME CLOUDINARY_API_KEY CLOUDINARY_API_SECRET
 
 echo "Deploying backend..."
 fly deploy -c "$SCRIPT_DIR/fly.backend.toml"
