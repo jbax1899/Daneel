@@ -90,7 +90,6 @@ See `deploy/README.md` for the multi-service Fly setup.
 **Provenance Storage:**
 ARETE persists response traces for transparency and auditability. By default, traces are stored in a SQLite database:
 ```bash
-PROVENANCE_BACKEND=sqlite
 PROVENANCE_SQLITE_PATH=/data/provenance.db
 ```
 

@@ -377,7 +377,6 @@ ENGAGEMENT_PROBABILISTIC_HIGH=0.6
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false
 
 # Provenance storage configuration
-PROVENANCE_BACKEND=sqlite
 PROVENANCE_SQLITE_PATH=/data/provenance.db
 
 # Optional web server configuration
@@ -443,7 +442,6 @@ ENGAGEMENT_PROBABILISTIC_HIGH=0.6
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false
 
 # Provenance storage configuration
-PROVENANCE_BACKEND=sqlite
 PROVENANCE_SQLITE_PATH=/data/provenance.db
 
 # Optional web server configuration
@@ -564,7 +562,6 @@ ENGAGEMENT_PROBABILISTIC_HIGH=0.6         # Upper bound for LLM refinement (Floa
 ENGAGEMENT_ENABLE_LLM_REFINEMENT=false    # Use LLM for score refinement (Boolean)
 
 # Provenance storage configuration
-PROVENANCE_BACKEND=sqlite                  # Storage backend (sqlite)
 PROVENANCE_SQLITE_PATH=/data/provenance.db # SQLite database path
 
 # Optional web server configuration

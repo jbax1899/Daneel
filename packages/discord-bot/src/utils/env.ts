@@ -230,9 +230,10 @@ const flyAppName = process.env.FLY_APP_NAME?.trim();
 // Default to the Fly-provisioned hostname when present so deployments work without extra config.
 const fallbackWebBaseUrl = flyAppName ? `https://${flyAppName}.fly.dev` : undefined;
 const rawWebBaseUrl = process.env.WEB_BASE_URL?.trim();
+const fallbackLocalBaseUrl = 'http://localhost:8080';
 const webBaseUrl = rawWebBaseUrl && rawWebBaseUrl.length > 0
   ? rawWebBaseUrl
-  : fallbackWebBaseUrl;
+  : fallbackWebBaseUrl || fallbackLocalBaseUrl;
 
 if (!webBaseUrl) {
   throw new Error(

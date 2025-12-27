@@ -22,11 +22,6 @@ const traceStoreLogger = typeof logger.child === 'function' ? logger.child({ mod
 export { assertValidResponseMetadata, traceStoreJsonReplacer };
 
 export function createTraceStoreFromEnv(): TraceStore {
-  const backend = process.env.PROVENANCE_BACKEND?.trim().toLowerCase();
-  if (backend && backend !== 'sqlite') {
-    throw new Error(`Unsupported PROVENANCE_BACKEND "${backend}". Only "sqlite" is supported.`);
-  }
-
   const envPath = process.env.PROVENANCE_SQLITE_PATH?.trim();
   const flyDefaultPath = process.env.FLY_APP_NAME ? '/data/provenance.db' : undefined;
   const defaultPath = envPath || flyDefaultPath || './data/provenance.db';
