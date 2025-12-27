@@ -30,8 +30,25 @@ type ReflectHandlerDeps = {
 const setCorsHeaders = (res: ServerResponse, req: IncomingMessage): void => {
   const allowedOrigins = runtimeConfig.cors.allowedOrigins;
   const origin = req.headers.origin;
-  const isAllowedOrigin = origin && allowedOrigins.includes(origin);
-  const allowOrigin = isAllowedOrigin ? origin : allowedOrigins[0];
+
+  // Sanitize configured allowed origins: remove wildcards, "null", and falsy values.
+  const sanitizedAllowedOrigins = Array.isArray(allowedOrigins)
+    ? allowedOrigins.filter(
+        (o) => typeof o === 'string' && o !== '*' && o.toLowerCase() !== 'null' && o.trim() !== ''
+      )
+    : [];
+
+  const isAllowedOrigin =
+    typeof origin === 'string' &&
+    origin.toLowerCase() !== 'null' &&
+    sanitizedAllowedOrigins.includes(origin);
+
+  const allowOrigin = isAllowedOrigin ? origin : sanitizedAllowedOrigins[0];
+
+  if (!allowOrigin) {
+    // No safe origin configured; do not set permissive CORS headers.
+    return;
+  }
 
   res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
