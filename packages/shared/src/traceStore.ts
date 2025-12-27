@@ -36,13 +36,25 @@ export function createTraceStoreFromEnv(): TraceStore {
   } catch (error) {
     const code = (error as { code?: string }).code;
     const isPermission = code === 'EACCES' || code === 'EPERM';
-    if (isPermission && !envPath) {
+    const isMissing = code === 'ENOENT';
+    const isDockerPath = envPath?.startsWith('/data/');
+
+    if (!envPath && isPermission) {
       // Fallback to a local relative path when default path is not writable and no env override is set.
       traceStoreLogger.warn(
         `Falling back to local SQLite path "./data/provenance.db" because default path "${defaultPath}" was not writable: ${String(error)}`
       );
       return new SqliteTraceStore({ dbPath: './data/provenance.db' });
     }
+
+    if (envPath && isDockerPath && (isPermission || isMissing)) {
+      // Allow the same /data path in local (non-container) runs by falling back to ./data.
+      traceStoreLogger.warn(
+        `Falling back to local SQLite path "./data/provenance.db" because "${envPath}" is unavailable: ${String(error)}`
+      );
+      return new SqliteTraceStore({ dbPath: './data/provenance.db' });
+    }
+
     throw error;
   }
 }

@@ -38,7 +38,6 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.bot
-    command: ["node", "packages/discord-bot/dist/index.js"]
     env_file:
       - ../.env
     networks:

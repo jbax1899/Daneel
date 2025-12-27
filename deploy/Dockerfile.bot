@@ -8,12 +8,13 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
+COPY tsconfig.json ./tsconfig.json
 COPY package.json package-lock.json ./
 COPY packages/discord-bot/package.json packages/discord-bot/package.json
 COPY packages/shared/package.json packages/shared/package.json
 COPY packages/ethics-core/package.json packages/ethics-core/package.json
 
-RUN npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --include=dev
 
 COPY packages/shared/ packages/shared/
 COPY packages/ethics-core/ packages/ethics-core/
@@ -24,4 +25,5 @@ RUN npm run build --workspace=@arete/shared \
   && npx tsc -p packages/discord-bot/tsconfig.json \
   && npm prune --omit=dev --legacy-peer-deps
 
-CMD ["node", "packages/discord-bot/dist/index.js"]
+WORKDIR /app/packages/discord-bot
+CMD ["node", "dist/index.js"]

@@ -2,6 +2,7 @@ FROM node:22-slim as build
 
 WORKDIR /app
 
+COPY tsconfig.json ./tsconfig.json
 COPY package.json package-lock.json ./
 COPY packages/web/package.json packages/web/package.json
 COPY packages/ethics-core/package.json packages/ethics-core/package.json

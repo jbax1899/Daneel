@@ -12,8 +12,11 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { createTraceStoreFromEnv } = require('@arete/shared');
 
-// Load environment variables from .env file
-require('dotenv').config();
+// Load environment variables from .env file when present (skip inside containers).
+const fsSync = require('node:fs');
+if (fsSync.existsSync(path.join(__dirname, '.env'))) {
+  require('dotenv').config();
+}
 
 // Resolve the directory containing the built frontend assets.
 const DIST_DIR = path.join(__dirname, 'packages', 'web', 'dist');

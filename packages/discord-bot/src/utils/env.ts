@@ -7,6 +7,7 @@
  */
 
 import dotenv from 'dotenv';
+import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import type { PromptKey } from '@arete/shared';
@@ -20,8 +21,8 @@ const __dirname = path.dirname(__filename);
 const envPath = path.resolve(__dirname, '../../../../.env');
 logger.debug(`Loading environment variables from: ${envPath}`);
 
-// Load environment variables from .env file in the root directory
-try {
+// Load environment variables from .env file in the root directory (when present).
+if (fs.existsSync(envPath)) {
   const { error, parsed } = dotenv.config({ path: envPath });
 
   if (error) {
@@ -29,8 +30,8 @@ try {
   } else if (parsed) {
     logger.debug(`Loaded environment variables: ${Object.keys(parsed).join(', ')}`);
   }
-} catch {
-  logger.warn('No .env found (expected on Fly.io deployments)');
+} else {
+  logger.debug('No .env file found; relying on injected environment variables.');
 }
 
 // Import shared module after environment has been configured so it reads the correct values.
