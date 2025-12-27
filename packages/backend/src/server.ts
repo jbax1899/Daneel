@@ -249,8 +249,16 @@ const server = http.createServer(async (req, res) => {
         ...(requestOrigin ? [requestOrigin] : []),
         ...runtimeConfig.csp.frameAncestors
       ];
+      const trimTrailingSlashes = (value: string): string => {
+        let end = value.length;
+        while (end > 0 && value[end - 1] === '/') {
+          end -= 1;
+        }
+        return value.slice(0, end);
+      };
+
       const normalizedFrameAncestors = [...new Set(
-        mergedFrameAncestors.map(domain => domain.replace(/\/+$/, ''))
+        mergedFrameAncestors.map(domain => trimTrailingSlashes(domain))
       )];
 
       const csp = [
