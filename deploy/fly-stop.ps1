@@ -1,7 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
+# Stops machines for backend/web/bot apps without destroying them.
+
 function Get-FlyAppName {
   param([string]$ConfigPath)
+  # Extract app name from fly.toml to keep scripts DRY.
   $content = Get-Content $ConfigPath -Raw
   if ($content -match '(?m)^\s*app\s*=\s*["'']([^"'' ]+)["'']') {
     return $Matches[1]

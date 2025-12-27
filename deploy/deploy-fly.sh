@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Deploys backend/web/bot Fly apps, ensuring secrets are set and machines are running.
+
 if ! command -v fly >/dev/null 2>&1; then
   echo "Fly CLI is required. Install from https://fly.io/docs/flyctl/install/"
   exit 1
@@ -8,6 +10,7 @@ fi
 
 get_app_name() {
   local config_path="$1"
+  # Extract app name from fly.toml to keep scripts DRY.
   local line
   line=$(grep -E "^app\\s*=" "$config_path" | head -n 1 || true)
   if [[ -z "$line" ]]; then
@@ -19,6 +22,7 @@ get_app_name() {
 
 ensure_app() {
   local config_path="$1"
+  # Create app if missing; no-op when it already exists.
   local app_name
   app_name=$(get_app_name "$config_path")
   set +e
@@ -38,12 +42,14 @@ ensure_app() {
 
 get_secret_names() {
   local app_name="$1"
+  # Read existing secrets so we only prompt for missing values.
   fly secrets list -a "$app_name" 2>/dev/null | awk 'NR>1 {print $1}'
 }
 
 get_env_value() {
   local env_path="$1"
   local key="$2"
+  # Load a specific key from .env, if present.
   [[ -f "$env_path" ]] || return 1
   local line
   line=$(grep -E "^${key}=" "$env_path" | head -n 1 || true)
@@ -57,6 +63,7 @@ ensure_secrets() {
   local app_name="$1"
   shift
   local required_secrets=("$@")
+  # Prompt only for missing secrets; prefer .env values when available.
   echo "Checking secrets for $app_name..."
   local existing
   existing=$(get_secret_names "$app_name")

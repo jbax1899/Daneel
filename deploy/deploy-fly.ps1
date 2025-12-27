@@ -1,5 +1,7 @@
 $ErrorActionPreference = 'Stop'
 
+# Deploys backend/web/bot Fly apps, ensuring secrets are set and machines are running.
+
 if (-not (Get-Command fly -ErrorAction SilentlyContinue)) {
   Write-Host "Fly CLI is required. Install from https://fly.io/docs/flyctl/install/"
   exit 1
@@ -7,6 +9,7 @@ if (-not (Get-Command fly -ErrorAction SilentlyContinue)) {
 
 function Get-FlyAppName {
   param([string]$ConfigPath)
+  # Extract app name from fly.toml to keep scripts DRY.
   $content = Get-Content $ConfigPath -Raw
   if ($content -match '(?m)^\s*app\s*=\s*["'']([^"'' ]+)["'']') {
     return $Matches[1]
@@ -16,6 +19,7 @@ function Get-FlyAppName {
 
 function Ensure-FlyApp {
   param([string]$ConfigPath)
+  # Create app if missing; no-op when it already exists.
   $appName = Get-FlyAppName -ConfigPath $ConfigPath
   $output = & fly apps create $appName 2>&1
   if ($LASTEXITCODE -ne 0) {
@@ -31,6 +35,7 @@ function Ensure-FlyApp {
 
 function Get-FlySecretNames {
   param([string]$AppName)
+  # Read existing secrets so we only prompt for missing values.
   $output = & fly secrets list -a $AppName 2>$null
   if ($LASTEXITCODE -ne 0) {
     return @()
@@ -44,6 +49,7 @@ function Get-EnvValueFromFile {
     [string]$EnvPath,
     [string]$Key
   )
+  # Load a specific key from .env, if present.
   if (-not (Test-Path $EnvPath)) {
     return $null
   }
@@ -71,6 +77,7 @@ function Ensure-FlySecrets {
     [string[]]$OptionalSecrets,
     [string]$EnvPath
   )
+  # Prompt only for missing secrets; prefer .env values when available.
   Write-Host "Checking secrets for $AppName..."
   $existing = Get-FlySecretNames -AppName $AppName
   foreach ($secret in $RequiredSecrets) {
