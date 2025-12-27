@@ -299,7 +299,10 @@ export class OpenAIService {
       const buildInputMessage = (role: OpenAIMessage['role'], text: string) => ({
         role,
         type: 'message' as const,
-        content: [{ type: 'input_text' as const, text }]
+        // Use string content for assistant history to stay within ResponseInput types.
+        content: role === 'assistant'
+          ? text
+          : [{ type: 'input_text' as const, text }]
       });
 
       // Map messages for the OpenAI Responses API
@@ -307,7 +310,10 @@ export class OpenAIService {
 
       // Validate messages before sending to OpenAI
       const validMessages = messages.filter(msg => {
-        if (!msg.content || typeof msg.content[0].text !== 'string' || msg.content[0].text.trim() === '') {
+        const contentText = typeof msg.content === 'string'
+          ? msg.content
+          : msg.content?.[0]?.text;
+        if (!contentText || typeof contentText !== 'string' || contentText.trim() === '') {
           logger.warn(`Filtering out invalid message: ${JSON.stringify(msg)}`);
           return false;
         }
