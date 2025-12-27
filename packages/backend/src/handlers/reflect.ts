@@ -38,17 +38,22 @@ const setCorsHeaders = (res: ServerResponse, req: IncomingMessage): void => {
       )
     : [];
 
-  const isAllowedOrigin =
-    typeof origin === 'string' &&
-    origin.toLowerCase() !== 'null' &&
-    sanitizedAllowedOrigins.includes(origin);
+  const normalizedAllowedOrigins = sanitizedAllowedOrigins.map((allowedOrigin) =>
+    allowedOrigin.trim().toLowerCase()
+  );
+  const normalizedOrigin = typeof origin === 'string' ? origin.trim().toLowerCase() : null;
+  const allowedIndex =
+    normalizedOrigin && normalizedOrigin !== 'null'
+      ? normalizedAllowedOrigins.indexOf(normalizedOrigin)
+      : -1;
 
-  if (!isAllowedOrigin || !origin) {
+  if (allowedIndex === -1 || !origin) {
     // No safe origin matched; omit credentialed CORS headers.
     return;
   }
 
-  res.setHeader('Access-Control-Allow-Origin', origin);
+  const safeOrigin = sanitizedAllowedOrigins[allowedIndex];
+  res.setHeader('Access-Control-Allow-Origin', safeOrigin);
   res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Turnstile-Token, X-Session-Id');
