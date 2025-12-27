@@ -75,7 +75,7 @@ For local development, you can use Cloudflare's test keys:
 ⚠️ **Never use test keys in production!**
 
 4. Run locally
-(starts the ethics core, Discord bot, and web server in development mode)
+(starts the backend, Discord bot, and web server in development mode)
 ```
 npm run dev
 ```
@@ -105,11 +105,11 @@ On Fly.io, `/data` is backed by a persistent volume defined in `deploy/fly.backe
 This repository houses all major packages:
 ```
 packages/
-  ethics-core/    → reasoning engine, provenance, circuit breakers
-  discord-bot/    → conversational interface for Discord
-  web/            → public landing page & explain viewer
-docs/             → philosophy, governance, ethics logs, and framework specs
-examples/         → demo scenarios
+  backend/        -> API server + ethics core + shared utilities
+  discord-bot/    -> conversational interface for Discord
+  web/            -> public landing page & explain viewer
+docs/             -> philosophy, governance, ethics logs, and framework specs
+examples/         -> demo scenarios
 ```
 
 ## License
@@ -129,3 +129,5 @@ Guidelines and governance structure are documented (COMING SOON) in:
 - CODE_OF_CONDUCT.md — expectations for dialogue and collaboration
   
 For now: open a Discussion to propose ideas, or pick a good-first-task issue from the tracker.
+
+

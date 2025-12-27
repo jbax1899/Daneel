@@ -24,7 +24,7 @@ import {
   TextInputBuilder,
   TextInputStyle
 } from 'discord.js';
-import { ResponseMetadata, type Citation } from 'ethics-core';
+import type { ResponseMetadata, Citation } from '@arete/backend/ethics-core';
 import { logger } from '../logger.js';
 import { ResponseHandler } from './ResponseHandler.js';
 import { OpenAIService, type OpenAIMessage, type OpenAIOptions, type SupportedModel } from '../openaiService.js';
@@ -997,4 +997,5 @@ export async function handleAlternativeLensSubmit(interaction: ButtonInteraction
     clearAlternativeLensInProgress(messageId);
   }
 }
+
 

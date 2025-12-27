@@ -41,10 +41,9 @@ import { readFollowUpContext, saveFollowUpContext, type ImageGenerationContext }
 import { recoverContextDetailsFromMessage, type RecoveredImageContext } from '../commands/image/contextResolver.js';
 import { buildResponseMetadata } from './response/metadata.js';
 import { buildFooterEmbed } from './response/provenanceFooter.js';
-import { ResponseMetadata } from 'ethics-core';
+import type { ResponseMetadata } from '@arete/backend/ethics-core';
 import type {
   ImageBackgroundType,
-  ImageQualityType,
   ImageRenderModel,
   ImageStylePreset,
   ImageTextModel,
@@ -96,6 +95,8 @@ const clampOutputCompression = (value: number | undefined | null): number => {
   }
   return Math.min(100, Math.max(1, Math.round(value as number)));
 };
+
+let warnedMissingTraceToken = false;
 
 export class MessageProcessor {
   private readonly openaiService: OpenAIService;
@@ -524,11 +525,21 @@ export class MessageProcessor {
           // Save trace asynchronously
           const persistTrace = async () => {
             try {
+              if (!config.traceApiToken && !warnedMissingTraceToken) {
+                warnedMissingTraceToken = true;
+                logger.warn('TRACE_API_TOKEN is not set; backend trace ingestion will reject requests.');
+              }
+
+              const headers: Record<string, string> = {
+                'Content-Type': 'application/json'
+              };
+              if (config.traceApiToken) {
+                headers['X-Arete-Trace-Token'] = config.traceApiToken;
+              }
+
               const response = await fetch(`${config.backendBaseUrl}/api/traces`, {
                 method: 'POST',
-                headers: {
-                  'Content-Type': 'application/json'
-                },
+                headers,
                 body: JSON.stringify(responseMetadata)
               });
               if (!response.ok) {
@@ -687,4 +698,5 @@ export async function cleanupTTSFile(ttsPath: string): Promise<void> {
     logger.debug(`Failed to delete TTS file ${ttsPath}: ${err?.message ?? err}`);
   }
 }
+
 

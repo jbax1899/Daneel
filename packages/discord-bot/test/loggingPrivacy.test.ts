@@ -17,12 +17,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { PassThrough } from 'node:stream';
 import { transports } from 'winston';
 
 import { OpenAIService, type OpenAIMessage } from '../src/utils/openaiService.js';
 import { logger, sanitizeLogData } from '../src/utils/logger.js';
 import { logContextIfVerbose } from '../src/utils/prompting/ContextBuilder.js';
-import { SqliteIncidentStore } from '@arete/shared';
+import { SqliteIncidentStore } from '@arete/backend/shared';
 
 const createStubbedOpenAIService = () => {
     const service = new OpenAIService('test-key');
@@ -116,13 +117,11 @@ test('sanitizeLogData redacts Discord snowflake identifiers in strings and objec
 
 test('logger pipeline applies sanitizer before emitting logs', () => {
     const captured: string[] = [];
-    const streamTransport = new transports.Stream({
-        stream: {
-            write: (message: string | Buffer) => {
-                captured.push(message.toString());
-            }
-        }
+    const stream = new PassThrough();
+    stream.on('data', chunk => {
+        captured.push(chunk.toString());
     });
+    const streamTransport = new transports.Stream({ stream });
 
     logger.add(streamTransport);
     try {
@@ -148,13 +147,11 @@ test('incident store logs do not emit raw Discord IDs', async () => {
     const rawUserId = '456789012345678901';
 
     const captured: string[] = [];
-    const streamTransport = new transports.Stream({
-        stream: {
-            write: (message: string | Buffer) => {
-                captured.push(message.toString());
-            }
-        }
+    const stream = new PassThrough();
+    stream.on('data', chunk => {
+        captured.push(chunk.toString());
     });
+    const streamTransport = new transports.Stream({ stream });
 
     logger.add(streamTransport);
     try {

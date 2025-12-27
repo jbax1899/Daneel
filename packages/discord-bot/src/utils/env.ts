@@ -10,7 +10,7 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import type { PromptKey } from '@arete/shared';
+import type { PromptKey } from '@arete/backend/shared';
 import { logger } from './logger.js';
 
 // Get the current directory
@@ -40,10 +40,10 @@ const {
   renderPrompt: sharedRenderPrompt,
   setActivePromptRegistry
 }: {
-  PromptRegistry: typeof import('@arete/shared').PromptRegistry;
-  renderPrompt: typeof import('@arete/shared').renderPrompt;
-  setActivePromptRegistry: typeof import('@arete/shared').setActivePromptRegistry;
-} = await import('@arete/shared');
+  PromptRegistry: typeof import('@arete/backend/shared').PromptRegistry;
+  renderPrompt: typeof import('@arete/backend/shared').renderPrompt;
+  setActivePromptRegistry: typeof import('@arete/backend/shared').setActivePromptRegistry;
+} = await import('@arete/backend/shared');
 
 /**
  * List of required environment variables that must be set for the application to run.
@@ -251,6 +251,7 @@ const backendBaseUrl = rawBackendBaseUrl && rawBackendBaseUrl.length > 0
   : fallbackBackendBaseUrl;
 
 logger.info(`Using backend base URL: ${backendBaseUrl}`);
+const traceApiToken = process.env.TRACE_API_TOKEN?.trim();
 
 // Instantiate the shared prompt registry and expose it to downstream modules.
 export const promptRegistry = new PromptRegistry({ overridePath: promptConfigPath });
@@ -371,6 +372,7 @@ export const config = {
   promptConfigPath,
   webBaseUrl,
   backendBaseUrl,
+  traceApiToken,
   
   // Bot mention names for engagement detection
   botMentionNames: getStringArrayEnv('BOT_MENTION_NAMES', DEFAULT_BOT_MENTION_NAMES),

@@ -5,10 +5,10 @@
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "concurrently \"node server.js\" \"npm run dev -w @arete/web\"",
-        "start:backend": "node server.js",
-        "start:prod-test": "cross-env NODE_ENV=production node server.js",
-        "dev:prod-test": "cross-env NODE_ENV=production node server.js & npm run dev -w @arete/web",
+        "start:dev": "concurrently \"node -r ts-node/register/transpile-only packages/backend/src/server.ts\" \"npm run dev -w @arete/web\"",
+        "start:backend": "node -r ts-node/register/transpile-only packages/backend/src/server.ts",
+        "start:prod-test": "npm run build --workspace=@arete/backend && cross-env NODE_ENV=production node server.js",
+        "dev:prod-test": "npm run build --workspace=@arete/backend && cross-env NODE_ENV=production node server.js & npm run dev -w @arete/web",
         "build": "npm run build --workspaces",
         "validate-arete-tags": "node scripts/validate-arete-tags.js",
         "blog-sync": "node scripts/blog-sync.js",
@@ -35,6 +35,7 @@
         "cross-env": "^10.1.0",
         "eslint": "^9.38.0",
         "eslint-config-prettier": "^10.1.8",
+        "eslint-plugin-react-hooks": "^5.2.0",
         "prettier": "3.7.4",
         "ts-node": "^10.9.2",
         "typescript": "^5.9.2",
@@ -42,7 +43,6 @@
     },
     "dependencies": {
         "@ai-sdk/openai": "^2.0.8",
-        "@arete/shared": "file:packages/shared",
         "@assistant-ui/react-ai-sdk": "^0.11.1",
         "@discordjs/voice": "^0.19.0",
         "@modelcontextprotocol/sdk": "^1.18.2",

@@ -1,12 +1,21 @@
+// @ts-nocheck
 import { fileURLToPath, URL } from 'node:url';
+import type { IncomingMessage, ServerResponse } from 'node:http';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
 // Vite plugin to set CSP headers for /embed route in development
+type NextFunction = (err?: unknown) => void;
+type DevServer = {
+  middlewares: {
+    use: (handler: (req: IncomingMessage, res: ServerResponse, next: NextFunction) => void) => void;
+  };
+};
+
 const cspPlugin = () => ({
   name: 'csp-headers',
-  configureServer(server) {
-    server.middlewares.use((req, res, next) => {
+  configureServer(server: DevServer) {
+    server.middlewares.use((req: IncomingMessage, res: ServerResponse, next: NextFunction) => {
       // Set CSP frame-ancestors header for /embed route
       if (req.url && (req.url === '/embed' || req.url.startsWith('/embed/'))) {
         // Allow embedding from production domains and localhost for development
@@ -81,8 +90,7 @@ export default defineConfig({
     alias: {
       '@components': fileURLToPath(new URL('./src/components', import.meta.url)),
       '@pages': fileURLToPath(new URL('./src/pages', import.meta.url)),
-      '@ethics-core': fileURLToPath(new URL('../ethics-core/src', import.meta.url)),
-      'ethics-core': fileURLToPath(new URL('../ethics-core/src/index.ts', import.meta.url)),
+      '@arete/backend/ethics-core': fileURLToPath(new URL('../backend/src/ethics-core/index.ts', import.meta.url)),
       '@styles': fileURLToPath(new URL('./src/styles', import.meta.url)),
       '@theme': fileURLToPath(new URL('./src/theme', import.meta.url)),
     },

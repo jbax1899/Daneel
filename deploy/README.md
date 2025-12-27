@@ -18,6 +18,10 @@ Services:
 - backend: `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY` (both required to enable CAPTCHA)
 - backend: `GITHUB_WEBHOOK_SECRET` (enables blog sync)
 - backend/bot: `LOG_LEVEL` (defaults to `debug`)
+- backend: `ARETE_ALLOWED_ORIGINS`, `ARETE_FRAME_ANCESTORS` (override CORS/CSP allowlists)
+- backend: `ARETE_DEFAULT_MODEL`, `ARETE_DEFAULT_REASONING_EFFORT`, `ARETE_DEFAULT_VERBOSITY` (reflect defaults)
+- backend/bot: `TRACE_API_TOKEN` (required for authenticated trace writes)
+- backend: `TRACE_API_RATE_LIMIT`, `TRACE_API_RATE_LIMIT_WINDOW_MS`, `TRACE_API_MAX_BODY_BYTES` (trace ingestion limits)
 
 ## Start
 `docker compose -f deploy/compose.yml up --build`

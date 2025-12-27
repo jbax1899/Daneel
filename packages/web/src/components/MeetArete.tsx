@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
 import { Turnstile, type TurnstileInstance } from '@marsidev/react-turnstile';
 import ProvenanceFooter from './ProvenanceFooter';
-import type { ResponseMetadata } from 'ethics-core';
+import type { ResponseMetadata } from '@arete/backend/ethics-core';
 import examplePrompts from '../data/examplePrompts.json';
 import { loadRuntimeConfig } from '../utils/runtimeConfig';
 
@@ -126,7 +126,7 @@ const MeetArete = (): JSX.Element => {
   const [isTurnstileMounted, setIsTurnstileMounted] = useState(false);
   const [turnstileSiteKey, setTurnstileSiteKey] = useState('');
   const abortRef = useRef<AbortController | null>(null);
-  const inputRef = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const turnstileRef = useRef<TurnstileInstance | null>(null);
   const hasInteractedRef = useRef(false); // Track if user has interacted to prevent initial status flash
   
@@ -281,6 +281,7 @@ const MeetArete = (): JSX.Element => {
       }, 100);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [turnstileKey, skipCaptcha, turnstileError, isTurnstileMounted]);
 
   // Auto-resize textarea based on content
@@ -664,3 +665,4 @@ const MeetArete = (): JSX.Element => {
 };
 
 export default MeetArete;
+

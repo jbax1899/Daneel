@@ -1,4 +1,8 @@
 :80 {
+  handle /api/traces {
+    respond "Forbidden" 403
+  }
+
   handle /api/* {
     reverse_proxy {$BACKEND_HOST}:3000
   }

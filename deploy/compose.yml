@@ -6,7 +6,7 @@ services:
     build:
       context: ..
       dockerfile: deploy/Dockerfile.backend
-    command: ["node", "server.js"]
+    command: ["node", "packages/backend/dist/server.js"]
     env_file:
       - ../.env
     volumes:
