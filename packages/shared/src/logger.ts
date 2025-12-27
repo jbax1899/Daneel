@@ -81,7 +81,7 @@ fs.mkdirSync(logDirectory, { recursive: true });
  * @type {import('winston').Logger}
  */
 export const logger = createLogger({
-  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  level: (process.env.LOG_LEVEL || 'debug').toLowerCase(),
   format: combine(
     sanitizeFormat(),
     timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),

@@ -17,6 +17,7 @@ Services:
 ## Optional environment
 - backend: `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY` (both required to enable CAPTCHA)
 - backend: `GITHUB_WEBHOOK_SECRET` (enables blog sync)
+- backend/bot: `LOG_LEVEL` (defaults to `debug`)
 
 ## Start
 `docker compose -f deploy/compose.yml up --build`
@@ -38,6 +39,7 @@ Services:
   - backend: `OPENAI_API_KEY`
   - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `GITHUB_WEBHOOK_SECRET`
   - bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
+  - bot (optional): `LOG_LEVEL`
 
 ## Notes
 - Only the web service is exposed on host port 8080 (`http://localhost:8080`) to avoid admin privileges.
