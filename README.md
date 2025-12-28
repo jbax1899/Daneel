@@ -6,6 +6,8 @@
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
+<img width="1280" height="640" alt="repo-card-1" src="https://github.com/user-attachments/assets/e36fd981-5802-41cc-9efe-f80073e72bdd" />
+
 ---
 
 ## What is ARETE?
@@ -21,11 +23,7 @@ Most assistants today give you polished answers but hide how they got there. ARE
 
 The goal is not to replace human judgment, but to make it easier for people and communities to **inspect, question, and correct** the system.
 
----
-
-## Core Principles
-
-ARETE’s design is guided by a few simple ideas:
+### Design Goals
 
 - **Ethics-first design** – Every feature should help people think more clearly about what matters.
 - **Transparency & provenance** – Reasoning and sources should be traceable, not hidden in a black box.
@@ -34,6 +32,8 @@ ARETE’s design is guided by a few simple ideas:
 - **Responsiveness** – Transparency should invite discussion and correction.
 - **Human oversight** – ARETE can guide reflection, but it should never be treated as an oracle.
 - **Open & self-hostable** – Anyone should be able to inspect, modify, and run their own instance.
+
+Explore the [public site](https://arete-web.fly.dev/) for more details and a quick demo!
 
 ---
 
@@ -44,11 +44,15 @@ ARETE is made up of three small services that work together:
 - **Discord bot**  
   The conversational interface. It listens in Discord, talks directly to the AI model to generate replies, and sends trace metadata to the backend for safekeeping.
 
-- **Backend API**  
-  The system’s memory and guardrail layer. It stores response traces, serves runtime configuration, verifies CAPTCHA challenges, enforces rate limits, and exposes audit data. It does **not** generate chat responses.
+<img width="1200" height="800" alt="chat-dark" src="https://github.com/user-attachments/assets/d2bce55e-2e93-4d9a-b174-87fa52d4d51d" />
 
 - **Web interface**  
   The public-facing site and explanation viewer. It displays documentation and trace reports, and forwards API requests to the backend in a controlled way.
+
+<img width="729" height="488" alt="image" src="https://github.com/user-attachments/assets/0b758ba3-2dc0-4b9f-bcda-073dca57eade" />
+
+- **Backend API**  
+  The system’s memory and guardrail layer. It stores response traces, serves runtime configuration, verifies CAPTCHA challenges, enforces rate limits, and exposes audit data.
 
 In production, these services are deployed separately but are designed to behave the same way locally and in the cloud.
 
