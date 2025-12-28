@@ -1,133 +1,181 @@
 # ARETE
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Hippocratic License HL3-CORE](https://img.shields.io/static/v1?label=Hippocratic%20License&message=HL3-CORE&labelColor=5e2751&color=bc8c3d)](https://firstdonoharm.dev/version/3/0/core.html)
+
 > Assistant for Realtime Ethical Thought and Evaluation
 
 An ethics-first, transparent reasoning assistant — built to be self-hosted by anyone.
 
-## Overview
-ARETE is a transparent reasoning assistant for open reasoning and ethical reflection.
-It helps make reasoning traceable, decisions explainable, and reflection part of the process rather than an afterthought.
+---
 
-Instead of chasing speed or persuasion like other AI systems, ARETE values clarity. You can view exactly how each response is formed—sources, confidence, trade-offs, and ethical constraints—so you can see not just *what* it thinks, but *why*.
+## What is ARETE?
 
-## Key Principles
-- Ethics-first design — Every feature should help people think more clearly about what matters.
-- Transparency & provenance — Reasoning is transparent; traces its chain of thought and source.
-- Humility and pluralism — Expresses uncertainty and welcomes alternate perspectives.
-- Auditability — Decisions are logged and explainable, not ephemeral.
-- Responsiveness — Transparency must invite reflection and correction, not just observation.
-- Human oversight — ARETE can guide reflection, but never replace it.
-- Open and self-hostable — Anyone can inspect, modify, and run their own instance.
+ARETE is an AI assistant that tries to **show its work**.
 
-## Documentation
+Most assistants today give you polished answers but hide how they got there. ARETE does the opposite: it focuses on clarity over speed or persuasion. For each response, it aims to surface:
 
-| Document  | Description |
-| ------------- | ------------- |
-| [PHILOSOPHY.md](PHILOSOPHY.md)  | Founding letter and moral charter. |
-| [SECURITY.md](SECURITY.md) | Security and ethical safety policy. |
-| [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md) | Dual-license rationale. |
+- how confident it is,
+- what sources it relied on,
+- what trade-offs it considered,
+- and what ethical constraints were in play.
 
-## Quickstart
-You can deploy ARETE locally or on Fly.io (either path uses the same environment configuration).
-1. Clone the repository
-```
+The goal is not to replace human judgment, but to make it easier for people and communities to **inspect, question, and correct** the system.
+
+---
+
+## Core Principles
+
+ARETE’s design is guided by a few simple ideas:
+
+- **Ethics-first design** – Every feature should help people think more clearly about what matters.
+- **Transparency & provenance** – Reasoning and sources should be traceable, not hidden in a black box.
+- **Humility & pluralism** – The assistant should express uncertainty and make room for multiple perspectives.
+- **Auditability** – Decisions and responses should be loggable and explainable.
+- **Responsiveness** – Transparency should invite discussion and correction.
+- **Human oversight** – ARETE can guide reflection, but it should never be treated as an oracle.
+- **Open & self-hostable** – Anyone should be able to inspect, modify, and run their own instance.
+
+---
+
+## Architecture at a Glance
+
+ARETE is made up of three small services that work together:
+
+- **Discord bot**  
+  The conversational interface. It listens in Discord, talks directly to the AI model to generate replies, and sends trace metadata to the backend for safekeeping.
+
+- **Backend API**  
+  The system’s memory and guardrail layer. It stores response traces, serves runtime configuration, verifies CAPTCHA challenges, enforces rate limits, and exposes audit data. It does **not** generate chat responses.
+
+- **Web interface**  
+  The public-facing site and explanation viewer. It displays documentation and trace reports, and forwards API requests to the backend in a controlled way.
+
+In production, these services are deployed separately but are designed to behave the same way locally and in the cloud.
+
+Locally, the web service proxies `/api/*` to the backend. On Fly, it reaches the backend over the internal Fly network.
+
+---
+
+## Getting Started (Local Development)
+
+### 1. Clone the repository
+
+```bash
 git clone https://github.com/arete-org/arete.git
 cd arete
 ```
-2. Install dependencies
-```
+
+### 2. Install dependencies
+
+```bash
 npm install
 ```
-3. Configure environment
-```
-DISCORD_TOKEN=your_discord_bot_token
-CLIENT_ID=your_discord_client_id
-OPENAI_API_KEY=your_openai_api_key
-TURNSTILE_SITE_KEY=your_turnstile_site_key
-TURNSTILE_SECRET_KEY=your_turnstile_secret_key
-VITE_TURNSTILE_SITE_KEY=your_turnstile_site_key
-```
-> See `.env.example` for optional parameters (e.g. rate limitting, engagement rules)
 
-**Required Services:**
-- Discord Bot Token and Client ID
-- OpenAI API Key
-- Cloudflare Turnstile CAPTCHA keys (for web API security)
+### 3. Configure environment variables
 
-**Cloudflare Turnstile Setup:**
-1. Navigate to the [Cloudflare Turnstile dashboard](https://dash.cloudflare.com/?to=/:account/turnstile)
-2. Create a new site with **Widget Mode set to "Invisible"** for seamless UX with no visible UI
-3. Copy the Site Key and Secret Key
-4. Add them to your `.env` file as `TURNSTILE_SITE_KEY` and `TURNSTILE_SECRET_KEY`
-5. **Important**: Widget type must be "Invisible" in Cloudflare dashboard (not "Managed"). Ensure the site key includes your production domain (e.g., `ai.jordanmakes.dev`) in the allowlist. Site key and secret key must be from the same Turnstile widget configuration.
-
-**Development Testing:**
-For local development, you can use Cloudflare's test keys:
-- Test site key: `1x00000000000000000000AA` (always passes)
-- Test secret key: `1x0000000000000000000000000000000AA` (always passes)
-
-⚠️ **Never use test keys in production!**
-
-4. Run locally
-(starts the ethics core, Discord bot, and web server in development mode)
-```
-npm run dev
-```
-5. Deploy to Fly.io (optional)
-```
-flyctl launch
-flyctl secrets set TURNSTILE_SITE_KEY=your_turnstile_site_key
-flyctl secrets set TURNSTILE_SECRET_KEY=your_turnstile_secret_key
-flyctl deploy
-```
-This launches ARETE as a self-contained service in the cloud.
-
-**Fly.io Deployment Notes:**
-- The Turnstile site key is baked into the frontend build during Docker build
-- The Turnstile secret key must be set as a Fly.io secret for runtime verification
-- Use `flyctl secrets set` to configure sensitive environment variables
-
-**Provenance Storage:**
-ARETE persists response traces for transparency and auditability. By default, traces are stored in a SQLite database:
 ```bash
-PROVENANCE_BACKEND=sqlite
+cp .env.example .env
+```
+
+At minimum:
+
+```env
+DISCORD_TOKEN=...
+CLIENT_ID=...
+GUILD_ID=...
+DEVELOPER_USER_ID=...
+OPENAI_API_KEY=...
+TRACE_API_TOKEN=...
+INCIDENT_PSEUDONYMIZATION_SECRET=...
+```
+
+### 4. Run the services
+
+To start the backend and web interface together:
+
+```bash
+npm run start:dev
+```
+
+The Discord bot runs as a separate process. In another terminal, run:
+
+```bash
+npm run dev -w @arete/discord-bot
+```
+
+---
+
+## Cloudflare Turnstile (Optional)
+
+Turnstile protects public endpoints from abuse.
+
+- If **both keys** are set, CAPTCHA is enforced.
+- If **neither key** is set, CAPTCHA is skipped.
+- If **only one key** is set, the backend returns a configuration error.
+
+```env
+TURNSTILE_SITE_KEY=...
+TURNSTILE_SECRET_KEY=...
+```
+
+---
+
+## Optional Services
+
+- **Cloudinary (image uploads)**  
+  If Cloudinary credentials are provided, images can be uploaded and referenced in traces.  
+  If not, the system falls back to attaching images directly in Discord.
+
+```env
+CLOUDINARY_CLOUD_NAME=...
+CLOUDINARY_API_KEY=...
+CLOUDINARY_API_SECRET=...
+```
+
+---
+
+## Provenance & Storage
+
+Response traces are stored in SQLite:
+
+```env
 PROVENANCE_SQLITE_PATH=/data/provenance.db
 ```
 
-On Fly.io, `/data` is backed by a persistent volume defined in `fly.toml`. For bare-metal deployments, ensure the path points to a persistent location.
+On Fly.io, `/data` is backed by a persistent volume. On other hosts, point this path at a durable directory.
 
-**Persistent Storage:**
-- ARETE uses a SQLite database at `/data/provenance.db` for trace storage
-- The Fly.io volume `provenance_data` is mounted at `/data` (see `fly.toml`)
-- Traces persist across redeploys and container restarts
-- To inspect the database: `flyctl ssh console` then `sqlite3 /data/provenance.db`
+---
 
-## Monorepo Structure
-This repository houses all major packages:
+## Deployment
+
+The repository supports multi-service deployment:
+
+- Docker Compose (local)
+- Fly.io (three separate apps: backend, web, discord-bot)
+
+Deployment configuration and scripts live under:
+
+```text
+deploy/
 ```
-packages/
-  ethics-core/    → reasoning engine, provenance, circuit breakers
-  discord-bot/    → conversational interface for Discord
-  web/            → public landing page & explain viewer
-docs/             → philosophy, governance, ethics logs, and framework specs
-examples/         → demo scenarios
-```
+
+See `deploy/README.md` for details.
+
+---
 
 ## License
 
-Dual-licensed under MIT + Hippocratic License v3.
+ARETE is dual-licensed under:
 
-The HL3 clauses prohibit unethical use (violations of human rights, state violence, labor exploitation, etc.).
+- MIT
+- Hippocratic License v3 (HL3-CORE)
 
-See [LICENSE_STRATEGY.md](LICENSE_STRATEGY.md) for details.
+See `docs/LICENSE_STRATEGY.md` for details.
+
+---
 
 ## Contributing
 
-We welcome thoughtful contributions of all kinds. 
-Guidelines and governance structure are documented (COMING SOON) in:
-- CONTRIBUTING.md — workflow and ethics review notes
-- GOVERNANCE.md — decision-making processes
-- CODE_OF_CONDUCT.md — expectations for dialogue and collaboration
-  
-For now: open a Discussion to propose ideas, or pick a good-first-task issue from the tracker.
+Governance and contribution guidelines are still being drafted.
+
+For now, thoughtful discussion, critique, and experimentation are welcome via issues and discussions.
