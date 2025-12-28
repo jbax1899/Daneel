@@ -1,4 +1,7 @@
-# Deployment (Issue #96)
+# Deployment
+
+If you landed here first, start with the main README for the big-picture overview:
+`README.md`
 
 This folder defines the minimal 3-service split for local/self-hosted Docker Compose.
 
@@ -11,8 +14,10 @@ Services:
 - Ensure `.env` is present at the repo root.
 
 ## Required environment
-- backend: `OPENAI_API_KEY`
-- discord-bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
+- backend: `OPENAI_API_KEY`, `TRACE_API_TOKEN`
+- discord-bot: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `OPENAI_API_KEY`, `DEVELOPER_USER_ID`, `INCIDENT_PSEUDONYMIZATION_SECRET`, `TRACE_API_TOKEN`
+
+Why `TRACE_API_TOKEN`? It's a shared key used to authenticate trace uploads from the bot to the backend.
 
 ## Optional environment
 - backend: `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY` (both required to enable CAPTCHA)
@@ -20,8 +25,9 @@ Services:
 - backend/bot: `LOG_LEVEL` (defaults to `debug`)
 - backend: `ARETE_ALLOWED_ORIGINS`, `ARETE_FRAME_ANCESTORS` (override CORS/CSP allowlists)
 - backend: `ARETE_DEFAULT_MODEL`, `ARETE_DEFAULT_REASONING_EFFORT`, `ARETE_DEFAULT_VERBOSITY` (reflect defaults)
-- backend/bot: `TRACE_API_TOKEN` (required for authenticated trace writes)
 - backend: `TRACE_API_RATE_LIMIT`, `TRACE_API_RATE_LIMIT_WINDOW_MS`, `TRACE_API_MAX_BODY_BYTES` (trace ingestion limits)
+- bot: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` (optional image uploads)
+  - If these are missing, images are still delivered via Discord attachments.
 
 ## Start
 `docker compose -f deploy/compose.yml up --build`
@@ -36,14 +42,14 @@ Services:
 - All three (bash): `./deploy/deploy-fly.sh`
 - All three (PowerShell): `./deploy/deploy-fly.ps1`
   (Requires Fly CLI: https://fly.io/docs/flyctl/install/)
-  TODO: add interactive prompts in the deploy scripts for setting Fly secrets (`fly secrets set`).
+  The scripts read `.env` and will prompt for any missing values.
   Note: we use three separate Fly apps to mirror the Docker Compose service split.
   Note: web uses `BACKEND_HOST=arete-backend.internal` in `deploy/fly.web.toml`; update it if the backend app name changes.
   Secrets per app:
-  - backend: `OPENAI_API_KEY`
-  - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `GITHUB_WEBHOOK_SECRET`
-  - bot: `DISCORD_TOKEN`, `OPENAI_API_KEY`
-  - bot (optional): `LOG_LEVEL`
+  - backend: `OPENAI_API_KEY`, `TRACE_API_TOKEN`
+  - backend (optional): `TURNSTILE_SECRET_KEY`, `TURNSTILE_SITE_KEY`, `GITHUB_WEBHOOK_SECRET`, `LOG_LEVEL`
+  - bot: `DISCORD_TOKEN`, `CLIENT_ID`, `GUILD_ID`, `OPENAI_API_KEY`, `DEVELOPER_USER_ID`, `INCIDENT_PSEUDONYMIZATION_SECRET`, `TRACE_API_TOKEN`
+  - bot (optional): `LOG_LEVEL`, `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`
 
 ## Notes
 - Only the web service is exposed on host port 8080 (`http://localhost:8080`) to avoid admin privileges.
