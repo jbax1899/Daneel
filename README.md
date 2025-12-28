@@ -72,7 +72,7 @@ cd arete
 ### 2. Install dependencies
 
 ```bash
-npm install
+pnpm install
 ```
 
 ### 3. Configure environment variables
@@ -98,13 +98,13 @@ INCIDENT_PSEUDONYMIZATION_SECRET=...
 To start the backend and web interface together:
 
 ```bash
-npm run start:dev
+pnpm start:dev
 ```
 
 The Discord bot runs as a separate process. In another terminal, run:
 
 ```bash
-npm run dev -w @arete/discord-bot
+pnpm dev -w @arete/discord-bot
 ```
 
 ---

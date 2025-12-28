@@ -35,10 +35,10 @@ graph TD
 ```json
 {
   "scripts": {
-    "pre-review": "npm run validate-arete-tags && npm run type-check && npm run lint-check",
-    "full-pre-review": "npm run pre-review && npm run ethics-check && npm run risk-check",
-    "ethics-check": "npm run ethics-audit",
-    "risk-check": "npm run risk-audit"
+    "pre-review": "pnpm validate-arete-tags && pnpm type-check && pnpm lint-check",
+    "full-pre-review": "pnpm pre-review && pnpm ethics-check && pnpm risk-check",
+    "ethics-check": "pnpm ethics-audit",
+    "risk-check": "pnpm risk-audit"
   }
 }
 ```
@@ -51,14 +51,14 @@ graph TD
 ```json
 {
   "commands": {
-    "pre-review": "npm run pre-review",
-    "full-pre-review": "npm run full-pre-review",
-    "ethics-check": "npm run ethics-check",
-    "risk-check": "npm run risk-check"
+    "pre-review": "pnpm pre-review",
+    "full-pre-review": "pnpm full-pre-review",
+    "ethics-check": "pnpm ethics-check",
+    "risk-check": "pnpm risk-check"
   },
   "tasks": {
     "pre-review": {
-      "command": "npm run pre-review",
+      "command": "pnpm pre-review",
       "description": "Run automated validation pipeline (ARETE tags, types, linting)"
     }
   }
@@ -104,7 +104,7 @@ graph TD
 
 ### Step 2: Run Automated Validation
 ```bash
-npm run pre-review
+pnpm pre-review
 ```
 
 **What it checks**:
@@ -132,7 +132,7 @@ Review the comments in this code for quality and completeness
 
 ### Step 5: Run Ethics/Risk Audits
 ```bash
-npm run ethics-check && npm run risk-check
+pnpm ethics-check && pnpm risk-check
 ```
 
 **What it validates**:
@@ -202,7 +202,7 @@ Every module must include:
 ## Troubleshooting
 
 ### Issue: Missing ARETE Tags
-**Solution**: Run `npm run validate-arete-tags` first
+**Solution**: Run `pnpm validate-arete-tags` first
 **Prevention**: Use pre-review checklist
 
 ### Issue: Inadequate Comments
@@ -224,7 +224,7 @@ Every module must include:
 ## Integration with Existing Tools
 
 ### CI/CD Pipeline
-- `npm run validate-arete-tags` runs in CI
+- `pnpm validate-arete-tags` runs in CI
 - Prevents merging code with missing tags
 - Enforces ARETE standards automatically
 
@@ -241,7 +241,7 @@ Every module must include:
 ## Best Practices
 
 ### For Contributors
-1. **Always run validation first**: `npm run pre-review`
+1. **Always run validation first**: `pnpm pre-review`
 2. **Use structured prompts**: Follow `.cursor/arete-prompts.md`
 3. **Follow the checklist**: Use `.cursor/pre-review-checklist.md`
 4. **Ask specific questions**: Use inline chat effectively

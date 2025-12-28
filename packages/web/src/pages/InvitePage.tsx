@@ -151,18 +151,18 @@ const InvitePage: React.FC = () => {
                     border: '1px solid var(--border)',
                     paddingTop: '3rem'
                   }}>
-{`npm install`}
+{`pnpm install`}
                   </pre>
                     <button 
                       className="cta-button secondary" 
                       onClick={async () => {
                         try {
-                          await navigator.clipboard.writeText('npm install');
+                          await navigator.clipboard.writeText('pnpm install');
                           showToast(setInstallToast, 'Copied to clipboard');
                         } catch (err) {
                           console.error('Failed to copy to clipboard:', err);
                           const textArea = document.createElement('textarea');
-                          textArea.value = 'npm install';
+                          textArea.value = 'pnpm install';
                           document.body.appendChild(textArea);
                           textArea.select();
                           document.execCommand('copy');
@@ -588,18 +588,18 @@ WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}
                   border: '1px solid var(--border)',
                   paddingTop: '3rem'
                 }}>
-{`npm run start:dev`}
+{`pnpm start:dev`}
                 </pre>
                 <button 
                   className="cta-button secondary" 
                   onClick={async () => {
                     try {
-                      await navigator.clipboard.writeText('npm run start:dev');
+                      await navigator.clipboard.writeText('pnpm start:dev');
                           showToast(setDevToast, 'Copied to clipboard');
                     } catch (err) {
                       console.error('Failed to copy to clipboard:', err);
                       const textArea = document.createElement('textarea');
-                      textArea.value = 'npm run start:dev';
+                      textArea.value = 'pnpm start:dev';
                       document.body.appendChild(textArea);
                       textArea.select();
                       document.execCommand('copy');
@@ -654,7 +654,7 @@ WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}
                     )}
               </div>
               <p>This will start both the Discord bot and the web interface. The web interface will be available at <code>http://localhost:5173</code>.</p>
-              <p>To run only the web UI, use: <code>npm run dev -w @arete/web</code></p>
+              <p>To run only the web UI, use: <code>pnpm dev -w @arete/web</code></p>
             </div>
 
             {/* Deployment Options */}
@@ -675,19 +675,19 @@ WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}
                     border: '1px solid var(--border)',
                     paddingTop: '3rem'
                   }}>
-{`npm run build && npm start`}
+{`pnpm build && pnpm start`}
                   </pre>
                   <button 
                     className="cta-button secondary" 
                     onClick={async () => {
                       try {
-                        const buildCommands = `npm run build && npm start`;
+                        const buildCommands = `pnpm build && pnpm start`;
                         await navigator.clipboard.writeText(buildCommands);
                           showToast(setBuildToast, 'Copied to clipboard');
                       } catch (err) {
                         console.error('Failed to copy to clipboard:', err);
                         const textArea = document.createElement('textarea');
-                        textArea.value = `npm run build && npm start`;
+                        textArea.value = `pnpm build && pnpm start`;
                         document.body.appendChild(textArea);
                         textArea.select();
                         document.execCommand('copy');

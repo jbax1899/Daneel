@@ -3,24 +3,29 @@ FROM node:22-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
+# Enable corepack for pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
 # Native addon support for @discordjs/opus and friends.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends python3 make g++ \
   && rm -rf /var/lib/apt/lists/*
 
 COPY tsconfig.json ./tsconfig.json
-COPY package.json package-lock.json ./
+COPY package.json pnpm-workspace.yaml ./
 COPY packages/discord-bot/package.json packages/discord-bot/package.json
 COPY packages/backend/package.json packages/backend/tsconfig.json packages/backend/
 
-RUN npm install --legacy-peer-deps --include=dev
+# Install dependencies (handle missing lockfile gracefully)
+COPY pnpm-lock.yaml* ./
+RUN pnpm install --frozen-lockfile || pnpm install
 
 COPY packages/backend/src/ packages/backend/src/
 COPY packages/discord-bot/ packages/discord-bot/
 
-RUN npm run build --workspace=@arete/backend \
-  && npx tsc -p packages/discord-bot/tsconfig.json \
-  && npm prune --omit=dev --legacy-peer-deps
+RUN pnpm --filter @arete/backend run build \
+  && pnpm exec tsc -p packages/discord-bot/tsconfig.json \
+  && pnpm prune
 
 WORKDIR /app/packages/discord-bot
 CMD ["node", "dist/index.js"]
