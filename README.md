@@ -105,22 +105,17 @@ npm run dev -w @arete/discord-bot
 
 ---
 
-## Cloudflare Turnstile (Optional)
+## Optional Services
 
-Turnstile protects public endpoints from abuse.
-
-- If **both keys** are set, CAPTCHA is enforced.
-- If **neither key** is set, CAPTCHA is skipped.
-- If **only one key** is set, the backend returns a configuration error.
+- **Cloudflare Turnstile (abuse prevention)**  
+  Turnstile protects public endpoints from abuse.  
+  If **both keys** are set, CAPTCHA is enforced.  
+  If **neither key** is set, CAPTCHA is skipped.
 
 ```env
 TURNSTILE_SITE_KEY=...
 TURNSTILE_SECRET_KEY=...
 ```
-
----
-
-## Optional Services
 
 - **Cloudinary (image uploads)**  
   If Cloudinary credentials are provided, images can be uploaded and referenced in traces.  
