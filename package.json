@@ -1,23 +1,22 @@
 {
     "name": "arete",
     "private": true,
+    "packageManager": "pnpm@10.26.2",
     "workspaces": [
         "packages/*"
     ],
     "scripts": {
-        "start:dev": "concurrently \"node -r ts-node/register/transpile-only packages/backend/src/server.ts\" \"pnpm dev -w @arete/web\"",
-        "start:backend": "node -r ts-node/register/transpile-only packages/backend/src/server.ts",
-        "start:prod-test": "pnpm build --filter @arete/backend && cross-env NODE_ENV=production node server.js",
-        "dev:prod-test": "pnpm build --filter @arete/backend && cross-env NODE_ENV=production node server.js & pnpm dev -w @arete/web",
+        "start:dev": "concurrently \"pnpm exec ts-node --transpile-only packages/backend/src/server.ts\" \"pnpm --filter @arete/web dev\"",
+        "start:backend": "pnpm exec ts-node --transpile-only packages/backend/src/server.ts",
+        "start:bot": "pnpm --filter @arete/discord-bot dev",
+        "start:prod-test": "pnpm --filter @arete/backend build && cross-env NODE_ENV=production node server.js",
+        "dev:prod-test": "concurrently \"pnpm --filter @arete/backend build && cross-env NODE_ENV=production node server.js\" \"pnpm --filter @arete/web dev\"",
         "build": "pnpm -r build",
         "validate-arete-tags": "node scripts/validate-arete-tags.js",
         "blog-sync": "node scripts/blog-sync.js",
         "pre-review": "pnpm validate-arete-tags && pnpm type-check && pnpm lint-check",
         "type-check": "pnpm exec tsc --noEmit",
-        "lint-check": "pnpm exec eslint packages/",
-        "ethics-check": "pnpm exec tsx -e \"console.log('Ethics audit: Check all @arete-ethics tags are current')\"",
-        "risk-check": "pnpm exec tsx -e \"console.log('Risk audit: Check all @arete-risk tags are current')\"",
-        "full-pre-review": "pnpm pre-review && pnpm ethics-check && pnpm risk-check"
+        "lint-check": "pnpm exec eslint packages/"
     },
     "devDependencies": {
         "@eslint/js": "^9.38.0",
@@ -27,6 +26,8 @@
         "@types/js-yaml": "^4.0.9",
         "@types/mime-types": "^3.0.1",
         "@types/node": "^24.5.1",
+        "@types/react": "^18.3.27",
+        "@types/react-dom": "^18.3.7",
         "@types/winston": "^2.4.4",
         "@types/ws": "^8.5.14",
         "@typescript-eslint/eslint-plugin": "^8.46.2",
@@ -37,9 +38,18 @@
         "eslint-config-prettier": "^10.1.8",
         "eslint-plugin-react-hooks": "^5.2.0",
         "prettier": "3.7.4",
+        "csstype": "^3.2.3",
         "ts-node": "^10.9.2",
+        "tsx": "^4.21.0",
         "typescript": "^5.9.2",
         "vite": "^7.1.10"
+    },
+    "pnpm": {
+        "overrides": {
+            "@types/react": "18.3.27",
+            "@types/react-dom": "18.3.7",
+            "csstype": "3.2.3"
+        }
     },
     "dependencies": {
         "@ai-sdk/openai": "^2.0.8",

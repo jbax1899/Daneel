@@ -21,10 +21,9 @@ graph TD
     D --> B
     C -->|Yes| E[Use Cursor Bugbot]
     E --> F[Use Inline Chat with ARETE Prompts]
-    F --> G[Run Ethics/Risk Audits]
-    G --> H[Accept Cursor Suggestions]
-    H --> I[Open Human PR Review]
-    I --> J[Human Focus: Logic, Ethics, Integration]
+    F --> G[Accept Cursor Suggestions]
+    G --> H[Open Human PR Review]
+    H --> I[Human Focus: Logic, Ethics, Integration]
 ```
 
 ## Implementation Components
@@ -35,10 +34,7 @@ graph TD
 ```json
 {
   "scripts": {
-    "pre-review": "pnpm validate-arete-tags && pnpm type-check && pnpm lint-check",
-    "full-pre-review": "pnpm pre-review && pnpm ethics-check && pnpm risk-check",
-    "ethics-check": "pnpm ethics-audit",
-    "risk-check": "pnpm risk-audit"
+    "pre-review": "pnpm validate-arete-tags && pnpm type-check && pnpm lint-check"
   }
 }
 ```
@@ -51,10 +47,7 @@ graph TD
 ```json
 {
   "commands": {
-    "pre-review": "pnpm pre-review",
-    "full-pre-review": "pnpm full-pre-review",
-    "ethics-check": "pnpm ethics-check",
-    "risk-check": "pnpm risk-check"
+    "pre-review": "pnpm pre-review"
   },
   "tasks": {
     "pre-review": {
@@ -130,22 +123,12 @@ Analyze this function for complexity issues
 Review the comments in this code for quality and completeness
 ```
 
-### Step 5: Run Ethics/Risk Audits
-```bash
-pnpm ethics-check && pnpm risk-check
-```
-
-**What it validates**:
-- Risk level accuracy
-- Ethics level appropriateness
-- Compliance with ARETE framework
-
-### Step 6: Accept Cursor Suggestions
+### Step 5: Accept Cursor Suggestions
 - Review all suggested simplifications
 - Accept comments and documentation improvements
 - Address any flagged issues
 
-### Step 7: Open Human PR Review
+### Step 6: Open Human PR Review
 - Human reviewers focus on:
   - Logic correctness
   - Ethical implications

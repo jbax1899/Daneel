@@ -189,12 +189,11 @@ const <loggerName>Logger = logger.child({ module: '<loggerName>' });
 2. **Run automated validation**: `pnpm pre-review` (validates ARETE tags, types, linting)
 3. **Use Cursor's Bugbot (Review PR)** for automated code quality analysis
 4. **Use inline chat (`Ctrl+K`)** with ARETE-specific prompts (see `.cursor/arete-prompts.md`)
-5. **Run ethics/risk audits**: `pnpm ethics-check && pnpm risk-check`
-6. **Accept suggested simplifications or comments** in-place
-7. **Open human PR review** for logic, ethics, and integration focus
+5. **Accept suggested simplifications or comments** in-place
+6. **Open human PR review** for logic, ethics, and integration focus
 
 ### Integration with Existing Tools
-- **Pre-review pipeline**: `pnpm pre-review` → `pnpm full-pre-review`
+- **Pre-review pipeline**: `pnpm pre-review`
 - **ARETE validation**: `pnpm validate-arete-tags` (enforced by CI)
 - **Cursor tasks**: Use `.cursor/tasks.json` commands for quick access
 - **Checklist**: Follow `.cursor/pre-review-checklist.md` before Cursor analysis

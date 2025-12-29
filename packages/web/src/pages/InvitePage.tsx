@@ -653,8 +653,9 @@ WEB_BASE_URL=https://your-domain.com       # Base URL for web server (String)`}
                       </div>
                     )}
               </div>
-              <p>This will start both the Discord bot and the web interface. The web interface will be available at <code>http://localhost:5173</code>.</p>
-              <p>To run only the web UI, use: <code>pnpm dev -w @arete/web</code></p>
+              <p>This will start the backend and the web interface. The web interface will be available at <code>http://localhost:5173</code>.</p>
+              <p>To run the Discord bot separately, use: <code>pnpm start:bot</code></p>
+              <p>To run only the web UI, use: <code>pnpm --filter @arete/web dev</code></p>
             </div>
 
             {/* Deployment Options */}

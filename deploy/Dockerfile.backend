@@ -4,7 +4,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Enable corepack for pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
 
 # Native addon support for better-sqlite3.
 RUN apt-get update \
@@ -15,14 +15,14 @@ COPY tsconfig.json ./tsconfig.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/backend/package.json packages/backend/tsconfig.json packages/backend/
 
-# Install dependencies (handle missing lockfile gracefully)
+# Install dependencies (include dev deps for build tooling; handle missing lockfile gracefully)
 COPY pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install --frozen-lockfile --prod=false || pnpm install --prod=false
 
 COPY packages/backend/src/ packages/backend/src/
 
 RUN pnpm --filter @arete/backend run build \
-  && pnpm prune
+  && pnpm prune --prod
 
 EXPOSE 3000
 CMD ["node", "packages/backend/dist/server.js"]

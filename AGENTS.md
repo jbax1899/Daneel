@@ -50,7 +50,6 @@ Example:
 ## Testing & Validation
 - Pre-review: `pnpm pre-review`
 - ARETE tags: `pnpm validate-arete-tags`
-- Ethics/risk audits: `pnpm ethics-check && pnpm risk-check`
 
 ## Context Hints
 - Bot: `packages/discord-bot/src/events`, `packages/discord-bot/src/commands`, `packages/discord-bot/src/voice`

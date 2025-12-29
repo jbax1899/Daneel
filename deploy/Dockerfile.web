@@ -3,7 +3,7 @@ FROM node:22-slim as build
 WORKDIR /app
 
 # Enable corepack for pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@10.26.2 --activate
 
 COPY tsconfig.json ./tsconfig.json
 COPY package.json pnpm-workspace.yaml ./

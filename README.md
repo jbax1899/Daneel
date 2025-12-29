@@ -75,6 +75,8 @@ cd arete
 pnpm install
 ```
 
+If pnpm isn't available yet, run `corepack enable` once (Node 16.10+), then re-run `pnpm install`.
+
 ### 3. Configure environment variables
 
 ```bash
@@ -95,17 +97,37 @@ INCIDENT_PSEUDONYMIZATION_SECRET=...
 
 ### 4. Run the services
 
-To start the backend and web interface together:
+Start the backend and web interface:
 
 ```bash
 pnpm start:dev
 ```
 
-The Discord bot runs as a separate process. In another terminal, run:
+In another terminal, start the Discord bot:
 
 ```bash
-pnpm dev -w @arete/discord-bot
+pnpm start:bot
 ```
+
+---
+
+## Useful Commands
+
+### Local development
+
+- `pnpm start:dev` - Backend + web (no bot).
+- `pnpm start:bot` - Discord bot only (requires bot env vars).
+- `pnpm start:backend` - Backend only (no web or bot).
+
+### Production-style checks
+
+- `pnpm start:prod-test` - Build backend and run production server.
+- `pnpm dev:prod-test` - Production backend + web dev server (no bot).
+
+### Validation
+
+- `pnpm build` - Build all workspace packages.
+- `pnpm pre-review` - ARETE tags + type-check + lint.
 
 ---
 

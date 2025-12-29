@@ -14,7 +14,7 @@
         "prestart": "pnpm build",
         "start": "node --es-module-specifier-resolution=node dist/index.js",
         "dev": "pnpm exec cross-env NODE_ENV=development pnpm exec tsx watch src/index.ts",
-        "build": "pnpm build --filter @arete/backend && pnpm clean && tsc && pnpm copy-files",
+        "build": "pnpm --filter @arete/backend build && pnpm clean && tsc && pnpm copy-files",
         "clean": "rimraf dist",
         "copy-files": "xcopy /s /e /i /y src\\*.* dist\\src\\ 2>nul && xcopy /s /e /i /y src\\commands\\*.* dist\\commands\\ 2>nul && xcopy /s /e /i /y src\\events\\*.* dist\\events\\ 2>nul && xcopy /s /e /i /y src\\utils\\*.* dist\\utils\\ 2>nul || echo No files to copy",
         "watch": "tsc -w"
@@ -39,6 +39,7 @@
         "opusscript": "^0.0.8",
         "prism-media": "^1.3.5",
         "reindex": "^0.1.0",
+        "ws": "^8.18.0",
         "winston": "^3.19.0"
     },
     "devDependencies": {
