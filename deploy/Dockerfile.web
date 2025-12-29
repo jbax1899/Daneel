@@ -10,9 +10,9 @@ COPY package.json pnpm-workspace.yaml ./
 COPY packages/web/package.json packages/web/package.json
 COPY packages/backend/package.json packages/backend/tsconfig.json packages/backend/
 
-# Install dependencies (handle missing lockfile gracefully)
+# Install dependencies (lockfile required)
 COPY pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile || pnpm install
+RUN pnpm install --frozen-lockfile
 
 COPY packages/web/ packages/web/
 COPY packages/backend/src/ packages/backend/src/
