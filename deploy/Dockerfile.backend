@@ -22,7 +22,7 @@ RUN pnpm install --frozen-lockfile --prod=false || pnpm install --prod=false
 COPY packages/backend/src/ packages/backend/src/
 
 RUN pnpm --filter @arete/backend run build \
-  && pnpm prune --prod
+  && CI=true pnpm --filter @arete/backend... install --prod
 
 EXPOSE 3000
 CMD ["node", "packages/backend/dist/server.js"]

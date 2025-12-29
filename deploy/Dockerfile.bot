@@ -25,7 +25,7 @@ COPY packages/discord-bot/ packages/discord-bot/
 
 RUN pnpm --filter @arete/backend run build \
   && pnpm exec tsc -p packages/discord-bot/tsconfig.json \
-  && pnpm prune --prod
+  && CI=true pnpm --filter @arete/discord-bot... install --prod
 
 WORKDIR /app/packages/discord-bot
 CMD ["node", "dist/index.js"]
