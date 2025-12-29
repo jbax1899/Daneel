@@ -18,9 +18,9 @@ This utility allows you to manually synchronize blog posts from GitHub Discussio
 
 ## Usage
 
-### Option 1: Using npm script (Recommended)
+### Option 1: Using pnpm script (Recommended)
 ```bash
-npm run blog-sync
+pnpm blog-sync
 ```
 
 ### Option 2: Direct execution

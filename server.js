@@ -11,7 +11,7 @@ const path = require('node:path');
 const entryPath = path.join(__dirname, 'packages', 'backend', 'dist', 'server.js');
 
 if (!fs.existsSync(entryPath)) {
-  console.error('Backend build output not found. Run: npm run build --workspace=@arete/backend');
+  console.error('Backend build output not found. Run: pnpm build --filter @arete/backend');
   process.exit(1);
 }
 

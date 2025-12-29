@@ -1,54 +1,56 @@
 {
-  "name": "@arete/discord-bot",
-  "version": "1.0.0",
-  "private": true,
-  "type": "module",
-  "main": "dist/index.js",
-  "exports": {
-    ".": "./dist/index.js",
-    "./src/utils/openaiService.js": "./dist/src/utils/openaiService.js",
-    "./src/utils/response/metadata.js": "./dist/src/utils/response/metadata.js",
-    "./src/utils/RateLimiter.js": "./dist/src/utils/RateLimiter.js"
-  },
-  "scripts": {
-    "prestart": "npm run build",
-    "start": "node --es-module-specifier-resolution=node dist/index.js",
-    "dev": "npx cross-env NODE_ENV=development npx tsx watch src/index.ts",
-    "build": "npm run build --workspace=@arete/backend && npm run clean && tsc && npm run copy-files",
-    "clean": "rimraf dist",
-    "copy-files": "xcopy /s /e /i /y src\\*.* dist\\src\\ 2>nul && xcopy /s /e /i /y src\\commands\\*.* dist\\commands\\ 2>nul && xcopy /s /e /i /y src\\events\\*.* dist\\events\\ 2>nul && xcopy /s /e /i /y src\\utils\\*.* dist\\utils\\ 2>nul || echo No files to copy",
-    "watch": "tsc -w"
-  },
-  "dependencies": {
-    "@arete/backend": "file:../backend",
-    "@openai/agents": "^0.3.4",
-    "@pinecone-database/pinecone": "^6.1.2",
-    "body-parser": "^2.2.0",
-    "cloudinary": "^2.8.0",
-    "date-fns": "^4.1.0",
-    "discord.js": "^14.25.1",
-    "dotenv": "^17.2.1",
-    "express": "^5.1.0",
-    "flyio": "^0.0.4",
-    "js-yaml": "^4.1.0",
-    "mime-types": "^2.1.35",
-    "node-fetch": "^3.3.2",
-    "only": "^0.0.2",
-    "openai": "^6.15.0",
-    "opusscript": "^0.0.8",
-    "prism-media": "^1.3.5",
-    "reindex": "^0.1.0",
-    "winston": "^3.19.0"
-  },
-  "devDependencies": {
-    "@types/body-parser": "^1.19.6",
-    "@types/express": "^5.0.3",
-    "@types/node": "^24.6.2",
-    "copyfiles": "^2.4.1",
-    "cross-env": "^10.1.0",
-    "rimraf": "^6.1.2",
-    "ts-node-dev": "^2.0.0",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.2"
-  }
+    "name": "@arete/discord-bot",
+    "version": "1.0.0",
+    "private": true,
+    "type": "module",
+    "main": "dist/index.js",
+    "exports": {
+        ".": "./dist/index.js",
+        "./src/utils/openaiService.js": "./dist/src/utils/openaiService.js",
+        "./src/utils/response/metadata.js": "./dist/src/utils/response/metadata.js",
+        "./src/utils/RateLimiter.js": "./dist/src/utils/RateLimiter.js"
+    },
+    "scripts": {
+        "prestart": "pnpm build",
+        "start": "node --es-module-specifier-resolution=node dist/index.js",
+        "dev": "pnpm exec cross-env NODE_ENV=development pnpm exec tsx watch src/index.ts",
+        "build": "pnpm --filter @arete/backend build && pnpm clean && tsc && pnpm copy-files",
+        "clean": "rimraf dist",
+        "copy-files": "xcopy /s /e /i /y src\\*.* dist\\src\\ 2>nul && xcopy /s /e /i /y src\\commands\\*.* dist\\commands\\ 2>nul && xcopy /s /e /i /y src\\events\\*.* dist\\events\\ 2>nul && xcopy /s /e /i /y src\\utils\\*.* dist\\utils\\ 2>nul || echo No files to copy",
+        "watch": "tsc -w"
+    },
+    "dependencies": {
+        "@arete/backend": "workspace:*",
+        "@openai/agents": "^0.3.4",
+        "@pinecone-database/pinecone": "^6.1.2",
+        "@sapphire/shapeshift": "^4.0.0",
+        "body-parser": "^2.2.0",
+        "cloudinary": "^2.8.0",
+        "date-fns": "^4.1.0",
+        "discord.js": "^14.25.1",
+        "dotenv": "^17.2.1",
+        "express": "^5.1.0",
+        "flyio": "^0.0.4",
+        "js-yaml": "^4.1.0",
+        "mime-types": "^2.1.35",
+        "node-fetch": "^3.3.2",
+        "only": "^0.0.2",
+        "openai": "^6.15.0",
+        "opusscript": "^0.0.8",
+        "prism-media": "^1.3.5",
+        "reindex": "^0.1.0",
+        "ws": "^8.18.0",
+        "winston": "^3.19.0"
+    },
+    "devDependencies": {
+        "@types/body-parser": "^1.19.6",
+        "@types/express": "^5.0.3",
+        "@types/node": "^24.6.2",
+        "copyfiles": "^2.4.1",
+        "cross-env": "^10.1.0",
+        "rimraf": "^6.1.2",
+        "ts-node-dev": "^2.0.0",
+        "tsx": "^4.21.0",
+        "typescript": "^5.9.2"
+    }
 }
