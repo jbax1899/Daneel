@@ -96,6 +96,8 @@ TRACE_API_TOKEN=...
 INCIDENT_PSEUDONYMIZATION_SECRET=...
 ```
 
+See `.env.example` for the full list and descriptions of optional settings.
+
 ### 4. Run the services
 
 Start the backend and web interface:
