@@ -47,7 +47,10 @@
             "@types/react": "18.3.27",
             "@types/react-dom": "18.3.7",
             "csstype": "3.2.3"
-        }
+        },
+        "onlyBuiltDependencies": [
+            "better-sqlite3"
+        ]
     },
     "dependencies": {
         "dotenv": "^16.6.1",

@@ -15,15 +15,14 @@ COPY tsconfig.json ./tsconfig.json
 COPY package.json pnpm-workspace.yaml ./
 COPY packages/backend/package.json packages/backend/tsconfig.json packages/backend/
 
-# Install dependencies (include dev deps for build tooling; lockfile required)
+# Install dependencies (lockfile required)
 COPY pnpm-lock.yaml* ./
-RUN pnpm install --frozen-lockfile --prod=false
 
 COPY packages/backend/src/ packages/backend/src/
 
 # Build with backend-local dev tooling, then install backend-only prod deps.
 RUN pnpm --dir packages/backend --ignore-workspace install --prod=false --lockfile-dir /app \
-  && pnpm --dir packages/backend --ignore-workspace run build \
+  && pnpm --dir packages/backend --ignore-workspace exec tsc -p tsconfig.json \
   # Install backend deps without workspace closure; the image only includes packages/backend.
   && CI=true pnpm --dir packages/backend install --prod --ignore-workspace --lockfile-dir /app
 
