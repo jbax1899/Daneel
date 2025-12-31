@@ -44,8 +44,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     //
     // Embed content
     //
-    // Provenance
-    embed.setTitle(`Reasoning - ${responseMetadata.provenance }`); // reduce vertical space, provenance in title
+    // Keep the footer compact by folding provenance into the description line.
 
     // Build description string
     // Instead of using inline eelements, we build a description that ideally only takes one line
@@ -53,11 +52,13 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     const descriptionParts: string[] = [];
 
     // Confidence, displayed as a percentage (e.g. "85%")
+    // Use a lowercase provenance label for the compact "(inferred)" suffix.
+    const provenanceLabel = responseMetadata.provenance.toLowerCase();
     if (responseMetadata.confidence < 0.0 || responseMetadata.confidence > 1.0) {
         console.warn(`Confidence score out of bounds: ${responseMetadata.confidence} - Reporting as 0%`);
-        descriptionParts.push(`0% confidence`);
+        descriptionParts.push(`0% confidence (${provenanceLabel})`);
     } else {
-        descriptionParts.push(`${(responseMetadata.confidence * 100).toFixed(0)}% confidence`);
+        descriptionParts.push(`${(responseMetadata.confidence * 100).toFixed(0)}% confidence (${provenanceLabel})`);
     }
 
     // Trade-offs, if any
@@ -75,8 +76,8 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
             const domain = c.url.hostname.replace('www.', '');
             // Return hostname embedded with url
             return `[${domain}](${c.url})`;
-        }).join(' • '); // Join multiple citations with smaller dot
-        descriptionParts.push(`Sources:\n${citationLines}`); // Push citations to new line for readability. Use term "Sources " instead of "Citations" for clarity
+        }).join(' · '); // Join multiple citations with smaller dot separators
+        descriptionParts.push(`Sources:\n${citationLines}`); // Push citations to new line for readability
     }
     
     // At last, set the description
@@ -85,7 +86,7 @@ export function buildFooterEmbed(responseMetadata: ResponseMetadata, webBaseUrl:
     // Footer: model | chainHash | sessionID | license
     // I would add links to sessionID and license, but Discord footers don't support links
     // Thankfully we already have the Full Trace button, which provides a source for more detailed information
-    embed.setFooter({ 
+    embed.setFooter({
         text: `${responseMetadata.modelVersion} • ${responseMetadata.chainHash} • ${responseMetadata.responseId} • ${responseMetadata.licenseContext}`
     });
 
