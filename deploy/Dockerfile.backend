@@ -21,7 +21,9 @@ RUN pnpm install --frozen-lockfile --prod=false
 
 COPY packages/backend/src/ packages/backend/src/
 
-RUN pnpm --dir packages/backend --ignore-workspace run build \
+# Build with backend-local dev tooling, then install backend-only prod deps.
+RUN pnpm --dir packages/backend --ignore-workspace install --prod=false --lockfile-dir /app \
+  && pnpm --dir packages/backend --ignore-workspace run build \
   # Install backend deps without workspace closure; the image only includes packages/backend.
   && CI=true pnpm --dir packages/backend install --prod --ignore-workspace --lockfile-dir /app
 
