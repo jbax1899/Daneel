@@ -28,4 +28,5 @@ RUN pnpm --dir packages/backend --ignore-workspace install --prod=false --lockfi
   && CI=true pnpm --dir packages/backend install --prod --ignore-workspace --lockfile-dir /app
 
 EXPOSE 3000
-CMD ["node", "packages/backend/dist/server.js"]
+WORKDIR /app/packages/backend
+CMD ["node", "dist/server.js"]
