@@ -5,26 +5,49 @@
  * @arete-scope: core
  *
  * @description: Handles all pricing calculations and estimations for text and image generation.
- * 
+ *
  * @impact
  * Risk: Incorrect pricing calculations can lead to unexpected costs.
  * Ethics: Inaccurate pricing information for LLM interactions can erode trust.
  */
 
-import * as crypto from 'node:crypto';
+import crypto from 'node:crypto';
 import { logger } from './logger.js';
 
 // ====================
 // Type Declarations
 // ====================
 
-export type GPT5ModelType = 'gpt-5' | 'gpt-5-mini' | 'gpt-5-nano' | 'gpt-5.1' | 'gpt-5.2';
-export type OmniModelType = 'gpt-4o' | 'gpt-4o-mini' | 'gpt-4.1' | 'gpt-4.1-mini' | 'gpt-4.1-nano';
-export type EmbeddingModelType = 'text-embedding-3-small' | 'text-embedding-3-large' | 'text-embedding-ada-002';
-export type TextModelPricingKey = GPT5ModelType | OmniModelType | EmbeddingModelType;
+export type GPT5ModelType =
+    | 'gpt-5'
+    | 'gpt-5-mini'
+    | 'gpt-5-nano'
+    | 'gpt-5.1'
+    | 'gpt-5.2';
+export type OmniModelType =
+    | 'gpt-4o'
+    | 'gpt-4o-mini'
+    | 'gpt-4.1'
+    | 'gpt-4.1-mini'
+    | 'gpt-4.1-nano';
+export type EmbeddingModelType =
+    | 'text-embedding-3-small'
+    | 'text-embedding-3-large'
+    | 'text-embedding-ada-002';
+export type TextModelPricingKey =
+    | GPT5ModelType
+    | OmniModelType
+    | EmbeddingModelType;
 export type ImageGenerationQuality = 'low' | 'medium' | 'high' | 'auto';
-export type ImageGenerationSize = '1024x1024' | '1024x1536' | '1536x1024' | 'auto';
-export type ImageModelPricingKey = 'gpt-image-1.5' | 'gpt-image-1' | 'gpt-image-1-mini';
+export type ImageGenerationSize =
+    | '1024x1024'
+    | '1024x1536'
+    | '1536x1024'
+    | 'auto';
+export type ImageModelPricingKey =
+    | 'gpt-image-1.5'
+    | 'gpt-image-1'
+    | 'gpt-image-1-mini';
 
 /**
  * Core cost breakdown for any model type
@@ -76,9 +99,18 @@ export interface CostStatistics {
     totalTokensIn: number;
     totalTokensOut: number;
     totalCostUsd: number;
-    byModel: Record<string, { calls: number; tokensIn: number; tokensOut: number; costUsd: number }>;
-    byChannel?: Record<string, { calls: number; tokensIn: number; tokensOut: number; costUsd: number }>;
-    byGuild?: Record<string, { calls: number; tokensIn: number; tokensOut: number; costUsd: number }>;
+    byModel: Record<
+        string,
+        { calls: number; tokensIn: number; tokensOut: number; costUsd: number }
+    >;
+    byChannel?: Record<
+        string,
+        { calls: number; tokensIn: number; tokensOut: number; costUsd: number }
+    >;
+    byGuild?: Record<
+        string,
+        { calls: number; tokensIn: number; tokensOut: number; costUsd: number }
+    >;
 }
 
 /**
@@ -117,25 +149,28 @@ export interface ImageGenerationCostEstimate {
  * Pricing per 1M tokens (USD) sourced from https://platform.openai.com/pricing
  * Updated on 2025-10-26
  */
-const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: number }> = {
+const TEXT_MODEL_PRICING: Record<
+    TextModelPricingKey,
+    { input: number; output: number }
+> = {
     // GPT-5 Models
-    'gpt-5.2':      { input: 1.75, output: 14.00 },
-    'gpt-5.1':      { input: 1.25, output: 10.00 },
-    'gpt-5':        { input: 1.25, output: 10.00 },
-    'gpt-5-mini':   { input: 0.25, output: 2.00 },
-    'gpt-5-nano':   { input: 0.05, output: 0.40 },
-    
+    'gpt-5.2': { input: 1.75, output: 14.0 },
+    'gpt-5.1': { input: 1.25, output: 10.0 },
+    'gpt-5': { input: 1.25, output: 10.0 },
+    'gpt-5-mini': { input: 0.25, output: 2.0 },
+    'gpt-5-nano': { input: 0.05, output: 0.4 },
+
     // GPT-4 Models
-    'gpt-4o':       { input: 2.50, output: 10.00 },
-    'gpt-4o-mini':  { input: 0.15, output: 0.60 },
-    'gpt-4.1':      { input: 2.00, output: 8.00 },
-    'gpt-4.1-mini': { input: 0.40, output: 1.60 },
-    'gpt-4.1-nano': { input: 0.10, output: 0.40 },
-    
+    'gpt-4o': { input: 2.5, output: 10.0 },
+    'gpt-4o-mini': { input: 0.15, output: 0.6 },
+    'gpt-4.1': { input: 2.0, output: 8.0 },
+    'gpt-4.1-mini': { input: 0.4, output: 1.6 },
+    'gpt-4.1-nano': { input: 0.1, output: 0.4 },
+
     // Embedding Models (these bill only on input tokens)
     'text-embedding-3-small': { input: 0.02, output: 0 },
     'text-embedding-3-large': { input: 0.13, output: 0 },
-    'text-embedding-ada-002': { input: 0.10, output: 0 }
+    'text-embedding-ada-002': { input: 0.1, output: 0 },
 };
 
 /**
@@ -144,59 +179,62 @@ const TEXT_MODEL_PRICING: Record<TextModelPricingKey, { input: number; output: n
  */
 const IMAGE_GENERATION_COST_TABLE: Record<
     ImageModelPricingKey,
-    Record<Exclude<ImageGenerationQuality, 'auto'>, Record<'1024x1024' | '1024x1536' | '1536x1024', number>>
+    Record<
+        Exclude<ImageGenerationQuality, 'auto'>,
+        Record<'1024x1024' | '1024x1536' | '1536x1024', number>
+    >
 > = {
     'gpt-image-1.5': {
         low: {
             '1024x1024': 0.009,
             '1024x1536': 0.013,
-            '1536x1024': 0.013
+            '1536x1024': 0.013,
         },
         medium: {
             '1024x1024': 0.034,
             '1024x1536': 0.05,
-            '1536x1024': 0.05
+            '1536x1024': 0.05,
         },
         high: {
             '1024x1024': 0.133,
             '1024x1536': 0.2,
-            '1536x1024': 0.2
-        }
+            '1536x1024': 0.2,
+        },
     },
     'gpt-image-1': {
         low: {
             '1024x1024': 0.011,
             '1024x1536': 0.016,
-            '1536x1024': 0.016
+            '1536x1024': 0.016,
         },
         medium: {
             '1024x1024': 0.042,
             '1024x1536': 0.063,
-            '1536x1024': 0.063
+            '1536x1024': 0.063,
         },
         high: {
             '1024x1024': 0.167,
             '1024x1536': 0.25,
-            '1536x1024': 0.25
-        }
+            '1536x1024': 0.25,
+        },
     },
     'gpt-image-1-mini': {
         low: {
             '1024x1024': 0.005,
             '1024x1536': 0.006,
-            '1536x1024': 0.006
+            '1536x1024': 0.006,
         },
         medium: {
             '1024x1024': 0.011,
             '1024x1536': 0.015,
-            '1536x1024': 0.015
+            '1536x1024': 0.015,
         },
         high: {
             '1024x1024': 0.036,
             '1024x1536': 0.052,
-            '1536x1024': 0.052
-        }
-    }
+            '1536x1024': 0.052,
+        },
+    },
 };
 
 /**
@@ -206,7 +244,9 @@ const IMAGE_GENERATION_COST_TABLE: Record<
  * @param {ImageGenerationQuality} quality - The quality to resolve
  * @returns {Exclude<ImageGenerationQuality, 'auto'>} The effective quality
  */
-function resolveEffectiveQuality(quality: ImageGenerationQuality): Exclude<ImageGenerationQuality, 'auto'> {
+function resolveEffectiveQuality(
+    quality: ImageGenerationQuality
+): Exclude<ImageGenerationQuality, 'auto'> {
     return quality === 'auto' ? 'low' : quality;
 }
 
@@ -216,7 +256,9 @@ function resolveEffectiveQuality(quality: ImageGenerationQuality): Exclude<Image
  * @param {ImageGenerationSize} size - The size to resolve
  * @returns {Exclude<ImageGenerationSize, 'auto'>} The effective size
  */
-function resolveEffectiveSize(size: ImageGenerationSize): Exclude<ImageGenerationSize, 'auto'> {
+function resolveEffectiveSize(
+    size: ImageGenerationSize
+): Exclude<ImageGenerationSize, 'auto'> {
     return size === 'auto' ? '1024x1024' : size;
 }
 
@@ -227,16 +269,22 @@ function resolveEffectiveSize(size: ImageGenerationSize): Exclude<ImageGeneratio
  * @param {number} outputTokens - The number of output tokens
  * @returns {CostBreakdown} The estimated cost breakdown
  */
-export function estimateTextCost(model: TextModelPricingKey, inputTokens: number, outputTokens: number): CostBreakdown {
+export function estimateTextCost(
+    model: TextModelPricingKey,
+    inputTokens: number,
+    outputTokens: number
+): CostBreakdown {
     const pricing = TEXT_MODEL_PRICING[model];
     if (!pricing) {
-        logger.warn(`No pricing information found for model ${model}. Assuming zero cost.`);
+        logger.warn(
+            `No pricing information found for model ${model}. Assuming zero cost.`
+        );
         return {
             inputTokens,
             outputTokens,
             inputCost: 0,
             outputCost: 0,
-            totalCost: 0
+            totalCost: 0,
         };
     }
 
@@ -248,7 +296,7 @@ export function estimateTextCost(model: TextModelPricingKey, inputTokens: number
         outputTokens,
         inputCost,
         outputCost,
-        totalCost: inputCost + outputCost
+        totalCost: inputCost + outputCost,
     };
 }
 
@@ -257,7 +305,9 @@ export function estimateTextCost(model: TextModelPricingKey, inputTokens: number
  * @param {ImageGenerationCostOptions} options - The options to estimate cost for
  * @returns {ImageGenerationCostEstimate} The estimated cost breakdown
  */
-export function estimateImageGenerationCost(options: ImageGenerationCostOptions): ImageGenerationCostEstimate {
+export function estimateImageGenerationCost(
+    options: ImageGenerationCostOptions
+): ImageGenerationCostEstimate {
     // Even when callers forget to request a count we assume at least one image
     // so that the consumer receives a realistic non-zero cost estimate.
     const imageCount = Math.max(1, options.imageCount ?? 1);
@@ -267,39 +317,45 @@ export function estimateImageGenerationCost(options: ImageGenerationCostOptions)
     // Calculated pricing for the given model
     const modelPricing = IMAGE_GENERATION_COST_TABLE[options.model];
     if (!modelPricing) {
-        logger.warn(`Unable to locate pricing table for image model ${options.model}. Assuming zero cost.`);
+        logger.warn(
+            `Unable to locate pricing table for image model ${options.model}. Assuming zero cost.`
+        );
         return {
             effectiveQuality,
             effectiveSize,
             imageCount,
             perImageCost: 0,
-            totalCost: 0
+            totalCost: 0,
         };
     }
 
     // Pricing for the given quality
     const qualityPricing = modelPricing[effectiveQuality];
     if (!qualityPricing) {
-        logger.warn(`No pricing tier defined for quality ${effectiveQuality} on model ${options.model}. Assuming zero cost.`);
+        logger.warn(
+            `No pricing tier defined for quality ${effectiveQuality} on model ${options.model}. Assuming zero cost.`
+        );
         return {
             effectiveQuality,
             effectiveSize,
             imageCount,
             perImageCost: 0,
-            totalCost: 0
+            totalCost: 0,
         };
     }
 
     // Pricing for the given size
     const perImageCost = qualityPricing[effectiveSize];
     if (typeof perImageCost !== 'number') {
-        logger.warn(`Unable to determine pricing for model ${options.model}, quality ${effectiveQuality}, and size ${effectiveSize}.`);
+        logger.warn(
+            `Unable to determine pricing for model ${options.model}, quality ${effectiveQuality}, and size ${effectiveSize}.`
+        );
         return {
             effectiveQuality,
             effectiveSize,
             imageCount,
             perImageCost: 0,
-            totalCost: 0
+            totalCost: 0,
         };
     }
 
@@ -311,7 +367,7 @@ export function estimateImageGenerationCost(options: ImageGenerationCostOptions)
         effectiveSize,
         imageCount,
         perImageCost,
-        totalCost
+        totalCost,
     };
 }
 
@@ -320,10 +376,15 @@ export function estimateImageGenerationCost(options: ImageGenerationCostOptions)
  * @param {number | null | undefined} amount - The amount to format
  * @param {number} fractionDigits - The number of fraction digits to include
  * @returns {string} The formatted amount
- */ 
-export function formatUsd(amount: number | null | undefined, fractionDigits = 6): string {
+ */
+export function formatUsd(
+    amount: number | null | undefined,
+    fractionDigits = 6
+): string {
     if (typeof amount !== 'number' || !Number.isFinite(amount)) {
-        logger.warn(`formatUsd received an invalid amount: ${amount}. Defaulting to $0.00.`);
+        logger.warn(
+            `formatUsd received an invalid amount: ${amount}. Defaulting to $0.00.`
+        );
         return '$0.00';
     }
 
@@ -356,7 +417,7 @@ export function createCostBreakdown(
         channelId,
         guildId,
         timestamp,
-        requestId
+        requestId,
     };
 }
 
@@ -368,14 +429,18 @@ export function createCostBreakdown(
  * @param {number | null} usage.total_tokens - The total number of tokens
  * @returns {string} The described token usage
  */
-export function describeTokenUsage(usage?: { input_tokens?: number | null; output_tokens?: number | null; total_tokens?: number | null }): string {
+export function describeTokenUsage(usage?: {
+    input_tokens?: number | null;
+    output_tokens?: number | null;
+    total_tokens?: number | null;
+}): string {
     if (!usage) {
         return 'Tokens: unknown';
     }
 
     const input = usage.input_tokens ?? 0;
     const output = usage.output_tokens ?? 0;
-    const total = usage.total_tokens ?? (input + output);
+    const total = usage.total_tokens ?? input + output;
     return `Tokens • In: ${input} • Out: ${output} • Total: ${total}`;
 }
 

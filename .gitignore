@@ -43,3 +43,6 @@ data/
 
 # Logs
 logs/
+
+# the 2>nul commmand creates a "nul" file on Unix systems, so we ignore it
+nul
