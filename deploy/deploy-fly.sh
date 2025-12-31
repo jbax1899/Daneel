@@ -69,7 +69,7 @@ get_or_create_trace_token() {
   fi
 
   local token
-  token=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
+  token=$(node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))")
   echo "Generated TRACE_API_TOKEN for deployment."
 
   if [[ -f "$env_path" ]]; then
