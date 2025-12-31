@@ -49,6 +49,7 @@ import type {
   ImageTextModel,
   ImageOutputFormat
 } from '../commands/image/types.js';
+//import { Pinecone } from '@pinecone-database/pinecone';
 
 type MessageProcessorOptions = {
   openaiService: OpenAIService;
@@ -102,6 +103,8 @@ export class MessageProcessor {
   private readonly contextBuilder: ContextBuilder;
   private readonly planner: Planner;
   private readonly rateLimiters: { user?: RateLimiter; channel?: RateLimiter; guild?: RateLimiter };
+  //private readonly pineconeClient = new Pinecone({ apiKey: process.env.PINECONE_API_KEY || '' });
+  //private readonly repoIndex = this.pineconeClient.index('discord-bot-code', 'discord-bot-code-v3tu03c.svc.aped-4627-b74a.pinecone.io');
 
   constructor(options: MessageProcessorOptions) {
     this.openaiService = options.openaiService;
